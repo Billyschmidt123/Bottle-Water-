@@ -44,3 +44,10 @@ body {
     border-left: 1px solid #ccc;
     overflow-y: auto;
 }
+
+/* === ADDED: Small button variant for map controls === */
+.btn-small {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+/* === END ADDED: Small button variant for map controls === */
