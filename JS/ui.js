@@ -46,8 +46,9 @@ function uiInit() {
         });
     }
 
-    // Load a route (placeholder CSV-based loader)
-    loadRouteFromCsv();
+    if (typeof loadRouteFromCsv === "function") {
+        loadRouteFromCsv();
+    }
     // === END ADDED: Wire up map control buttons ===
 }
 
@@ -90,7 +91,6 @@ function openStopModal(index) {
     fetch("MODULES/stop-modal.html")
         .then(r => r.text())
         .then(html => {
-            // Inject stop data placeholders
             const filled = html
                 .replace(/{{COMPANY}}/g, stop.company || "")
                 .replace(/{{ADDRESS_HEADER}}/g, stop.addressCombined || "")
@@ -103,7 +103,6 @@ function openStopModal(index) {
 
             showModal(filled);
 
-            // Initialize signature pad and product dropdowns after modal is in DOM
             initSignaturePad();
             populateProductDropdowns(stop);
             attachStopModalHandlers(index);
@@ -117,12 +116,9 @@ function openStopModal(index) {
 
 
 // ============================================================================
-// === ADDED: FULL ROUTE NAVIGATION + SIDEBAR + DIRECTIONS (ADD-ONLY) ========
+// === ADDED: FULL ROUTE NAVIGATION + SIDEBAR + DIRECTIONS ====================
 // ============================================================================
 
-/**
- * Start the imported route.
- */
 function startRouteFlow() {
     if (!appState.stops || !appState.stops.length) {
         console.warn("No stops loaded.");
@@ -135,9 +131,6 @@ function startRouteFlow() {
     renderSidebarStops();
 }
 
-/**
- * Finish the route.
- */
 function finishRouteFlow() {
     appState.currentStopIndex = -1;
     updateCurrentStopInfo();
@@ -145,9 +138,6 @@ function finishRouteFlow() {
     console.log("Route finished.");
 }
 
-/**
- * Go to next stop.
- */
 function goToNextStop() {
     if (!appState.stops || !appState.stops.length) return;
 
@@ -159,9 +149,6 @@ function goToNextStop() {
     }
 }
 
-/**
- * Go to previous stop.
- */
 function goToPreviousStop() {
     if (!appState.stops || !appState.stops.length) return;
 
@@ -173,9 +160,6 @@ function goToPreviousStop() {
     }
 }
 
-/**
- * Open directions in Google Maps.
- */
 function openDirectionsForCurrentStop() {
     const idx = appState.currentStopIndex;
     const stop = appState.stops[idx];
@@ -185,9 +169,6 @@ function openDirectionsForCurrentStop() {
     window.open(url, "_blank");
 }
 
-/**
- * Render sidebar stop list.
- */
 function renderSidebarStops() {
     const container = document.getElementById("sidebarStops");
     if (!container) return;
@@ -199,6 +180,10 @@ function renderSidebarStops() {
         div.className = "sidebar-stop";
         div.textContent = stop.company || stop.address || ("Stop " + (index + 1));
         div.dataset.index = index;
+
+        if (typeof isStopCompleted === "function" && isStopCompleted(stop)) {
+            div.classList.add("completed-stop");
+        }
 
         div.addEventListener("click", () => {
             appState.currentStopIndex = index;
@@ -213,9 +198,6 @@ function renderSidebarStops() {
     highlightSidebarStop(appState.currentStopIndex);
 }
 
-/**
- * Highlight the active stop in the sidebar.
- */
 function highlightSidebarStop(index) {
     const container = document.getElementById("sidebarStops");
     if (!container) return;
@@ -230,9 +212,6 @@ function highlightSidebarStop(index) {
     });
 }
 
-/**
- * Clear sidebar stops.
- */
 function clearSidebarStops() {
     const container = document.getElementById("sidebarStops");
     if (container) container.innerHTML = "";
@@ -240,4 +219,164 @@ function clearSidebarStops() {
 
 // ============================================================================
 // === END ADDED: FULL ROUTE NAVIGATION + SIDEBAR + DIRECTIONS ===============
+// ============================================================================
+
+
+
+// ============================================================================
+// === ADDED: SIGNATURE + STOP COMPLETION WIRING =============================
+// ============================================================================
+
+let signaturePad = null;
+let signatureCanvasEl = null;
+let signatureHintEl = null;
+
+function initSignaturePad() {
+    signatureCanvasEl = document.getElementById("signatureCanvas");
+    signatureHintEl = document.getElementById("signatureHint");
+
+    if (!signatureCanvasEl) {
+        console.warn("No signature canvas found.");
+        return;
+    }
+
+    const ctx = signatureCanvasEl.getContext("2d");
+    let drawing = false;
+    let hasDrawn = false;
+
+    function getPos(evt) {
+        const rect = signatureCanvasEl.getBoundingClientRect();
+        const x = (evt.touches ? evt.touches[0].clientX : evt.clientX) - rect.left;
+        const y = (evt.touches ? evt.touches[0].clientY : evt.clientY) - rect.top;
+        return { x, y };
+    }
+
+    function startDraw(evt) {
+        drawing = true;
+        hasDrawn = true;
+        if (signatureHintEl) signatureHintEl.style.display = "none";
+        const pos = getPos(evt);
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+        evt.preventDefault();
+    }
+
+    function moveDraw(evt) {
+        if (!drawing) return;
+        const pos = getPos(evt);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+        evt.preventDefault();
+    }
+
+    function endDraw(evt) {
+        drawing = false;
+        evt && evt.preventDefault();
+    }
+
+    signatureCanvasEl.addEventListener("mousedown", startDraw);
+    signatureCanvasEl.addEventListener("mousemove", moveDraw);
+    signatureCanvasEl.addEventListener("mouseup", endDraw);
+    signatureCanvasEl.addEventListener("mouseleave", endDraw);
+
+    signatureCanvasEl.addEventListener("touchstart", startDraw, { passive: false });
+    signatureCanvasEl.addEventListener("touchmove", moveDraw, { passive: false });
+    signatureCanvasEl.addEventListener("touchend", endDraw, { passive: false });
+
+    signaturePad = {
+        hasDrawn: () => hasDrawn,
+        toDataURL: () => signatureCanvasEl.toDataURL("image/png")
+    };
+}
+
+function populateProductDropdowns(stop) {
+    const waterSel = document.getElementById("waterProducts");
+    const coffeeSel = document.getElementById("coffeeProducts");
+    if (waterSel) {
+        waterSel.innerHTML = "";
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "Select water product";
+        waterSel.appendChild(opt);
+    }
+    if (coffeeSel) {
+        coffeeSel.innerHTML = "";
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "Select coffee product";
+        coffeeSel.appendChild(opt);
+    }
+}
+
+function attachStopModalHandlers(index) {
+    const stop = appState.stops[index];
+    if (!stop) return;
+
+    const btnSave = document.getElementById("btnSaveAndReceipt");
+    const btnNotDelivered = document.getElementById("btnNotDelivered");
+
+    if (btnSave && !btnSave._bound) {
+        btnSave.addEventListener("click", () => {
+            const emailEl = document.getElementById("stopEmail");
+            const feeEl = document.getElementById("stopDeliveryFee");
+            const travelEl = document.getElementById("stopTravel");
+            const instrEl = document.getElementById("stopSpecialInstructions");
+            const recvEl = document.getElementById("stopReceivedBy");
+            const waterSel = document.getElementById("waterProducts");
+            const coffeeSel = document.getElementById("coffeeProducts");
+
+            stop.email = emailEl ? emailEl.value : stop.email;
+            stop.deliveryFee = feeEl ? feeEl.value : stop.deliveryFee;
+            stop.travel = travelEl ? travelEl.value : stop.travel;
+            stop.specialInstructions = instrEl ? instrEl.value : stop.specialInstructions;
+            stop.receivedBy = recvEl ? recvEl.value : stop.receivedBy;
+            stop.waterProduct = waterSel ? waterSel.value : stop.waterProduct;
+            stop.coffeeProduct = coffeeSel ? coffeeSel.value : stop.coffeeProduct;
+
+            if (typeof saveStopEdit === "function") {
+                saveStopEdit(stop, {
+                    email: stop.email,
+                    deliveryFee: stop.deliveryFee,
+                    travel: stop.travel,
+                    specialInstructions: stop.specialInstructions,
+                    receivedBy: stop.receivedBy,
+                    waterProduct: stop.waterProduct,
+                    coffeeProduct: stop.coffeeProduct
+                });
+            }
+
+            if (signaturePad && signaturePad.hasDrawn()) {
+                const sigData = signaturePad.toDataURL();
+                if (typeof saveSignatureForStop === "function") {
+                    saveSignatureForStop(stop, sigData);
+                }
+            }
+
+            if (typeof markStopCompleted === "function") {
+                markStopCompleted(stop);
+            }
+
+            if (typeof renderSidebarStops === "function") {
+                renderSidebarStops();
+            }
+            if (typeof renderStopsOnMap === "function") {
+                renderStopsOnMap();
+            }
+
+            closeModal();
+        });
+        btnSave._bound = true;
+    }
+
+    if (btnNotDelivered && !btnNotDelivered._bound) {
+        btnNotDelivered.addEventListener("click", () => {
+            console.log("Marked as not delivered:", stop.company || stop.address);
+            closeModal();
+        });
+        btnNotDelivered._bound = true;
+    }
+}
+
+// ============================================================================
+// === END ADDED: SIGNATURE + STOP COMPLETION WIRING =========================
 // ============================================================================
