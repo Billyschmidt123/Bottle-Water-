@@ -41,6 +41,32 @@
 
     <div class="app-container">
         <div id="mapPanel">
+
+            <!-- === ADDED: Map top bar with current stop + controls === -->
+            <div id="mapTopBar">
+                <div id="currentStopInfo">
+                    No stop selected
+                </div>
+                <div id="mapControlButtons">
+                    <button id="btnPrevStop" class="btn-top btn-small">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </button>
+                    <button id="btnNextStop" class="btn-top btn-small">
+                        Forward <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <button id="btnStartRoute" class="btn-top btn-small btn-success">
+                        <i class="fas fa-play"></i> Start
+                    </button>
+                    <button id="btnFinishRoute" class="btn-top btn-small btn-warning">
+                        <i class="fas fa-flag-checkered"></i> Finish
+                    </button>
+                    <button id="btnDirections" class="btn-top btn-small">
+                        <i class="fas fa-route"></i> Directions
+                    </button>
+                </div>
+            </div>
+            <!-- === END ADDED: Map top bar with current stop + controls === -->
+
             <div id="map"></div>
         </div>
 
@@ -52,6 +78,11 @@
     <div id="modalContainer"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- === ADDED: jsPDF for delivery receipt generation === -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- === END ADDED: jsPDF for delivery receipt generation === -->
+
     <script src="JS/loader.js?v=1"></script>
 
 </body>
