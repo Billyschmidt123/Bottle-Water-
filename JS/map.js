@@ -22,9 +22,25 @@ function renderStopsOnMap() {
 
     appState.stops.forEach((stop, index) => {
         if (!stop.lat || !stop.lng) return;
-        const marker = L.marker([stop.lat, stop.lng]).addTo(map);
+
+        const isCompleted = typeof isStopCompleted === "function" ? isStopCompleted(stop) : false;
+        const icon = L.icon({
+            iconUrl: isCompleted ? "images/marker-icon-green.png" : "images/marker-icon.png",
+            shadowUrl: "images/marker-shadow.png",
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
+
+        const marker = L.marker([stop.lat, stop.lng], { icon }).addTo(map);
         marker.on('click', () => {
-            selectStop(index);
+            appState.currentStopIndex = index;
+            updateCurrentStopInfo();
+            updateMapForCurrentStop();
+            if (typeof highlightSidebarStop === "function") {
+                highlightSidebarStop(index);
+            }
         });
         marker.bindTooltip(stop.company || stop.address || ("Stop " + (index + 1)));
         stopMarkers.push(marker);
@@ -44,16 +60,9 @@ function updateMapForCurrentStop() {
 
 
 // ============================================================================
-// === ADDED: Route → Map Integration (DO NOT MODIFY EXISTING CODE ABOVE) ===
+// === ADDED: Route → Map Integration ========================================
 // ============================================================================
 
-/**
- * Convert a customer row into a lat/lng pair.
- * Your CSV MUST contain fields named:
- *   - "lat"
- *   - "lng"
- * If not, the stop will be skipped.
- */
 function convertCustomerToLatLng(customerRow) {
     if (!customerRow) return null;
 
@@ -65,51 +74,69 @@ function convertCustomerToLatLng(customerRow) {
     return { lat: lat, lng: lng };
 }
 
-/**
- * Load a selected route from storage and push it into appState.stops
- * so your existing map logic (renderStopsOnMap, updateMapForCurrentStop)
- * works WITHOUT ANY MODIFICATION.
- */
+function buildStopIdFromRow(row, index) {
+    if (!row) return "stop-" + index;
+    const parts = [];
+    if (row.CustomerId) parts.push(row.CustomerId);
+    if (row.Customer) parts.push(row.Customer);
+    if (row.Address) parts.push(row.Address);
+    return parts.join("|") || ("stop-" + index);
+}
+
 function loadRouteOntoMap(routeKey) {
     if (!routeKey) return;
 
-    const routes = getRoutesData();
+    const routes = typeof getRoutesData === "function" ? getRoutesData() : appState.routes || {};
     const route = routes[routeKey];
     if (!route || !Array.isArray(route.customers)) {
         console.warn("Route not found:", routeKey);
         return;
     }
 
-    // Convert CSV rows → stops compatible with your existing map logic
     const stops = [];
 
     route.customers.forEach((row, index) => {
         const coords = convertCustomerToLatLng(row);
         if (!coords) return;
 
-        stops.push({
+        const stop = {
+            id: buildStopIdFromRow(row, index),
             lat: coords.lat,
             lng: coords.lng,
             company: row.Customer || row.Name || row.CustomerName || ("Stop " + (index + 1)),
             address: row.Address || "",
+            addressCombined: row.Address || "",
+            phone: row.Phone || "",
+            email: row.Email || "",
+            deliveryFee: row.DeliveryFee || "",
+            travel: row.Travel || "",
+            specialInstructions: row.SpecialInstructions || "",
+            receivedBy: row.ReceivedBy || "",
             raw: row
-        });
+        };
+
+        const existingEdits = typeof getStopEdits === "function" ? getStopEdits(stop) : null;
+        if (existingEdits) {
+            Object.assign(stop, existingEdits);
+        }
+
+        stops.push(stop);
     });
 
-    // Push into your existing appState (ADD ONLY — DO NOT MODIFY EXISTING STRUCTURE)
     if (typeof appState !== "object") window.appState = {};
     appState.stops = stops;
-    appState.currentStopIndex = 0;
+    appState.currentStopIndex = stops.length ? 0 : -1;
 
-    // Render using your existing functions
     renderStopsOnMap();
     updateMapForCurrentStop();
+    if (typeof renderSidebarStops === "function") {
+        renderSidebarStops();
+    }
+    if (typeof updateCurrentStopInfo === "function") {
+        updateCurrentStopInfo();
+    }
 }
 
-/**
- * Listen for route selection changes.
- * This is additive — does NOT modify any existing dropdown logic.
- */
 (function attachRouteDropdownListener() {
     document.addEventListener("change", function (evt) {
         const el = evt.target;
@@ -124,5 +151,5 @@ function loadRouteOntoMap(routeKey) {
 })();
 
 // ============================================================================
-// === END ADDED: Route → Map Integration =====================================
+// === END ADDED: Route → Map Integration ====================================
 // ============================================================================
