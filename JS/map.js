@@ -1,15 +1,18 @@
-function initMap() {
-    map = L.map('map').setView([51.0447, -114.0719], 12);
+// map.js
+// Leaflet map + route → stops + markers
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+let map = null;
+let stopMarkers = [];
+
+function initMap() {
+    map = L.map("map").setView([51.0447, -114.0719], 12);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19
     }).addTo(map);
 }
 
 window.initMap = initMap;
-
-// === ADDED: Map helpers for current stop display and centering ===
-let stopMarkers = [];
 
 function clearStopMarkers() {
     stopMarkers.forEach(m => map.removeLayer(m));
@@ -23,9 +26,10 @@ function renderStopsOnMap() {
     appState.stops.forEach((stop, index) => {
         if (!stop.lat || !stop.lng) return;
 
-        const isCompleted = typeof isStopCompleted === "function" ? isStopCompleted(stop) : false;
+        const completed = typeof isStopCompleted === "function" ? isStopCompleted(stop) : false;
+
         const icon = L.icon({
-            iconUrl: isCompleted ? "images/marker-icon-green.png" : "images/marker-icon.png",
+            iconUrl: completed ? "images/marker-icon-green.png" : "images/marker-icon.png",
             shadowUrl: "images/marker-shadow.png",
             iconSize: [25, 41],
             iconAnchor: [12, 41],
@@ -34,14 +38,15 @@ function renderStopsOnMap() {
         });
 
         const marker = L.marker([stop.lat, stop.lng], { icon }).addTo(map);
-        marker.on('click', () => {
+
+        marker.on("click", () => {
             appState.currentStopIndex = index;
             updateCurrentStopInfo();
             updateMapForCurrentStop();
-            if (typeof highlightSidebarStop === "function") {
-                highlightSidebarStop(index);
-            }
+            highlightSidebarStop(index);
+            openStopModal(index);
         });
+
         marker.bindTooltip(stop.company || stop.address || ("Stop " + (index + 1)));
         stopMarkers.push(marker);
     });
@@ -55,23 +60,15 @@ function updateMapForCurrentStop() {
         map.setView([stop.lat, stop.lng], 14);
     }
 }
-// === END ADDED: Map helpers ===
 
+function convertCustomerToLatLng(row) {
+    if (!row) return null;
 
-
-// ============================================================================
-// === ADDED: Route → Map Integration ========================================
-// ============================================================================
-
-function convertCustomerToLatLng(customerRow) {
-    if (!customerRow) return null;
-
-    const lat = parseFloat(customerRow.lat || customerRow.Lat || customerRow.latitude);
-    const lng = parseFloat(customerRow.lng || customerRow.Lng || customerRow.longitude);
+    const lat = parseFloat(row.lat || row.Lat || row.latitude);
+    const lng = parseFloat(row.lng || row.Lng || row.longitude);
 
     if (isNaN(lat) || isNaN(lng)) return null;
-
-    return { lat: lat, lng: lng };
+    return { lat, lng };
 }
 
 function buildStopIdFromRow(row, index) {
@@ -86,7 +83,7 @@ function buildStopIdFromRow(row, index) {
 function loadRouteOntoMap(routeKey) {
     if (!routeKey) return;
 
-    const routes = typeof getRoutesData === "function" ? getRoutesData() : appState.routes || {};
+    const routes = appState.routes || {};
     const route = routes[routeKey];
     if (!route || !Array.isArray(route.customers)) {
         console.warn("Route not found:", routeKey);
@@ -116,25 +113,18 @@ function loadRouteOntoMap(routeKey) {
         };
 
         const existingEdits = typeof getStopEdits === "function" ? getStopEdits(stop) : null;
-        if (existingEdits) {
-            Object.assign(stop, existingEdits);
-        }
+        if (existingEdits) Object.assign(stop, existingEdits);
 
         stops.push(stop);
     });
 
-    if (typeof appState !== "object") window.appState = {};
     appState.stops = stops;
     appState.currentStopIndex = stops.length ? 0 : -1;
 
     renderStopsOnMap();
     updateMapForCurrentStop();
-    if (typeof renderSidebarStops === "function") {
-        renderSidebarStops();
-    }
-    if (typeof updateCurrentStopInfo === "function") {
-        updateCurrentStopInfo();
-    }
+    renderSidebarStops();
+    updateCurrentStopInfo();
 }
 
 (function attachRouteDropdownListener() {
@@ -149,7 +139,3 @@ function loadRouteOntoMap(routeKey) {
         loadRouteOntoMap(routeKey);
     });
 })();
-
-// ============================================================================
-// === END ADDED: Route → Map Integration ====================================
-// ============================================================================
