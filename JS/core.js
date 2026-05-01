@@ -1,21 +1,19 @@
-let map = null;
-let appState = {
-    routes: [],
-    customers: [],
-    activeRoute: null
+// core.js
+// App bootstrap and shared state
+
+window.appState = {
+    stops: [],
+    currentStopIndex: -1,
+    routes: {}
 };
 
 function appInit() {
     console.log("App initialized");
-    initMap();
-    uiInit();
-    navigationInit();
-    managerInit();
+
+    if (typeof initMap === "function") initMap();
+    if (typeof uiInit === "function") uiInit();
+    if (typeof managerInit === "function") managerInit();
+    if (typeof navigationInit === "function") navigationInit();
 }
 
-// === ADDED: Extended appState for route / stop / driver tracking ===
-appState.stops = [];              // array of stop objects loaded from CSV (or placeholder)
-appState.currentStopIndex = -1;   // index of currently selected stop
-appState.driverName = "";         // driver name captured on Start
-appState.tripLog = [];            // simple in-memory trip log
-// === END ADDED: Extended appState ===
+document.addEventListener("DOMContentLoaded", appInit);
