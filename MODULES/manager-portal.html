@@ -1,27 +1,33 @@
 <div class="modal">
-    <div class="modal-header">Manager Portal</div>
+    <div class="modal-header">
+        <h2>Manager Portal</h2>
+    </div>
 
-    <div class="modal-body manager-panel">
+    <div class="modal-body">
 
-        <div class="manager-section">
-            <h3>Routes</h3>
-            <button class="manager-btn" onclick="console.log('Load routes')">Load Routes</button>
-        </div>
+        <!-- ROUTE IMPORT SECTION -->
+        <h3>Route Import</h3>
 
-        <div class="manager-section">
-            <h3>Products</h3>
-            <button class="manager-btn" onclick="loadProducts()">Manage Products</button>
-        </div>
+        <button id="btnImportRoutes" class="btn-primary" style="width:100%; margin-bottom:10px;">
+            Load routes
+        </button>
 
-        <div class="manager-section">
-            <h3>Call-In Orders</h3>
-            <button class="manager-btn" onclick="openCallInModal()">New Call-In</button>
-        </div>
+        <label for="routeDropdown">Available Routes</label>
+        <select id="routeDropdown" style="width:100%; margin-bottom:20px;">
+            <option value="">-- Select a route --</option>
+        </select>
 
-        <div class="manager-section">
-            <h3>End of Day</h3>
-            <button class="manager-btn" onclick="endOfDay()">Run EOD</button>
-        </div>
+        <hr>
+
+        <!-- OTHER MANAGER SECTIONS (PLACEHOLDERS) -->
+        <h3>Products</h3>
+        <button class="btn-secondary" style="width:100%; margin-bottom:10px;">Manage Products</button>
+
+        <h3>Call-In Orders</h3>
+        <button class="btn-secondary" style="width:100%; margin-bottom:10px;">View Call-In Orders</button>
+
+        <h3>End of Day</h3>
+        <button class="btn-secondary" style="width:100%; margin-bottom:10px;">Run End of Day</button>
 
     </div>
 
