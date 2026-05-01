@@ -1,12 +1,10 @@
-// ============================================================================
-// MANAGER MODULE
-// ============================================================================
+// manager.js
+// Manager portal + GitHub route importer
 
 function managerInit() {
     console.log("Manager module ready");
 }
 
-// Load Manager Portal HTML
 function loadManagerPortal() {
     fetch("MODULES/manager-portal.html")
         .then(r => r.text())
@@ -16,24 +14,12 @@ function loadManagerPortal() {
         .catch(err => console.error("Failed to load manager portal:", err));
 }
 
-
-
-// ============================================================================
-// GITHUB ROUTE IMPORTER
-// ============================================================================
-
-// Your GitHub repo base path
 const GITHUB_BASE =
     "https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/routes/";
-
 const GITHUB_API =
     "https://api.github.com/repos/Billyschmidt123/Bottle-Water-/contents/routes/";
-
 const ROUTE_FOLDERS = ["week1", "week2", "week3", "week4", "other"];
 
-
-
-// Main importer
 async function importAllRoutesFromGitHub() {
     console.log("Importing routes from GitHub...");
 
@@ -77,15 +63,8 @@ async function importAllRoutesFromGitHub() {
     }
 
     console.log("Routes imported:", Object.keys(appState.routes));
-
     populateRouteDropdown();
 }
-
-
-
-// ============================================================================
-// CSV PARSER
-// ============================================================================
 
 function parseCsv(text) {
     const lines = text.split("\n").map(l => l.trim()).filter(l => l.length);
@@ -97,22 +76,14 @@ function parseCsv(text) {
     for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(",");
         const obj = {};
-
         headers.forEach((h, idx) => {
             obj[h] = cols[idx] ? cols[idx].trim() : "";
         });
-
         rows.push(obj);
     }
 
     return rows;
 }
-
-
-
-// ============================================================================
-// POPULATE ROUTE DROPDOWN
-// ============================================================================
 
 function populateRouteDropdown() {
     const dd = document.getElementById("routeDropdown");
@@ -133,12 +104,6 @@ function populateRouteDropdown() {
     console.log("Route dropdown populated.");
 }
 
-
-
-// ============================================================================
-// MANAGER PORTAL ENHANCER
-// ============================================================================
-
 function enhanceManagerPortalIfPresent() {
     const modals = document.querySelectorAll(".modal");
     if (!modals.length) return;
@@ -154,7 +119,6 @@ function enhanceManagerPortalIfPresent() {
 
     if (!managerModal) return;
 
-    // Bind the Load Routes button
     const importBtn = managerModal.querySelector("#btnImportRoutes");
     if (importBtn && !importBtn._bound) {
         importBtn.addEventListener("click", () => {
@@ -164,12 +128,6 @@ function enhanceManagerPortalIfPresent() {
         importBtn._bound = true;
     }
 }
-
-
-
-// ============================================================================
-// PATCH showModal TO AUTO-ENHANCE MANAGER PORTAL
-// ============================================================================
 
 (function () {
     const originalShowModal = window.showModal;
