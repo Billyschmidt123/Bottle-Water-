@@ -1,0 +1,31 @@
+<div class="modal">
+    <div class="modal-header">Manager Portal</div>
+
+    <div class="modal-body manager-panel">
+
+        <div class="manager-section">
+            <h3>Routes</h3>
+            <button class="manager-btn" onclick="console.log('Load routes')">Load Routes</button>
+        </div>
+
+        <div class="manager-section">
+            <h3>Products</h3>
+            <button class="manager-btn" onclick="loadProducts()">Manage Products</button>
+        </div>
+
+        <div class="manager-section">
+            <h3>Call-In Orders</h3>
+            <button class="manager-btn" onclick="openCallInModal()">New Call-In</button>
+        </div>
+
+        <div class="manager-section">
+            <h3>End of Day</h3>
+            <button class="manager-btn" onclick="endOfDay()">Run EOD</button>
+        </div>
+
+    </div>
+
+    <div class="modal-footer">
+        <button class="btn-danger" onclick="closeModal()">Close</button>
+    </div>
+</div>
