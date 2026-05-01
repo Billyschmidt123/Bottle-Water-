@@ -1,4 +1,5 @@
-// Basic delivery edits storage
+// storage.js
+// Delivery edits + completion state
 
 const DELIVERY_EDITS_KEY = "deliveryEdits_v1";
 
@@ -23,6 +24,7 @@ function saveDeliveryEdits(edits) {
 function getStopKey(stop) {
     if (!stop) return null;
     if (stop.id) return String(stop.id);
+
     const parts = [];
     if (stop.company) parts.push(stop.company);
     if (stop.addressCombined) parts.push(stop.addressCombined);
