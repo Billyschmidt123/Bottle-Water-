@@ -1,69 +1,44 @@
+// ui.js
+// UI wiring, stop modal, sidebar, navigation, signature
+
 function uiInit() {
     console.log("UI initialized");
 
-    document.getElementById("openManagerBtn").addEventListener("click", () => {
-        loadManagerPortal();
-    });
+    const mgrBtn = document.getElementById("openManagerBtn");
+    if (mgrBtn) {
+        mgrBtn.addEventListener("click", () => loadManagerPortal());
+    }
 
-    document.getElementById("refreshRoutesBtn").addEventListener("click", () => {
-        console.log("Refreshing routes...");
-    });
-
-    // === ADDED: Wire up map control buttons ===
     const btnPrev = document.getElementById("btnPrevStop");
     const btnNext = document.getElementById("btnNextStop");
     const btnStart = document.getElementById("btnStartRoute");
     const btnFinish = document.getElementById("btnFinishRoute");
     const btnDirections = document.getElementById("btnDirections");
 
-    if (btnPrev) {
-        btnPrev.addEventListener("click", () => {
-            goToPreviousStop();
-        });
-    }
-
-    if (btnNext) {
-        btnNext.addEventListener("click", () => {
-            goToNextStop();
-        });
-    }
-
-    if (btnStart) {
-        btnStart.addEventListener("click", () => {
-            startRouteFlow();
-        });
-    }
-
-    if (btnFinish) {
-        btnFinish.addEventListener("click", () => {
-            finishRouteFlow();
-        });
-    }
-
-    if (btnDirections) {
-        btnDirections.addEventListener("click", () => {
-            openDirectionsForCurrentStop();
-        });
-    }
+    if (btnPrev) btnPrev.addEventListener("click", goToPreviousStop);
+    if (btnNext) btnNext.addEventListener("click", goToNextStop);
+    if (btnStart) btnStart.addEventListener("click", startRouteFlow);
+    if (btnFinish) btnFinish.addEventListener("click", finishRouteFlow);
+    if (btnDirections) btnDirections.addEventListener("click", openDirectionsForCurrentStop);
 
     if (typeof loadRouteFromCsv === "function") {
         loadRouteFromCsv();
     }
-    // === END ADDED: Wire up map control buttons ===
 }
 
 function showModal(html) {
     const container = document.getElementById("modalContainer");
+    if (!container) return;
     container.innerHTML = html;
     container.style.display = "flex";
 }
 
 function closeModal() {
     const container = document.getElementById("modalContainer");
+    if (!container) return;
     container.style.display = "none";
 }
 
-// === ADDED: UI helpers for current stop info and stop modal ===
 function updateCurrentStopInfo() {
     const el = document.getElementById("currentStopInfo");
     if (!el) return;
@@ -76,12 +51,12 @@ function updateCurrentStopInfo() {
         return;
     }
 
-    const headerParts = [];
-    if (stop.company) headerParts.push(stop.company);
-    if (stop.addressCombined) headerParts.push(stop.addressCombined);
-    if (stop.phone) headerParts.push("Phone: " + stop.phone);
+    const parts = [];
+    if (stop.company) parts.push(stop.company);
+    if (stop.addressCombined) parts.push(stop.addressCombined);
+    if (stop.phone) parts.push("Phone: " + stop.phone);
 
-    el.textContent = headerParts.join(" | ");
+    el.textContent = parts.join(" | ");
 }
 
 function openStopModal(index) {
@@ -107,17 +82,10 @@ function openStopModal(index) {
             populateProductDropdowns(stop);
             attachStopModalHandlers(index);
         })
-        .catch(err => {
-            console.error("Failed to load stop modal:", err);
-        });
+        .catch(err => console.error("Failed to load stop modal:", err));
 }
-// === END ADDED: UI helpers ===
 
-
-
-// ============================================================================
-// === ADDED: FULL ROUTE NAVIGATION + SIDEBAR + DIRECTIONS ====================
-// ============================================================================
+// Route navigation + sidebar
 
 function startRouteFlow() {
     if (!appState.stops || !appState.stops.length) {
@@ -190,6 +158,7 @@ function renderSidebarStops() {
             updateCurrentStopInfo();
             updateMapForCurrentStop();
             highlightSidebarStop(index);
+            openStopModal(index);
         });
 
         container.appendChild(div);
@@ -217,15 +186,7 @@ function clearSidebarStops() {
     if (container) container.innerHTML = "";
 }
 
-// ============================================================================
-// === END ADDED: FULL ROUTE NAVIGATION + SIDEBAR + DIRECTIONS ===============
-// ============================================================================
-
-
-
-// ============================================================================
-// === ADDED: SIGNATURE + STOP COMPLETION WIRING =============================
-// ============================================================================
+// Signature + stop completion
 
 let signaturePad = null;
 let signatureCanvasEl = null;
@@ -292,6 +253,7 @@ function initSignaturePad() {
 function populateProductDropdowns(stop) {
     const waterSel = document.getElementById("waterProducts");
     const coffeeSel = document.getElementById("coffeeProducts");
+
     if (waterSel) {
         waterSel.innerHTML = "";
         const opt = document.createElement("option");
@@ -299,6 +261,7 @@ function populateProductDropdowns(stop) {
         opt.textContent = "Select water product";
         waterSel.appendChild(opt);
     }
+
     if (coffeeSel) {
         coffeeSel.innerHTML = "";
         const opt = document.createElement("option");
@@ -356,12 +319,8 @@ function attachStopModalHandlers(index) {
                 markStopCompleted(stop);
             }
 
-            if (typeof renderSidebarStops === "function") {
-                renderSidebarStops();
-            }
-            if (typeof renderStopsOnMap === "function") {
-                renderStopsOnMap();
-            }
+            renderSidebarStops();
+            renderStopsOnMap();
 
             closeModal();
         });
@@ -376,7 +335,3 @@ function attachStopModalHandlers(index) {
         btnNotDelivered._bound = true;
     }
 }
-
-// ============================================================================
-// === END ADDED: SIGNATURE + STOP COMPLETION WIRING =========================
-// ============================================================================
