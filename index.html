@@ -56,20 +56,58 @@
             align-items: center !important;
             pointer-events: auto !important;
         }
+
+        /* ADDITIVE FIX: TOP NAVIGATION BUTTONS AND CONTACT INFO */
+        .route-controls { display: flex; gap: 8px; margin-left: 15px; }
+        .btn-route { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; font-size: 12px; }
+        .btn-start { background: #28a745; }
+        .btn-finish { background: #dc3545; }
+        .btn-dir { background: #17a2b8; }
+        .btn-opt { background: #6f42c1; }
+        
+        .contact-info-bar { 
+            position: absolute; 
+            top: 75px; 
+            left: 50px; 
+            right: 10px; 
+            z-index: 1000; 
+            background: rgba(255, 255, 255, 0.9); 
+            padding: 5px 15px; 
+            border-radius: 8px; 
+            box-shadow: 0 1px 5px rgba(0,0,0,0.1); 
+            display: flex; 
+            gap: 20px; 
+            font-size: 13px; 
+            font-weight: 500;
+        }
+        .info-item i { color: #007bff; margin-right: 5px; }
     </style>
 </head>
 <body>
     <div class="build-tag">Build 15</div>
     <header class="topbar">
-        <div class="topbar-left">
+        <div class="topbar-left" style="display: flex; align-items: center;">
             <span class="app-title">LogiFlow Delivery System</span>
             <select id="routeDropdownMap"><option value="">-- Select Route --</option></select>
+            <!-- ADDITIVE FIX: ROUTE ACTION BUTTONS -->
+            <div class="route-controls">
+                <button class="btn-route btn-start" id="startRouteBtn">START ROUTE</button>
+                <button class="btn-route btn-finish" id="finishRouteBtn">FINISH ROUTE</button>
+                <button class="btn-route btn-dir" id="directionsBtn">DIRECTIONS</button>
+                <button class="btn-route btn-opt" id="optimizeBtn">OPTIMIZE ROUTE</button>
+            </div>
         </div>
         <div class="topbar-right">
             <button id="openManagerBtn" class="btn-top"><i class="fas fa-user-gear"></i> Manager Portal</button>
             <button id="forceRefreshBtn" class="btn-top" onclick="window.location.reload()"><i class="fas fa-sync-alt"></i> Force Refresh</button>
         </div>
     </header>
+
+    <!-- ADDITIVE FIX: CONTACT INFO OVERLAY -->
+    <div class="contact-info-bar">
+        <div class="info-item"><i class="fas fa-map-marker-alt"></i> <span id="currentAddressDisplay">No Route Selected</span></div>
+        <div class="info-item"><i class="fas fa-phone"></i> <span id="currentPhoneDisplay">--</span></div>
+    </div>
 
     <div id="managerOverlay" class="manager-overlay">
         <div class="manager-menu-content">
@@ -289,7 +327,7 @@
         
         document.getElementById('cancelCrudBtn').addEventListener('click', () => { document.getElementById('crudModal').style.display = 'none'; });
 
-        // ADDITIVE FIX: FULL RESTORATION OF ROUTE LOADING HANDLER
+        // ADDITIVE FIX: ROUTE INITIALIZATION AND STOP MODAL INTEGRATION
         async function initializeRoutes() {
             try {
                 const dropdown = document.getElementById('routeDropdownMap');
@@ -301,22 +339,40 @@
                     dropdown.appendChild(opt);
                 });
 
-                // RESTORED: Listener for when a route is actually selected
                 dropdown.addEventListener('change', async (e) => {
                     if (!e.target.value) return;
-                    document.getElementById('sidebarContent').innerHTML = "Loading stops...";
+                    const sidebar = document.getElementById('sidebarContent');
+                    sidebar.innerHTML = "Processing Stop List...";
+                    
                     try {
                         const csvRes = await fetch(e.target.value);
                         const csvText = await csvRes.text();
-                        // This uses your existing map.js logic to parse and show stops
-                        if (typeof window.processCSV === 'function') {
-                            window.processCSV(csvText);
+                        
+                        // ADDITIVE FIX: LOAD STOP-MODAL.HTML AND INJECT CSV DATA
+                        const modalRes = await fetch('stop-modal.html');
+                        if (modalRes.ok) {
+                            const modalHtml = await modalRes.text();
+                            sidebar.innerHTML = modalHtml;
+                            
+                            // Trigger the map logic to render points
+                            if (typeof window.processCSV === 'function') {
+                                window.processCSV(csvText);
+                            }
+                            
+                            // Post-processing: Update address/phone bar if data exists
+                            const lines = csvText.split('\n');
+                            if (lines.length > 1) {
+                                const firstStop = lines[1].split(',');
+                                document.getElementById('currentAddressDisplay').textContent = firstStop[2] || "Grande Prairie, AB";
+                                document.getElementById('currentPhoneDisplay').textContent = firstStop[3] || "555-0100";
+                            }
                         } else {
-                            console.warn("processCSV not found in map.js");
+                            // Fallback if stop-modal.html isn't found
+                            if (typeof window.processCSV === 'function') window.processCSV(csvText);
                         }
                     } catch (err) {
-                        console.error("CSV Fetch Error", err);
-                        document.getElementById('sidebarContent').innerHTML = "Error loading route.";
+                        console.error("Route Loading Failed", err);
+                        sidebar.innerHTML = "Error loading route data.";
                     }
                 });
             } catch (e) {
