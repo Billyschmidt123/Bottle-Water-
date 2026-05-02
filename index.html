@@ -10,7 +10,7 @@
     <style>
         .github-refresh-btn { background: #6f42c1 !important; color: white !important; }
         .btn-top { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        #routeDropdownMap { padding: 8px; border-radius: 4px; }
+        #routeDropdownMap { padding: 8px; border-radius: 4px; width: 200px; }
     </style>
 </head>
 
@@ -32,7 +32,7 @@
         </div>
     </header>
 
-    <div id="map" style="height: 500px;"></div>
+    <div id="map" style="height: 500px; background: #eee; margin: 10px; border-radius: 8px;"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -43,7 +43,6 @@
             BASE_RAW: 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/'
         };
 
-        // Safety function to parse CSV and handle empty values
         function parseCSV(text) {
             const lines = text.split(/\r?\n/).filter(l => l.trim());
             if (!lines.length) return [];
@@ -52,7 +51,8 @@
                 const values = line.split(',');
                 const obj = {};
                 headers.forEach((h, i) => {
-                    let key = h === 'slip / po' ? 'delivery slip' : h; // Applied naming correction
+                    // Update label to delivery slip
+                    let key = (h.toLowerCase() === 'slip / po' || h.toLowerCase() === 'slip/po') ? 'delivery slip' : h;
                     obj[key] = (values[i] || '').trim();
                 });
                 return obj;
@@ -62,23 +62,31 @@
         window.refreshRoutesFromGitHub = async function() {
             try {
                 const res = await fetch(GITHUB_CONFIG.BASE_RAW + 'routes/routes-manifest.json?cb=' + Date.now());
-                if (!res.ok) throw new Error("Manifest not found on GitHub");
                 
+                // If manifest is missing (404), trigger a sync to build it
+                if (res.status === 404) {
+                    console.log("Manifest missing. Attempting to rebuild from repository...");
+                    return await window.syncRouteListFromGitHubDir();
+                }
+
                 const manifest = await res.json();
+                if (!manifest.routes) return;
+
                 const routePromises = manifest.routes.map(async r => {
-                    const csvRes = await fetch(GITHUB_CONFIG.BASE_RAW + 'routes/' + r.file + '?cb=' + Date.now());
-                    const csvText = await csvRes.text();
-                    return { ...r, stops: parseCSV(csvText) };
+                    try {
+                        const csvRes = await fetch(GITHUB_CONFIG.BASE_RAW + 'routes/' + r.file + '?cb=' + Date.now());
+                        const csvText = await csvRes.text();
+                        return { ...r, stops: parseCSV(csvText) };
+                    } catch (err) { return null; }
                 });
 
-                const updatedRoutes = await Promise.all(routePromises);
+                const updatedRoutes = (await Promise.all(routePromises)).filter(r => r !== null);
                 window.logiflowRouteCache = { routes: updatedRoutes, updatedAt: new Date().toISOString() };
                 localStorage.setItem('logiflowRouteCache_v1', JSON.stringify(window.logiflowRouteCache));
                 
                 populateRouteDropdown(updatedRoutes);
-                console.log("UI updated with latest GitHub data.");
             } catch (e) {
-                console.error("Refresh Error:", e);
+                console.error("Master Sync Failed:", e.message);
             }
         };
 
@@ -88,12 +96,13 @@
                 const res = await fetch(API_URL, {
                     headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}` }
                 });
-                const data = await res.json();
 
-                // FIX: Verify if 'data' is actually the list of files
-                if (!Array.isArray(data)) {
-                    throw new Error(data.message || "Could not retrieve file list from GitHub.");
+                if (res.status === 401) {
+                    throw new Error("GitHub Security Key (Token) is invalid or expired.");
                 }
+
+                const data = await res.json();
+                if (!Array.isArray(data)) throw new Error("Could not find the 'routes' folder.");
 
                 const csvFiles = data.filter(f => f.name.endsWith('.csv')).map(f => ({
                     id: f.name.replace('.csv', ''),
@@ -103,15 +112,15 @@
 
                 const manifest = { updatedAt: new Date().toISOString(), routes: csvFiles };
                 
-                // Update the manifest file on GitHub
+                // Save the new manifest back to GitHub so 404s stop happening
                 await pushManifestToGitHub(manifest);
                 
-                // Immediately refresh the UI data
+                // Load the data from the newly found files
                 await window.refreshRoutesFromGitHub();
                 
-                alert(`Sync Complete: Found ${csvFiles.length} routes. Lists updated.`);
+                alert(`Sync Successful: ${csvFiles.length} routes found and manifest updated.`);
             } catch (e) {
-                alert("Sync Error: " + e.message);
+                alert("Connection Error: " + e.message);
             }
         };
 
@@ -119,18 +128,20 @@
             const path = 'routes/routes-manifest.json';
             const url = `https://api.github.com/repos/${GITHUB_CONFIG.REPO}/contents/${path}`;
             
-            const getRes = await fetch(url, { headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}` } });
-            const sha = getRes.ok ? (await getRes.json()).sha : null;
+            try {
+                const getRes = await fetch(url, { headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}` } });
+                const sha = getRes.ok ? (await getRes.json()).sha : null;
 
-            await fetch(url, {
-                method: 'PUT',
-                headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    message: "Auto-sync route manifest",
-                    content: btoa(JSON.stringify(manifest, null, 2)),
-                    sha: sha
-                })
-            });
+                await fetch(url, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: "System Auto-Sync: Updating Route Manifest",
+                        content: btoa(JSON.stringify(manifest, null, 2)),
+                        sha: sha
+                    })
+                });
+            } catch (e) { console.error("Manifest Push Failed:", e); }
         }
 
         function populateRouteDropdown(routes) {
@@ -148,7 +159,7 @@
         document.getElementById('refreshGitHubListBtn').addEventListener('click', () => window.syncRouteListFromGitHubDir());
         document.getElementById('refreshRoutesBtn').addEventListener('click', () => window.refreshRoutesFromGitHub());
 
-        // Run auto-check on startup
+        // Run startup sync
         window.refreshRoutesFromGitHub();
     })();
     </script>
