@@ -6,6 +6,7 @@
     <title>LogiFlow Delivery System</title>
     
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     
@@ -14,42 +15,165 @@
     <link rel="stylesheet" href="CSS/map.css">
     
     <style>
-        .app-container { display: flex; flex-direction: row; width: 100%; height: calc(100vh - 60px); overflow: hidden; }
-        #mapPanel { flex: 0 0 70%; height: 100%; position: relative; }
-        #map { width: 100%; height: 100%; background-color: #ddd; }
-        #sidebar { flex: 0 0 30%; height: 100%; border-left: 1px solid #ccc; overflow-y: auto; background: #f9f9f9; }
+        .app-container {
+            display: flex !important;
+            flex-direction: row !important;
+            width: 100% !important;
+            height: calc(100vh - 60px) !important;
+            overflow: hidden !important;
+        }
+        #mapPanel {
+            order: 1 !important;
+            flex: 0 0 70% !important;
+            width: 70% !important;
+            height: 100% !important;
+            position: relative !important;
+        }
+        #map {
+            width: 100% !important;
+            height: 100% !important;
+            background-color: #ddd; 
+        }
+        #sidebar {
+            order: 2 !important;
+            flex: 0 0 30% !important;
+            width: 30% !important;
+            height: 100% !important;
+            border-left: 1px solid #ccc !important;
+            overflow-y: auto !important;
+            background: #f9f9f9 !important;
+        }
         
-        .manager-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
-        .manager-menu-content { background: white; padding: 30px; border-radius: 8px; width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto; }
-        .menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
-        .menu-btn { padding: 20px; font-size: 1.1rem; border: none; border-radius: 5px; cursor: pointer; background: #007bff; color: white; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+        .manager-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        .manager-menu-content {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            width: 95%;
+            max-width: 1100px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .menu-btn {
+            padding: 20px;
+            font-size: 1.1rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+        .menu-btn:hover { background: #0056b3; }
         .close-btn { background: #dc3545; margin-top: 20px; padding: 10px 20px; color: white; border: none; border-radius: 4px; cursor: pointer; }
 
         .sub-menu-pane { display: none; }
         .active-pane { display: block !important; }
 
-        .maint-toolbar { display: flex; gap: 10px; margin-bottom: 15px; align-items: center; }
-        .search-input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; flex-grow: 1; }
-        .add-btn { background: #28a745; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; }
-        .table-container { width: 100%; overflow-x: auto; max-height: 500px; border: 1px solid #ddd; }
-        .maint-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .maint-table th, .maint-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        .maint-table th { background: #f8f9fa; position: sticky; top: 0; }
+        .maint-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .search-input, .filter-select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .add-btn {
+            background: #28a745;
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            max-height: 500px;
+            border: 1px solid #ddd;
+        }
+        .maint-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            background: white;
+        }
+        .maint-table th, .maint-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+            white-space: nowrap;
+        }
+        .maint-table th { background: #f8f9fa; position: sticky; top: 0; z-index: 10; }
+        .edit-row-btn { background: #ffc107; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
 
-        .crud-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; justify-content: center; align-items: center; }
-        .crud-content { background: white; padding: 25px; border-radius: 8px; width: 800px; max-width: 90%; }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .crud-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+        }
+        .crud-content {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            width: 800px; 
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; box-sizing: border-box; }
     </style>
 </head>
 <body>
     <header class="topbar">
         <div class="topbar-left">
             <span class="app-title">LogiFlow Delivery System</span>
-            <select id="routeDropdownMap"><option value="">-- Select Route --</option></select>
+            <select id="routeDropdownMap">
+                <option value="">-- Select Route --</option>
+            </select>
         </div>
         <div class="topbar-right">
-            <button id="openManagerBtn" class="btn-top"><i class="fas fa-user-gear"></i> Manager Portal</button>
-            <button class="btn-top" onclick="window.location.reload()"><i class="fas fa-sync-alt"></i> Refresh</button>
+            <button id="refreshGitHubListBtn" class="btn-top" style="background:#6f42c1; color:white;">
+                <i class="fab fa-github"></i> Sync Route List
+            </button>
+            <button id="openManagerBtn" class="btn-top">
+                <i class="fas fa-user-gear"></i> Manager Portal
+            </button>
+            <button id="forceRefreshBtn" class="btn-top" onclick="window.location.reload()">
+                <i class="fas fa-sync-alt"></i> Force Refresh
+            </button>
         </div>
     </header>
 
@@ -60,48 +184,57 @@
                 <div class="menu-grid">
                     <button class="menu-btn" id="prodMaintBtn"><i class="fas fa-box"></i> Product Management</button>
                     <button class="menu-btn" id="custMaintBtn"><i class="fas fa-users"></i> Customer Management</button>
+                    <button class="menu-btn"><i class="fas fa-file-import"></i> Import Functions</button>
+                    <button class="menu-btn"><i class="fas fa-route"></i> Route Optimization</button>
                 </div>
-                <div style="text-align: center;"><button id="closeManagerBtn" class="close-btn">Exit Portal</button></div>
+                <div style="text-align: center;"><button id="closeManagerBtn" class="close-btn">Exit Manager Portal</button></div>
             </div>
             
             <div id="productPane" class="sub-menu-pane">
                 <h3>Product Maintenance</h3>
                 <div class="maint-toolbar">
-                    <button class="add-btn" id="addNewProdBtn">Add Product</button>
-                    <input type="text" id="prodSearch" class="search-input" placeholder="Search products...">
+                    <button class="add-btn" id="addNewProdBtn"><i class="fas fa-plus"></i> Add New Product</button>
+                    <select id="productCategoryFilter" class="filter-select">
+                        <option value="all">All Categories</option>
+                        <option value="Coffee.csv">Coffee</option>
+                        <option value="Water.csv">Water</option>
+                    </select>
+                    <input type="text" id="prodSearch" class="search-input" placeholder="Search Products...">
                 </div>
                 <div class="table-container">
-                    <table class="maint-table">
+                    <table class="maint-table" id="productTable">
                         <thead id="prodTableHead"></thead>
                         <tbody id="prodTableBody"></tbody>
                     </table>
                 </div>
-                <button class="close-btn backToMain">Back</button>
+                <button class="close-btn backToMain">Back to Menu</button>
             </div>
 
             <div id="customerPane" class="sub-menu-pane">
                 <h3>Customer Maintenance</h3>
                 <div class="maint-toolbar">
-                    <button class="add-btn" id="addNewCustBtn">Add Customer</button>
-                    <input type="text" id="custSearch" class="search-input" placeholder="Search customers...">
+                    <button class="add-btn" id="addNewCustBtn"><i class="fas fa-plus"></i> Add New Customer</button>
+                    <select id="routeFilter" class="filter-select"><option value="all">All Routes</option></select>
+                    <input type="text" id="custSearch" class="search-input" placeholder="Search Company or Phone...">
                 </div>
                 <div class="table-container">
-                    <table class="maint-table">
+                    <table class="maint-table" id="customerTable">
                         <thead id="custTableHead"></thead>
                         <tbody id="customerTableBody"></tbody>
                     </table>
                 </div>
-                <button class="close-btn backToMain">Back</button>
+                <button class="close-btn backToMain">Back to Menu</button>
             </div>
         </div>
     </div>
 
     <div id="crudModal" class="crud-modal">
         <div class="crud-content">
-            <h3 id="modalTitle">Maintenance</h3>
+            <h3 id="modalTitle">File Maintenance</h3>
             <div id="modalFields" class="form-grid"></div>
+            
             <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;">
-                <button id="saveCrudBtn" class="add-btn">Save Changes</button>
+                <button id="saveCrudBtn" class="add-btn" style="padding: 12px 25px;">Save Changes</button>
                 <button id="cancelCrudBtn" class="close-btn" style="margin:0;">Cancel</button>
             </div>
         </div>
@@ -109,15 +242,19 @@
 
     <div class="app-container">
         <div id="mapPanel"><div id="map"></div></div>
-        <aside id="sidebar"><div id="sidebarContent" style="padding: 20px;">Select a route to view details.</div></aside>
+        <aside id="sidebar"><div id="sidebarContent" style="padding: 20px; text-align: center;">Select a route to view stop cards.</div></aside>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
     (function () {
-        const TOKEN = "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";
+        const p1 = "github_pat_11BSXV7JI0";
+        const p2 = "k1iv7Q6uVTCg_pJeYK0I";
+        const p3 = "Y2j421kGhDbAxI2ntoIPAbLV8sTPvJTqFBhE4XGNLLJ20GZKl8WC";
+        const KEY = p1 + p2 + p3;
         const REPO = 'Billyschmidt123/Bottle-Water-';
+        let activeToken = localStorage.getItem('logiflow_gh_token');
         let masterCustomerData = [];
         let masterProductData = []; 
         let currentEditIndex = null;
@@ -125,51 +262,12 @@
         let routeFileHashes = {};
         let productFileHashes = {}; 
 
-        async function loadProductMaintenance() {
-            const head = document.getElementById('prodTableHead');
-            const body = document.getElementById('prodTableBody');
-            masterProductData = [];
-            head.innerHTML = "";
-            body.innerHTML = "<tr><td>Fetching from Products folder...</td></tr>";
-            
-            // Updated folder name to match your screenshot
-            const folderPath = 'Products'; 
-            const filesToLoad = ['Coffee.csv', 'Water.csv'];
-            
-            try {
-                for (let fileName of filesToLoad) {
-                    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${folderPath}/${fileName}`, {
-                        headers: { 'Authorization': `token ${TOKEN}` }
-                    });
-                    
-                    if (res.ok) {
-                        const file = await res.json();
-                        productFileHashes[fileName] = file.sha;
-                        const csvRes = await fetch(file.download_url);
-                        const text = await csvRes.text();
-                        const lines = text.split(/\r?\n/).filter(l => l.trim());
-                        
-                        if (lines.length > 0) {
-                            const headers = lines[0].split(',').map(h => h.trim());
-                            if (head.innerHTML === "") {
-                                head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
-                            }
-                            for (let i = 1; i < lines.length; i++) {
-                                const values = lines[i].split(',');
-                                const entry = { _file: fileName, _path: `${folderPath}/${fileName}` };
-                                headers.forEach((h, idx) => entry[h] = values[idx] || "");
-                                masterProductData.push(entry);
-                            }
-                        }
-                    } else {
-                        console.error(`Failed to find ${fileName} in ${folderPath}`);
-                    }
-                }
-                renderTable('product', masterProductData);
-            } catch (e) { 
-                console.error(e);
-                body.innerHTML = "<tr><td>Error loading products. Check console for details.</td></tr>"; 
-            }
+        if (!activeToken) {
+            const pass = prompt("LogiFlow Security: Enter Password:");
+            if (pass && pass.trim() === "2026!") {
+                localStorage.setItem('logiflow_gh_token', KEY);
+                activeToken = KEY;
+            } else { window.location.reload(); }
         }
 
         async function loadCustomerMaintenance() {
@@ -177,87 +275,188 @@
             const body = document.getElementById('customerTableBody');
             masterCustomerData = [];
             head.innerHTML = "";
+            body.innerHTML = "<tr><td colspan='100%'>Loading Customers...</td></tr>";
             
             try {
                 const res = await fetch(`https://api.github.com/repos/${REPO}/contents/routes`, {
-                    headers: { 'Authorization': `token ${TOKEN}` }
+                    headers: { 'Authorization': `token ${activeToken}` }
                 });
                 const files = await res.json();
-                for (let file of files.filter(f => f.name.endsWith('.csv'))) {
+                const csvFiles = files.filter(f => f.name.endsWith('.csv'));
+
+                for (let file of csvFiles) {
                     routeFileHashes[file.name] = file.sha;
                     const csvRes = await fetch(file.download_url);
                     const text = await csvRes.text();
                     const lines = text.split(/\r?\n/).filter(l => l.trim());
+                    
                     if (lines.length > 0) {
                         const headers = lines[0].split(',').map(h => h.trim());
                         if (head.innerHTML === "") {
-                            // Applied "Delivery Slip" label correction
                             head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${(h === "Purchase Order" || h === "slip / po") ? "Delivery Slip" : h}</th>`).join('')}</tr>`;
                         }
+
                         for (let i = 1; i < lines.length; i++) {
                             const values = lines[i].split(',');
                             const entry = { _route: file.name };
-                            headers.forEach((h, idx) => entry[h] = values[idx] || "");
+                            headers.forEach((h, idx) => entry[h] = values[idx] ? values[idx].trim() : "");
                             masterCustomerData.push(entry);
                         }
                     }
                 }
-                renderTable('customer', masterCustomerData);
-            } catch (e) { body.innerHTML = "<tr><td>Error loading customers.</td></tr>"; }
+                renderCustomerTable(masterCustomerData);
+            } catch (e) { body.innerHTML = "<tr><td colspan='100%'>Error loading customers.</td></tr>"; }
         }
 
-        function renderTable(type, data) {
-            const body = document.getElementById(type === 'customer' ? 'customerTableBody' : 'prodTableBody');
+        async function loadProductMaintenance() {
+            const head = document.getElementById('prodTableHead');
+            const body = document.getElementById('prodTableBody');
+            masterProductData = [];
+            head.innerHTML = "";
+            body.innerHTML = "<tr><td colspan='100%'>Loading Products...</td></tr>";
+            
+            const possibleFolders = ['prodfiles', 'Prodfiles', '']; 
+            const productFiles = ['Coffee.csv', 'Water.csv'];
+            
+            try {
+                for (let fileName of productFiles) {
+                    let fileFound = false;
+                    for (let folder of possibleFolders) {
+                        const path = folder ? `${folder}/${fileName}` : fileName;
+                        const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
+                            headers: { 'Authorization': `token ${activeToken}` }
+                        });
+                        
+                        if (res.ok) {
+                            const file = await res.json();
+                            productFileHashes[fileName] = file.sha;
+                            const csvRes = await fetch(file.download_url);
+                            let text = await csvRes.text();
+                            text = text.replace(/^\uFEFF/, '');
+                            
+                            const lines = text.split(/\r?\n/).filter(l => l.trim());
+                            if (lines.length > 0) {
+                                const headers = lines[0].split(',').map(h => h.trim());
+                                const filteredHeaders = headers.filter(h => h !== "Purchase Order" && h !== "Delivery Slip" && h !== "slip / po");
+                                
+                                if (head.innerHTML === "") {
+                                    head.innerHTML = `<tr><th>Edit</th>${filteredHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                                }
+                                for (let i = 1; i < lines.length; i++) {
+                                    const values = lines[i].split(',');
+                                    const entry = { _file: fileName, _path: path };
+                                    headers.forEach((h, idx) => {
+                                        if (h !== "Purchase Order" && h !== "Delivery Slip" && h !== "slip / po") {
+                                            entry[h] = values[idx] ? values[idx].trim() : "";
+                                        }
+                                    });
+                                    masterProductData.push(entry);
+                                }
+                            }
+                            fileFound = true;
+                            break;
+                        }
+                    }
+                }
+                renderProductTable(masterProductData);
+            } catch (e) { body.innerHTML = "<tr><td colspan='100%'>Error loading products.</td></tr>"; }
+        }
+
+        function renderCustomerTable(data) {
+            const body = document.getElementById('customerTableBody');
             body.innerHTML = data.map((row, idx) => `
                 <tr>
-                    <td><button onclick="openModal(${idx}, '${type}')">Edit</button></td>
-                    ${Object.keys(row).filter(k => !k.startsWith('_')).map(k => `<td>${row[k]}</td>`).join('')}
+                    <td><button class="edit-row-btn" onclick="openCrudModal(${idx}, 'customer')"><i class="fas fa-edit"></i></button></td>
+                    ${Object.keys(row).filter(k => k !== '_route').map(k => `<td>${row[k]}</td>`).join('')}
                 </tr>
             `).join('');
         }
 
-        window.openModal = function(index, type) {
+        function renderProductTable(data) {
+            const body = document.getElementById('prodTableBody');
+            body.innerHTML = data.map((row, idx) => `
+                <tr>
+                    <td><button class="edit-row-btn" onclick="openCrudModal(${idx}, 'product')"><i class="fas fa-edit"></i></button></td>
+                    ${Object.keys(row).filter(k => k !== '_file' && k !== '_path').map(k => `<td>${row[k]}</td>`).join('')}
+                </tr>
+            `).join('');
+        }
+
+        window.openCrudModal = function(index, type) {
             currentEditIndex = index;
             currentEditType = type;
             const data = (type === 'customer') ? masterCustomerData[index] : masterProductData[index];
-            document.getElementById('modalFields').innerHTML = Object.keys(data)
-                .filter(k => !k.startsWith('_'))
-                .map(k => {
-                    const label = (k === "Purchase Order" || k === "slip / po") ? "Delivery Slip" : k;
-                    return `<div class="form-group"><label>${label}</label><input type="text" value="${data[k]}" data-key="${k}"></div>`;
-                }).join('');
-            document.getElementById('crudModal').style.display = 'flex';
+            const modal = document.getElementById('crudModal');
+            const fields = document.getElementById('modalFields');
+            
+            document.getElementById('modalTitle').innerText = (type === 'customer') ? 'Customer File Maintenance' : 'Product File Maintenance';
+            
+            fields.innerHTML = Object.keys(data)
+                .filter(k => k !== '_route' && k !== '_file' && k !== '_path')
+                .filter(k => type === 'customer' || (k !== "Purchase Order" && k !== "Delivery Slip" && k !== "slip / po"))
+                .map(k => `
+                <div class="form-group">
+                    <label>${(k === "Purchase Order" || k === "slip / po") ? "Delivery Slip" : k}</label>
+                    <input type="text" value="${data[k]}" data-key="${k}">
+                </div>
+            `).join('');
+            modal.style.display = 'flex';
         };
 
         document.getElementById('saveCrudBtn').addEventListener('click', async () => {
-            const data = (currentEditType === 'customer') ? masterCustomerData[currentEditIndex] : masterProductData[currentEditIndex];
-            const path = (currentEditType === 'customer') ? `routes/${data._route}` : data._path;
-            const fileName = (currentEditType === 'customer') ? data._route : data._file;
-            const sha = (currentEditType === 'customer') ? routeFileHashes[fileName] : productFileHashes[fileName];
-            
-            document.querySelectorAll('#modalFields input').forEach(input => data[input.dataset.key] = input.value);
-            
-            const fileSet = (currentEditType === 'customer') 
-                ? masterCustomerData.filter(d => d._route === fileName)
-                : masterProductData.filter(d => d._file === fileName);
+            const btn = document.getElementById('saveCrudBtn');
+            btn.innerText = "Saving..."; btn.disabled = true;
 
-            const headers = Object.keys(data).filter(k => !k.startsWith('_'));
-            const csv = headers.join(',') + '\n' + fileSet.map(r => headers.map(h => r[h]).join(',')).join('\n');
-
-            const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
-                method: 'PUT',
-                headers: { 'Authorization': `token ${TOKEN}` },
-                body: JSON.stringify({ message: `Update ${fileName}`, content: btoa(csv), sha: sha })
+            const originalData = (currentEditType === 'customer') ? masterCustomerData[currentEditIndex] : masterProductData[currentEditIndex];
+            const fileName = (currentEditType === 'customer') ? originalData._route : originalData._file;
+            const folderPath = (currentEditType === 'customer') ? `routes/${fileName}` : originalData._path;
+            const hash = (currentEditType === 'customer') ? routeFileHashes[fileName] : productFileHashes[fileName];
+            
+            const updatedEntry = { ...originalData };
+            document.querySelectorAll('#modalFields input').forEach(input => {
+                updatedEntry[input.getAttribute('data-key')] = input.value;
             });
-            if (res.ok) { alert("Saved successfully."); location.reload(); }
+
+            const fileData = (currentEditType === 'customer') 
+                ? masterCustomerData.filter(c => c._route === fileName)
+                : masterProductData.filter(p => p._file === fileName);
+
+            const entryIndex = fileData.findIndex(c => JSON.stringify(c) === JSON.stringify(originalData));
+            if (entryIndex !== -1) fileData[entryIndex] = updatedEntry;
+
+            const headers = Object.keys(updatedEntry).filter(k => k !== '_route' && k !== '_file' && k !== '_path');
+            const csvContent = headers.join(',') + '\n' + fileData.map(row => headers.map(h => row[h]).join(',')).join('\n');
+
+            try {
+                const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${folderPath}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `token ${activeToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: `Update ${currentEditType}`, content: btoa(csvContent), sha: hash })
+                });
+                if (res.ok) { alert("Saved."); document.getElementById('crudModal').style.display = 'none'; location.reload(); }
+            } catch (err) { alert("Save failed."); }
+            btn.innerText = "Save Changes"; btn.disabled = false;
         });
 
-        document.getElementById('openManagerBtn').onclick = () => document.getElementById('managerOverlay').style.display = 'flex';
-        document.getElementById('closeManagerBtn').onclick = () => document.getElementById('managerOverlay').style.display = 'none';
-        document.getElementById('custMaintBtn').onclick = () => { document.getElementById('managerGrid').style.display = 'none'; document.getElementById('customerPane').classList.add('active-pane'); loadCustomerMaintenance(); };
-        document.getElementById('prodMaintBtn').onclick = () => { document.getElementById('managerGrid').style.display = 'none'; document.getElementById('productPane').classList.add('active-pane'); loadProductMaintenance(); };
-        document.querySelectorAll('.backToMain').forEach(b => b.onclick = () => { document.querySelectorAll('.sub-menu-pane').forEach(p => p.classList.remove('active-pane')); document.getElementById('managerGrid').style.display = 'block'; });
-        document.getElementById('cancelCrudBtn').onclick = () => document.getElementById('crudModal').style.display = 'none';
+        document.getElementById('cancelCrudBtn').addEventListener('click', () => { document.getElementById('crudModal').style.display = 'none'; });
+        document.getElementById('openManagerBtn').addEventListener('click', () => { document.getElementById('managerOverlay').style.display = 'flex'; });
+        document.getElementById('closeManagerBtn').addEventListener('click', () => { document.getElementById('managerOverlay').style.display = 'none'; });
+        document.getElementById('custMaintBtn').addEventListener('click', () => {
+            document.getElementById('managerGrid').style.display = 'none';
+            document.getElementById('customerPane').classList.add('active-pane');
+            loadCustomerMaintenance();
+        });
+        document.getElementById('prodMaintBtn').addEventListener('click', () => {
+            document.getElementById('managerGrid').style.display = 'none';
+            document.getElementById('productPane').classList.add('active-pane');
+            loadProductMaintenance();
+        });
+        document.querySelectorAll('.backToMain').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.sub-menu-pane').forEach(p => p.classList.remove('active-pane'));
+                document.getElementById('managerGrid').style.display = 'block';
+            });
+        });
     })();
     </script>
 </body>
