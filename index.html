@@ -3,120 +3,159 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogiFlow Delivery System</title>
+    <title>LogiFlow - Grande Prairie</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        :root { --primary: #0056b3; --success: #28a745; --bg: #f8f9fa; }
-        body { font-family: sans-serif; background: var(--bg); margin: 0; padding: 20px; }
-        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .header { text-align: center; margin-bottom: 20px; }
-        select { width: 100%; padding: 12px; margin: 10px 0; border-radius: 5px; border: 1px solid #ddd; font-size: 16px; }
-        .btn { width: 100%; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-sync { background: #6c757d; color: white; margin-bottom: 20px; }
-        #status { font-size: 0.85em; text-align: center; color: #666; margin-top: 5px; }
+        :root { --primary: #0056b3; --success: #28a745; --danger: #dc3545; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: var(--bg); }
+        
+        /* Navigation */
+        .navbar { background: #333; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .nav-brand { font-weight: bold; font-size: 1.2rem; }
+        
+        /* View Management */
+        .view { display: none; padding: 20px; }
+        .view.active { display: block; }
+
+        /* Manager Panel Styling */
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
+        .status-box { background: #e9ecef; padding: 10px; border-radius: 5px; font-size: 0.9em; margin-bottom: 15px; border-left: 4px solid var(--primary); }
+        
+        /* Map Placeholder */
+        #map-container { height: 400px; background: #ddd; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 2px dashed #bbb; }
+
+        /* Form Elements */
+        select { width: 100%; padding: 12px; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; }
+        .btn { padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-sync { background: var(--success); color: white; width: 100%; }
+        .btn-nav { background: transparent; color: white; border: 1px solid white; padding: 5px 10px; font-size: 0.8em; }
+        .btn-nav:hover { background: white; color: #333; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="header">
-        <h1>LogiFlow</h1>
-        <p>Grande Prairie Dispatch</p>
+<nav class="navbar">
+    <div class="nav-brand">LogiFlow Dispatch</div>
+    <div id="nav-controls">
+        <button class="btn-nav" onclick="switchView('map-view')">Map View</button>
+        <button class="btn-nav" onclick="switchView('manager-view')">Manager Portal</button>
     </div>
+</nav>
 
-    <!-- Master Sync Button -->
-    <button class="btn btn-sync" onclick="syncRouteDropdowns()">
-        <i class="fas fa-sync-alt"></i> Sync Latest Routes
-    </button>
-    <div id="status">Last synced: Never</div>
+<!-- LANDING PAGE: THE MAP -->
+<div id="map-view" class="view active">
+    <div class="card" style="max-width: 800px;">
+        <h3>Today's Route Map</h3>
+        <select id="routeSelect" onchange="loadRouteToMap()">
+            <option value="">-- Choose Your Route --</option>
+        </select>
+        <div id="map-container">
+            <p><i class="fas fa-map-marker-alt"></i> Map Interface Loading...</p>
+        </div>
+    </div>
+</div>
 
-    <label for="routeSelect"><strong>Assigned Route:</strong></label>
-    <select id="routeSelect" class="route-selector">
-        <option value="">-- Waiting for Sync --</option>
-    </select>
+<!-- MANAGER PANEL: THE SYNC TOOL -->
+<div id="manager-view" class="view">
+    <div class="card">
+        <h3><i class="fas fa-tools"></i> Manager Control Panel</h3>
+        <p style="font-size: 0.85em; color: #666;">Use this to update the route list for all 10 technicians.</p>
+        
+        <div class="status-box">
+            <strong>System Status:</strong><br>
+            <span id="sync-status">Routes loaded from local memory.</span>
+        </div>
 
-    <button class="btn btn-primary" onclick="loadSelectedRoute()">
-        <i class="fas fa-file-download"></i> Load Route Data
-    </button>
+        <button class="btn btn-sync" onclick="refreshManifest()">
+            <i class="fas fa-cloud-download-alt"></i> Sync with routes-manifest.json
+        </button>
+
+        <p style="margin-top: 20px; font-size: 0.75em; color: #999;">
+            Note: Run your <strong>sync_routes.bat</strong> and upload the JSON to GitHub before clicking Sync.
+        </p>
+    </div>
 </div>
 
 <script>
-    const GITHUB_CONFIG = {
+    const CONFIG = {
         owner: "Billyschmidt123",
         repo: "Bottle-Water-",
-        branch: "main",
         manifestPath: "ROUTES/routes-manifest.json"
     };
 
-    // 1. Initial Load: Try to load from cache immediately, then sync
+    // Initialize App
     window.onload = () => {
-        const cached = localStorage.getItem('logiflow_route_cache');
-        if (cached) {
-            console.log("Loading routes from local storage...");
-            populateDropdowns(JSON.parse(cached).routes);
-        }
-        syncRouteDropdowns(); 
+        loadCachedRoutes();
     };
 
-    // 2. Fetch the manifest you built with the .bat script
-    async function syncRouteDropdowns() {
-        const statusDiv = document.getElementById('status');
-        const url = `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${GITHUB_CONFIG.manifestPath}`;
+    function switchView(viewId) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById(viewId).classList.add('active');
+    }
+
+    // Load from Local Storage so the Map is ready immediately
+    function loadCachedRoutes() {
+        const cached = localStorage.getItem('logiflow_master_routes');
+        if (cached) {
+            const data = JSON.parse(cached);
+            updateDropdown(data.routes);
+            document.getElementById('sync-status').textContent = "Loaded " + data.routes.length + " routes from cache.";
+        }
+    }
+
+    // The Manager's Sync Function
+    async function refreshManifest() {
+        const status = document.getElementById('sync-status');
+        const url = `https://raw.githubusercontent.com/${CONFIG.owner}/${CONFIG.repo}/main/${CONFIG.CONFIG.manifestPath}?cb=${Date.now()}`;
         
-        statusDiv.textContent = "Syncing with GitHub...";
+        status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Contacting GitHub...';
 
         try {
-            const response = await fetch(url + '?cb=' + Date.now()); // Cache-buster
-            if (!response.ok) throw new Error("Manifest file not found.");
+            const response = await fetch(url);
+            if (!response.ok) throw new Error("Could not find manifest.");
             
-            const data = await response.json(); // Structure: { "routes": [...] }
+            const data = await response.json(); // Fetches { "routes": [...] }
 
             if (data && data.routes) {
-                // Store locally so techs can work offline later
-                localStorage.setItem('logiflow_route_cache', JSON.stringify(data));
+                // Save to Local Storage for the Technicians
+                localStorage.setItem('logiflow_master_routes', JSON.stringify(data));
                 
-                populateDropdowns(data.routes);
+                // Update the Map Dropdown
+                updateDropdown(data.routes);
                 
-                const now = new Date();
-                statusDiv.textContent = "Last synced: " + now.toLocaleTimeString();
-                console.log("Master Manifest synced successfully.");
+                status.style.color = "green";
+                status.textContent = "SUCCESS: " + data.routes.length + " routes synced to all devices.";
             }
         } catch (err) {
-            console.error("Sync error:", err);
-            statusDiv.textContent = "Sync Failed. Using offline routes.";
+            status.style.color = "red";
+            status.textContent = "SYNC FAILED: Check internet or GitHub file path.";
+            console.error(err);
         }
     }
 
-    // 3. Inject the routes into the dropdown
-    function populateDropdowns(routes) {
+    function updateDropdown(routes) {
         const select = document.getElementById('routeSelect');
-        select.innerHTML = '<option value="">-- Select Route --</option>';
-
+        // Save current selection
+        const currentVal = select.value;
+        
+        select.innerHTML = '<option value="">-- Choose Your Route --</option>';
         routes.forEach(route => {
             const opt = document.createElement('option');
-            opt.value = route.file; // The relative path (e.g., routes/Week 1/...)[cite: 1]
-            opt.textContent = route.name; // The clean display name[cite: 1]
+            opt.value = route.file; // e.g. routes/Week 1/Route.csv
+            opt.textContent = route.name; // e.g. Week 1 Friday[cite: 1]
             select.appendChild(opt);
         });
+
+        // Restore selection if it still exists
+        select.value = currentVal;
     }
 
-    // 4. Handle loading the CSV data when a tech picks a route
-    function loadSelectedRoute() {
-        const select = document.getElementById('routeSelect');
-        const filePath = select.value;
-
-        if (!filePath) {
-            alert("Please select a route first.");
-            return;
+    function loadRouteToMap() {
+        const file = document.getElementById('routeSelect').value;
+        if (file) {
+            console.log("Loading Map Data from: " + file);
+            // Add your mapping logic here
         }
-
-        // Redirect or trigger your CSV parser here
-        const csvUrl = `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${filePath}`;
-        console.log("Loading CSV from:", csvUrl);
-        
-        // This is where your app's existing logic takes over to show the route stops
-        alert("Loading route file: " + filePath);
     }
 </script>
 
