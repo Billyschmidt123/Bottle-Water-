@@ -87,7 +87,6 @@
         .sub-menu-pane { display: none; }
         .active-pane { display: block !important; }
 
-        /* ADDITION: PROFESSIONAL TABLE & TOOLBAR STYLES */
         .maint-toolbar {
             display: flex;
             gap: 10px;
@@ -127,7 +126,7 @@
         .maint-table th { background: #f8f9fa; position: sticky; top: 0; }
         .edit-row-btn { background: #ffc107; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
 
-        /* ADDITION: CRUD MODAL */
+        /* ADDITION: WIDER MODAL & SCHEDULING STYLES */
         .crud-modal {
             display: none;
             position: fixed;
@@ -141,13 +140,41 @@
             background: white;
             padding: 25px;
             border-radius: 8px;
-            width: 400px;
-            max-height: 80vh;
+            width: 800px; /* Wider for Professional Look */
+            max-width: 90%;
+            max-height: 90vh;
             overflow-y: auto;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
         }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input { width: 100%; padding: 8px; box-sizing: border-box; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; box-sizing: border-box; }
+        
+        .scheduling-section {
+            border-top: 2px solid #eee;
+            margin-top: 20px;
+            padding-top: 15px;
+        }
+        .route-chip {
+            display: inline-flex;
+            align-items: center;
+            background: #e9ecef;
+            padding: 5px 10px;
+            border-radius: 20px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+        }
+        .remove-route {
+            margin-left: 8px;
+            color: #dc3545;
+            cursor: pointer;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -190,14 +217,11 @@
                 <button class="close-btn backToMain">Back to Menu</button>
             </div>
 
-            <!-- RESTORED & ENHANCED CUSTOMER MAINTENANCE -->
             <div id="customerPane" class="sub-menu-pane">
                 <h3>Customer Maintenance</h3>
                 <div class="maint-toolbar">
                     <button class="add-btn" id="addNewCustBtn"><i class="fas fa-plus"></i> Add New Customer</button>
-                    <select id="routeFilter" class="filter-select">
-                        <option value="all">All Routes</option>
-                    </select>
+                    <select id="routeFilter" class="filter-select"><option value="all">All Routes</option></select>
                     <input type="text" id="custSearch" class="search-input" placeholder="Search Company or Phone...">
                 </div>
                 <div class="table-container">
@@ -211,13 +235,41 @@
         </div>
     </div>
 
-    <!-- ADDITION: FULL CRUD MODAL -->
+    <!-- ENHANCED CRUD MODAL -->
     <div id="crudModal" class="crud-modal">
         <div class="crud-content">
-            <h3 id="modalTitle">Edit Customer</h3>
-            <div id="modalFields"></div>
-            <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button id="saveCrudBtn" class="add-btn">Save Changes</button>
+            <h3 id="modalTitle">Customer File Maintenance</h3>
+            <div id="modalFields" class="form-grid"></div>
+            
+            <!-- ADDITION: PURCHASE ORDER & STATUS -->
+            <div class="form-grid" style="margin-top:10px;">
+                <div class="form-group">
+                    <label>Purchase Order (PO)</label>
+                    <input type="text" id="modalPO" placeholder="Enter PO Number">
+                </div>
+                <div class="form-group">
+                    <label>Account Status</label>
+                    <select id="modalStatus">
+                        <option value="Active">Active (Visible to Driver)</option>
+                        <option value="Inactive">Inactive (Hidden from Driver)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- ADDITION: SCHEDULING SECTION -->
+            <div class="scheduling-section">
+                <h4>Scheduling & Route Assignments</h4>
+                <div id="currentRoutesList" style="margin-bottom: 10px;"></div>
+                <div class="form-group" style="max-width: 300px;">
+                    <label>Add to Route</label>
+                    <select id="addToRouteDropdown">
+                        <option value="">-- Choose Route --</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;">
+                <button id="saveCrudBtn" class="add-btn" style="padding: 12px 25px;">Save Changes</button>
                 <button id="cancelCrudBtn" class="close-btn" style="margin:0;">Cancel</button>
             </div>
         </div>
@@ -240,6 +292,8 @@
         const REPO = 'Billyschmidt123/Bottle-Water-';
         let activeToken = localStorage.getItem('logiflow_gh_token');
         let masterCustomerData = [];
+        let currentEditIndex = null;
+        let routeFileHashes = {};
 
         if (!activeToken) {
             const pass = prompt("LogiFlow Security: Enter Password:");
@@ -249,11 +303,11 @@
             } else { window.location.reload(); }
         }
 
-        // ADDITION: CUSTOMER TABLE HOOKUP LOGIC
         async function loadCustomerMaintenance() {
             const head = document.getElementById('custTableHead');
             const body = document.getElementById('custTableBody');
             const filter = document.getElementById('routeFilter');
+            const routeAddSelect = document.getElementById('addToRouteDropdown');
             masterCustomerData = [];
             
             try {
@@ -264,12 +318,15 @@
                 const csvFiles = files.filter(f => f.name.endsWith('.csv'));
 
                 while (filter.options.length > 1) filter.remove(1);
+                while (routeAddSelect.options.length > 1) routeAddSelect.remove(1);
 
                 for (let file of csvFiles) {
+                    routeFileHashes[file.name] = file.sha;
                     const opt = document.createElement('option');
                     opt.value = file.name;
                     opt.textContent = file.name.replace('.csv', '');
                     filter.appendChild(opt);
+                    routeAddSelect.appendChild(opt.cloneNode(true));
 
                     const csvRes = await fetch(file.download_url);
                     const text = await csvRes.text();
@@ -302,17 +359,74 @@
         }
 
         window.openCrudModal = function(index) {
+            currentEditIndex = index;
             const data = masterCustomerData[index];
             const modal = document.getElementById('crudModal');
             const fields = document.getElementById('modalFields');
+            const routeList = document.getElementById('currentRoutesList');
+            
             fields.innerHTML = Object.keys(data).filter(k => k !== '_route').map(k => `
                 <div class="form-group">
                     <label>${k}</label>
-                    <input type="text" value="${data[k]}" data-key="${k}">
+                    <input type="text" value="${data[k]}" data-key="${k}" id="field_${k}">
                 </div>
             `).join('');
+            
+            // Render Route Chips with Delete Key
+            routeList.innerHTML = `<div class="route-chip">${data._route} <span class="remove-route" onclick="removeRouteFromCust('${data._route}')">×</span></div>`;
+            
             modal.style.display = 'flex';
         };
+
+        // ADDITION: SAVE TO GITHUB LOGIC
+        document.getElementById('saveCrudBtn').addEventListener('click', async () => {
+            if (currentEditIndex === null) return;
+            const btn = document.getElementById('saveCrudBtn');
+            btn.innerText = "Saving...";
+            btn.disabled = true;
+
+            const originalData = masterCustomerData[currentEditIndex];
+            const fileName = originalData._route;
+            
+            // Get updated values from fields
+            const updatedEntry = { ...originalData };
+            document.querySelectorAll('#modalFields input').forEach(input => {
+                updatedEntry[input.getAttribute('data-key')] = input.value;
+            });
+
+            // Rebuild CSV content for that specific file
+            const fileData = masterCustomerData.filter(c => c._route === fileName);
+            const entryIndexInFile = fileData.findIndex(c => JSON.stringify(c) === JSON.stringify(originalData));
+            if (entryIndexInFile !== -1) fileData[entryIndexInFile] = updatedEntry;
+
+            const headers = Object.keys(updatedEntry).filter(k => k !== '_route');
+            const csvContent = headers.join(',') + '\n' + 
+                fileData.map(row => headers.map(h => row[h]).join(',')).join('\n');
+
+            try {
+                const res = await fetch(`https://api.github.com/repos/${REPO}/contents/routes/${fileName}`, {
+                    method: 'PUT',
+                    headers: { 
+                        'Authorization': `token ${activeToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: `Update customer in ${fileName}`,
+                        content: btoa(csvContent),
+                        sha: routeFileHashes[fileName]
+                    })
+                });
+
+                if (res.ok) {
+                    alert("Customer Information Saved Successfully.");
+                    document.getElementById('crudModal').style.display = 'none';
+                    loadCustomerMaintenance();
+                } else { alert("Failed to save. Check permissions."); }
+            } catch (err) { alert("Error connecting to GitHub."); }
+            
+            btn.innerText = "Save Changes";
+            btn.disabled = false;
+        });
 
         document.getElementById('custSearch').addEventListener('input', (e) => {
             const val = e.target.value.toLowerCase();
@@ -332,7 +446,6 @@
             document.getElementById('crudModal').style.display = 'none';
         });
 
-        // PRESERVED NAVIGATION LOGIC
         document.getElementById('openManagerBtn').addEventListener('click', () => {
             document.getElementById('managerOverlay').style.display = 'flex';
         });
