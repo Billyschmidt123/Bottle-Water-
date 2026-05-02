@@ -233,45 +233,25 @@
         window.refreshRoutesFromGitHub = function() {
             console.log("Syncing with GitHub...");
             
-            const manifestOptions = [
-                'routes/routes-manifest.json',
-                'routes-manifest.json',
-                'ROUTES/routes-manifest.json'
-            ];
+            // --- MODIFIED: UPDATED GITHUB REPO URL FOR MANIFEST FETCHING ---
+            const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/';
+            const manifestPath = 'routes/routes-manifest.json';
 
-            const fetchManifest = (index) => {
-                if (index >= manifestOptions.length) return Promise.reject('Manifest not found');
-                return fetch(manifestOptions[index] + '?cb=' + Date.now())
-                    .then(res => {
-                        if (!res.ok) return fetchManifest(index + 1);
-                        return res.json();
-                    });
-            };
-
-            return fetchManifest(0)
+            return fetch(GITHUB_RAW_BASE + manifestPath + '?cb=' + Date.now())
+                .then(res => {
+                    if (!res.ok) throw new Error('Manifest not found on GitHub');
+                    return res.json();
+                })
                 .then(manifest => {
                     const promises = manifest.routes.map(r => {
-                        let targetPath = r.file;
+                        const targetPath = 'routes/' + r.file;
                         
-                        const tryPaths = [
-                            targetPath,
-                            'routes/' + targetPath,
-                            'ROUTES/' + targetPath
-                        ];
-
-                        const attemptFetch = (pathIndex) => {
-                            if (pathIndex >= tryPaths.length) return Promise.reject('File not found');
-                            const encodedPath = encodeURI(tryPaths[pathIndex]);
-                            
-                            return fetch(encodedPath + '?cb=' + Date.now())
-                                .then(res => {
-                                    if (!res.ok) return attemptFetch(pathIndex + 1);
-                                    return res.text();
-                                });
-                        };
-
-                        return attemptFetch(0)
-                            .then(csv => ({ ...r, stops: parseCSV(csv) }))
+                        return fetch(GITHUB_RAW_BASE + targetPath + '?cb=' + Date.now())
+                            .then(res => {
+                                if (!res.ok) return null;
+                                return res.text();
+                            })
+                            .then(csv => csv ? ({ ...r, stops: parseCSV(csv) }) : null)
                             .catch(() => null);
                     });
 
@@ -285,6 +265,7 @@
                     populateRouteDropdown(routes);
                     return cache;
                 });
+            // --- END MODIFIED FETCH LOGIC ---
         };
 
         function loadRouteCache() {
