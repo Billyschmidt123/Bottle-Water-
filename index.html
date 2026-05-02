@@ -228,7 +228,6 @@
                     <button class="add-btn" id="addNewProdBtn"><i class="fas fa-plus"></i> Add New Product</button>
                     <select id="productCategoryFilter" class="filter-select">
                         <option value="all">All Categories</option>
-                        <!-- Case matched options -->
                         <option value="Coffee.csv">Coffee</option>
                         <option value="Water.csv">Water</option>
                     </select>
@@ -380,19 +379,16 @@
             masterProductData = [];
             head.innerHTML = "";
             
-            // FIX ADDITION: Updated casing to match GitHub (Coffee.csv, Water.csv)
+            // FOLDER FIX: Changed from 'Products' to 'Prodfiles' based on image_94f437.png
             const productFiles = ['Coffee.csv', 'Water.csv'];
             
             try {
                 for (let fileName of productFiles) {
-                    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/Products/${fileName}`, {
+                    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/Prodfiles/${fileName}`, {
                         headers: { 'Authorization': `token ${activeToken}` }
                     });
                     
-                    if (!res.ok) {
-                        console.warn(`File ${fileName} not found in Products folder.`);
-                        continue; 
-                    }
+                    if (!res.ok) continue;
 
                     const file = await res.json();
                     productFileHashes[fileName] = file.sha;
@@ -400,6 +396,9 @@
                     const csvRes = await fetch(file.download_url);
                     const text = await csvRes.text();
                     
+                    // SAFETY: Don't load if it looks like HTML (indicates a 404 page)
+                    if (text.trim().startsWith('<')) continue;
+
                     const lines = text.split(/\r?\n/).filter(l => l.trim());
                     if (lines.length > 0) {
                         const headers = lines[0].split(',');
@@ -489,8 +488,8 @@
 
             const originalData = (currentEditType === 'customer') ? masterCustomerData[currentEditIndex] : masterProductData[currentEditIndex];
             const fileName = (currentEditType === 'customer') ? originalData._route : originalData._file;
-            // FIX ADDITION: Updated folder casing to 'Products'
-            const folder = (currentEditType === 'customer') ? 'routes' : 'Products';
+            // FOLDER FIX: Changed from 'Products' to 'Prodfiles' based on image_94f437.png
+            const folder = (currentEditType === 'customer') ? 'routes' : 'Prodfiles';
             const hash = (currentEditType === 'customer') ? routeFileHashes[fileName] : productFileHashes[fileName];
             
             const updatedEntry = { ...originalData };
