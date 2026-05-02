@@ -24,7 +24,6 @@ window.processCSV = function(csvText) {
         let data = {};
         headers.forEach((h, i) => data[h] = vals[i] ? vals[i].trim() : "");
         
-        // Supports various coordinate naming conventions found in your files
         const lat = parseFloat(data.latitude || data.lat);
         const lng = parseFloat(data.longitude || data.lng || data.long);
 
