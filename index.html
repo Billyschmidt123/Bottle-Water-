@@ -3,161 +3,229 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogiFlow - Grande Prairie</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        :root { --primary: #0056b3; --success: #28a745; --danger: #dc3545; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: var(--bg); }
-        
-        /* Navigation */
-        .navbar { background: #333; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
-        .nav-brand { font-weight: bold; font-size: 1.2rem; }
-        
-        /* View Management */
-        .view { display: none; padding: 20px; }
-        .view.active { display: block; }
+    <title>LogiFlow Delivery System</title>
+    <meta name="theme-color" content="#007bff">
 
-        /* Manager Panel Styling */
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
-        .status-box { background: #e9ecef; padding: 10px; border-radius: 5px; font-size: 0.9em; margin-bottom: 15px; border-left: 4px solid var(--primary); }
-        
-        /* Map Placeholder */
-        #map-container { height: 400px; background: #ddd; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 2px dashed #bbb; }
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="stylesheet" href="ASSETS/LEAFLET/leaflet.css?v=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-        /* Form Elements */
-        select { width: 100%; padding: 12px; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; }
-        .btn { padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        .btn-sync { background: var(--success); color: white; width: 100%; }
-        .btn-nav { background: transparent; color: white; border: 1px solid white; padding: 5px 10px; font-size: 0.8em; }
-        .btn-nav:hover { background: white; color: #333; }
-    </style>
+    <link rel="stylesheet" href="CSS/main.css?v=1">
+    <link rel="stylesheet" href="CSS/theme.css?v=1">
+    <link rel="stylesheet" href="CSS/map.css?v=1">
+    <link rel="stylesheet" href="CSS/modal.css?v=1">
+    <link rel="stylesheet" href="CSS/manager.css?v=1">
 </head>
+
 <body>
 
-<nav class="navbar">
-    <div class="nav-brand">LogiFlow Dispatch</div>
-    <div id="nav-controls">
-        <button class="btn-nav" onclick="switchView('map-view')">Map View</button>
-        <button class="btn-nav" onclick="switchView('manager-view')">Manager Portal</button>
-    </div>
-</nav>
-
-<!-- LANDING PAGE: THE MAP -->
-<div id="map-view" class="view active">
-    <div class="card" style="max-width: 800px;">
-        <h3>Today's Route Map</h3>
-        <select id="routeSelect" onchange="loadRouteToMap()">
-            <option value="">-- Choose Your Route --</option>
-        </select>
-        <div id="map-container">
-            <p><i class="fas fa-map-marker-alt"></i> Map Interface Loading...</p>
-        </div>
-    </div>
-</div>
-
-<!-- MANAGER PANEL: THE SYNC TOOL -->
-<div id="manager-view" class="view">
-    <div class="card">
-        <h3><i class="fas fa-tools"></i> Manager Control Panel</h3>
-        <p style="font-size: 0.85em; color: #666;">Use this to update the route list for all 10 technicians.</p>
-        
-        <div class="status-box">
-            <strong>System Status:</strong><br>
-            <span id="sync-status">Routes loaded from local memory.</span>
+    <header class="topbar">
+        <div class="topbar-left">
+            <span class="app-title">LogiFlow Delivery System</span>
+            <select id="routeDropdownMap" style="margin-left:15px; padding:6px; border-radius:4px; border:1px solid #ccc;">
+                <option value="">-- Select Route --</option>
+            </select>
         </div>
 
-        <button class="btn btn-sync" onclick="refreshManifest()">
-            <i class="fas fa-cloud-download-alt"></i> Sync with routes-manifest.json
-        </button>
+        <div class="topbar-right">
+            <button class="btn-top openManagerBtn">
+                <i class="fas fa-user-gear"></i> Manager Portal
+            </button>
 
-        <p style="margin-top: 20px; font-size: 0.75em; color: #999;">
-            Note: Run your <strong>sync_routes.bat</strong> and upload the JSON to GitHub before clicking Sync.
-        </p>
+            <button id="refreshRoutesBtn" class="btn-top">
+                <i class="fas fa-sync"></i> Refresh
+            </button>
+        </div>
+    </header>
+
+    <div class="app-container">
+        <div id="mapPanel">
+            <div id="mapTopBar">
+                <div id="currentStopInfo">No stop selected</div>
+                <div id="mapControlButtons">
+                    <button id="btnPrevStop" class="btn-top btn-small"><i class="fas fa-arrow-left"></i> Back</button>
+                    <button id="btnNextStop" class="btn-top btn-small">Forward <i class="fas fa-arrow-right"></i></button>
+                    <button id="btnStartRoute" class="btn-top btn-small btn-success"><i class="fas fa-play"></i> Start</button>
+                    <button id="btnFinishRoute" class="btn-top btn-small btn-warning"><i class="fas fa-flag-checkered"></i> Finish</button>
+                    <button id="btnDirections" class="btn-top btn-small"><i class="fas fa-route"></i> Directions</button>
+                </div>
+            </div>
+            <div id="map"></div>
+        </div>
+
+        <aside id="sidebar">
+            <div id="sidebarContent">
+                <div style="padding: 20px; text-align: center; color: #666;">
+                    Select a route to view delivery details.
+                </div>
+            </div>
+        </aside>
     </div>
-</div>
 
-<script>
-    const CONFIG = {
-        owner: "Billyschmidt123",
-        repo: "Bottle-Water-",
-        manifestPath: "ROUTES/routes-manifest.json"
-    };
+    <div id="modalContainer"></div>
 
-    // Initialize App
-    window.onload = () => {
-        loadCachedRoutes();
-    };
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="JS/loader.js?v=1"></script>
 
-    function switchView(viewId) {
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.getElementById(viewId).classList.add('active');
-    }
+    <script>
+    (function () {
+        const ROUTE_CACHE_KEY = 'logiflowRouteCache_v1';
 
-    // Load from Local Storage so the Map is ready immediately
-    function loadCachedRoutes() {
-        const cached = localStorage.getItem('logiflow_master_routes');
-        if (cached) {
-            const data = JSON.parse(cached);
-            updateDropdown(data.routes);
-            document.getElementById('sync-status').textContent = "Loaded " + data.routes.length + " routes from cache.";
+        window.loadModule = function (moduleName) {
+            const container = document.getElementById('sidebarContent');
+            if (!container) return;
+
+            const url = 'MODULES/' + moduleName + '.html';
+            fetch(url + '?cb=' + Date.now())
+                .then(res => {
+                    if (!res.ok) throw new Error('Module load failed');
+                    return res.text();
+                })
+                .then(html => {
+                    container.innerHTML = html;
+                    const temp = document.createElement('div');
+                    temp.innerHTML = html;
+                    temp.querySelectorAll('script').forEach(oldScript => {
+                        const newScript = document.createElement('script');
+                        if (oldScript.src) newScript.src = oldScript.src;
+                        else newScript.textContent = oldScript.textContent;
+                        document.body.appendChild(newScript);
+                    });
+                    
+                    if (window.logiflowRouteCache) {
+                        populateRouteDropdown(window.logiflowRouteCache.routes);
+                    }
+                })
+                .catch(err => console.error(err));
+        };
+
+        function initManagerButtons() {
+            document.querySelectorAll('.openManagerBtn').forEach(btn => {
+                if (!btn.__bound) {
+                    btn.addEventListener('click', () => window.loadModule('manager-portal'));
+                    btn.__bound = true;
+                }
+            });
         }
-    }
 
-    // The Manager's Sync Function
-    async function refreshManifest() {
-        const status = document.getElementById('sync-status');
-        const url = `https://raw.githubusercontent.com/${CONFIG.owner}/${CONFIG.repo}/main/${CONFIG.CONFIG.manifestPath}?cb=${Date.now()}`;
-        
-        status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Contacting GitHub...';
+        function parseCSV(text) {
+            if (!text) return [];
+            const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+            if (lines.length === 0) return [];
+            const headers = lines[0].split(',').map(h => h.trim());
+            return lines.slice(1).map(line => {
+                const parts = line.split(',');
+                const obj = {};
+                headers.forEach((h, i) => obj[h] = (parts[i] || '').trim());
+                return obj;
+            });
+        }
 
-        try {
-            const response = await fetch(url);
-            if (!response.ok) throw new Error("Could not find manifest.");
+        function populateRouteDropdown(routes) {
+            const selectors = ['#routeDropdownMap', '#routeDropdown'];
+            selectors.forEach(selector => {
+                const dropdown = document.querySelector(selector);
+                if (!dropdown) return;
+
+                while (dropdown.options.length > 1) dropdown.remove(1);
+
+                routes.forEach(route => {
+                    const opt = document.createElement('option');
+                    opt.value = route.id || route.name;
+                    opt.textContent = route.name || route.id;
+                    dropdown.appendChild(opt);
+                });
+            });
+        }
+
+        window.refreshRoutesFromGitHub = function() {
+            console.log("Syncing with GitHub...");
+            const manifestUrl = 'ROUTES/routes-manifest.json?cb=' + Date.now();
             
-            const data = await response.json(); // Fetches { "routes": [...] }
+            return fetch(manifestUrl)
+                .then(res => res.json())
+                .then(manifest => {
+                    const promises = manifest.routes.map(r => {
+                        return fetch(r.file + '?cb=' + Date.now())
+                            .then(res => res.text())
+                            .then(csv => ({ ...r, stops: parseCSV(csv) }))
+                            .catch(() => null);
+                    });
 
-            if (data && data.routes) {
-                // Save to Local Storage for the Technicians
-                localStorage.setItem('logiflow_master_routes', JSON.stringify(data));
-                
-                // Update the Map Dropdown
-                updateDropdown(data.routes);
-                
-                status.style.color = "green";
-                status.textContent = "SUCCESS: " + data.routes.length + " routes synced to all devices.";
+                    return Promise.all(promises);
+                })
+                .then(results => {
+                    const routes = results.filter(r => r !== null);
+                    const cache = { routes: routes, updatedAt: new Date().toISOString() };
+                    localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
+                    window.logiflowRouteCache = cache;
+                    populateRouteDropdown(routes);
+                    return cache;
+                });
+        };
+
+        function loadRouteCache() {
+            try {
+                const raw = localStorage.getItem(ROUTE_CACHE_KEY);
+                return raw ? JSON.parse(raw) : null;
+            } catch (e) { return null; }
+        }
+
+        function initRouteSystem() {
+            let cached = loadRouteCache();
+            
+            if (!cached) {
+                console.log("No manifest found. Creating initial JSON structure.");
+                cached = { 
+                    routes: [], 
+                    updatedAt: new Date().toISOString(),
+                    status: "initialized" 
+                };
+                localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cached));
             }
-        } catch (err) {
-            status.style.color = "red";
-            status.textContent = "SYNC FAILED: Check internet or GitHub file path.";
-            console.error(err);
-        }
-    }
 
-    function updateDropdown(routes) {
-        const select = document.getElementById('routeSelect');
-        // Save current selection
-        const currentVal = select.value;
-        
-        select.innerHTML = '<option value="">-- Choose Your Route --</option>';
-        routes.forEach(route => {
-            const opt = document.createElement('option');
-            opt.value = route.file; // e.g. routes/Week 1/Route.csv
-            opt.textContent = route.name; // e.g. Week 1 Friday[cite: 1]
-            select.appendChild(opt);
+            if (cached) {
+                window.logiflowRouteCache = cached;
+                populateRouteDropdown(cached.routes);
+            }
+            
+            window.refreshRoutesFromGitHub().catch(e => console.warn("Offline mode active."));
+
+            document.getElementById('refreshRoutesBtn').addEventListener('click', (e) => {
+                e.preventDefault();
+                window.refreshRoutesFromGitHub().then(() => alert("Routes Updated"));
+            });
+        }
+
+        window.closeModal = function() {
+            const container = document.getElementById('sidebarContent');
+            const header = container.querySelector('h2');
+            if (header && (header.textContent === 'Bulk Route Importer' || header.textContent === 'Bulk Route Importer & GitHub Sync')) {
+                window.loadModule('manager-portal');
+            } else {
+                container.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Select a route to begin.</div>';
+            }
+        };
+
+        window.updateManifestManually = function(jsonString) {
+            try {
+                const data = JSON.parse(jsonString);
+                if (data.routes) {
+                    const cache = { routes: data.routes, updatedAt: new Date().toISOString(), manual: true };
+                    localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
+                    window.logiflowRouteCache = cache;
+                    populateRouteDropdown(data.routes);
+                    return true;
+                }
+            } catch(e) { console.error("Invalid JSON provided"); return false; }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initManagerButtons();
+            initRouteSystem();
         });
-
-        // Restore selection if it still exists
-        select.value = currentVal;
-    }
-
-    function loadRouteToMap() {
-        const file = document.getElementById('routeSelect').value;
-        if (file) {
-            console.log("Loading Map Data from: " + file);
-            // Add your mapping logic here
-        }
-    }
-</script>
-
+    })();
+    </script>
 </body>
 </html>
