@@ -85,6 +85,10 @@
         /* Modal */
         .order-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
         .order-content { background: white; padding: 25px; border-radius: 8px; width: 90%; max-width: 900px; }
+
+        /* ADDED MODAL FIELD STYLING */
+        .modal-field-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; background: #f9f9f9; padding: 10px; border-radius: 5px; font-size: 0.85rem; }
+        .sig-panel { border: 2px dashed #ccc; height: 100px; background: #fff; margin-top: 5px; display: flex; align-items: center; justify-content: center; color: #999; }
     </style>
 </head>
 <body>
@@ -126,6 +130,21 @@
         <div class="order-content">
             <h2 id="orderCompanyName">Stop Details</h2>
             <hr>
+            
+            <!-- ADDED: NEW INFO FIELDS SECTION -->
+            <div class="modal-field-group">
+                <div>
+                    <strong>Address:</strong> <span id="modFullAddr">--</span><br>
+                    <strong>Phone:</strong> <span id="modPhone">--</span><br>
+                    <strong>Delivery Fee:</strong> <span id="modFee">--</span><br>
+                    <strong>Travel:</strong> <span id="modTravel">--</span>
+                </div>
+                <div>
+                    <strong>Instructions:</strong> <span id="modInstruct" style="color:red">--</span><br>
+                    <strong>Notes:</strong> <span id="modNotes">--</span>
+                </div>
+            </div>
+
             <div style="display: flex; gap: 20px;">
                 <div style="flex: 1;">
                     <h4 style="color:#007bff">Water</h4>
@@ -138,6 +157,25 @@
                     <button id="addCoffeeBtn" class="btn-top" style="background:#6f42c1; width:100%">+ Add Coffee</button>
                 </div>
             </div>
+
+            <!-- ADDED: PRE-ORDERED PRODUCT SECTION -->
+            <div style="margin-top: 15px; padding: 10px; background: #e8f4fd; border-radius: 5px; border-left: 5px solid #007bff;">
+                <strong><i class="fas fa-list-check"></i> PRE-ORDERED PRODUCTS (Call-ins):</strong>
+                <div id="preOrderDisplay" style="font-style: italic; margin-top: 5px;">None</div>
+            </div>
+
+            <!-- ADDED: SIGNATURE AND RECEIVED BY -->
+            <div style="display: flex; gap: 20px; margin-top: 15px;">
+                <div style="flex: 1;">
+                    <strong>Received By:</strong>
+                    <input type="text" id="receivedByInp" style="width: 100%; padding: 8px; margin-top: 5px;" placeholder="Name...">
+                </div>
+                <div style="flex: 1;">
+                    <strong>Signature:</strong>
+                    <div class="sig-panel">Signature Panel</div>
+                </div>
+            </div>
+
             <div style="text-align: right; margin-top: 20px;">
                 <button class="btn-top btn-start">Complete</button>
                 <button onclick="document.getElementById('orderModal').style.display='none'" class="btn-top btn-finish">Cancel</button>
@@ -252,6 +290,16 @@
                     document.getElementById('currentAddress').innerText = data.address || "N/A";
                     document.getElementById('currentPhone').innerText = data.phone || "--";
                     document.getElementById('orderCompanyName').innerText = data.company || "Details";
+                    
+                    /* ADDED: DATA MAPPING FOR NEW MODAL FIELDS */
+                    document.getElementById('modFullAddr').innerText = `${data.address || ''} (${data.city || ''} ${data['postal code'] || ''})`;
+                    document.getElementById('modPhone').innerText = data.phone || "--";
+                    document.getElementById('modFee').innerText = data['delivery fee'] || "$0.00";
+                    document.getElementById('modTravel').innerText = data.travel || "0";
+                    document.getElementById('modInstruct').innerText = data['special instructions'] || "None";
+                    document.getElementById('modNotes').innerText = data.notes || "None";
+                    document.getElementById('preOrderDisplay').innerText = data['pre ordered items'] || "No pre-orders found";
+                    
                     document.getElementById('orderModal').style.display = 'flex';
                 };
                 sidebar.appendChild(card);
