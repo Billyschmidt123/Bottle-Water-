@@ -11,30 +11,33 @@
     <link rel="stylesheet" href="CSS/map.css">
     
     <style>
-        /* ADDITION START: RESTORE 70/30 SPLIT AND BUTTON STYLING */
+        /* ADDITION START: FORCE 70/30 SPLIT WITH SIDEBAR ON RIGHT */
         .app-container {
-            display: flex;
-            flex-direction: row;
-            width: 100%;
-            height: calc(100vh - 60px);
+            display: flex !important;
+            flex-direction: row !important;
+            width: 100% !important;
+            height: calc(100vh - 60px) !important;
         }
         #mapPanel {
-            flex: 0 0 70%;
-            width: 70%;
-            height: 100%;
+            order: 1 !important; /* Forces Map to the Left */
+            flex: 0 0 70% !important;
+            width: 70% !important;
+            height: 100% !important;
         }
         #sidebar {
-            flex: 0 0 30%;
-            width: 30%;
-            height: 100%;
-            border-left: 1px solid #ccc;
-            overflow-y: auto;
-            background: #f9f9f9;
+            order: 2 !important; /* Forces Sidebar to the Right */
+            flex: 0 0 30% !important;
+            width: 30% !important;
+            height: 100% !important;
+            border-left: 1px solid #ccc !important;
+            border-right: none !important;
+            overflow-y: auto !important;
+            background: #f9f9f9 !important;
         }
         .topbar-right {
-            display: flex;
-            gap: 10px;
-            align-items: center;
+            display: flex !important;
+            gap: 10px !important;
+            align-items: center !important;
         }
         /* ADDITION END */
     </style>
@@ -48,7 +51,7 @@
             </select>
         </div>
         <div class="topbar-right">
-            <!-- ADDITION START: RESTORE MISSING BUTTONS -->
+            <!-- ADDITION START: RESTORED HEADER BUTTONS -->
             <button id="refreshGitHubListBtn" class="btn-top" style="background:#6f42c1; color:white;">
                 <i class="fab fa-github"></i> Sync Route List
             </button>
@@ -64,10 +67,11 @@
     </header>
 
     <div class="app-container">
-        <!-- POSITION MAINTAINED: MAP LEFT (70%), SIDEBAR RIGHT (30%) -->
+        <!-- POSITION: MAP (LEFT 70%) -->
         <div id="mapPanel">
             <div id="map" style="height: 100%; min-height: 600px;"></div>
         </div>
+        <!-- POSITION: SIDEBAR (RIGHT 30%) -->
         <aside id="sidebar">
             <div id="sidebarContent" style="padding: 20px; text-align: center; color: #666;">
                 Select a route to view stop cards.
