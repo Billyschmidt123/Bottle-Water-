@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="CSS/map.css">
     
     <style>
-        /* 70/30 SPLIT (Matches image_973a0e.png) */
+        /* 70/30 SPLIT - FIXED SIDEBAR ON RIGHT */
         .app-container {
             display: flex !important;
             flex-direction: row !important;
@@ -28,12 +28,11 @@
             width: 70% !important;
             height: 100% !important;
             position: relative !important;
-            background-color: #ddd; /* Visible placeholder */
         }
         #map {
             width: 100% !important;
             height: 100% !important;
-            z-index: 10 !important; /* Ensure map stays on top of the panel background */
+            background-color: #ddd; 
         }
         #sidebar {
             order: 2 !important;
@@ -83,6 +82,9 @@
             </div>
         </aside>
     </div>
+
+    <!-- Load the map logic BEFORE the cleanup script -->
+    <script src="JS/map.js"></script>
 
     <script>
     (function () {
@@ -138,29 +140,24 @@
         });
 
         document.getElementById('refreshRoutesBtn').addEventListener('click', autoSyncRoutes);
-        
         const syncBtn = document.getElementById('refreshGitHubListBtn');
         if(syncBtn) { syncBtn.addEventListener('click', autoSyncRoutes); }
 
-        // Start the process
         autoSyncRoutes().catch(() => {});
 
-        /* FIX: ENSURE LEAFLET LOADS AFTER LAYOUT */
+        // SAFER MAP REFRESH
         window.addEventListener('load', () => {
             setTimeout(() => {
-                // If the map object is globally defined in your map.js, this will wake it up
-                if (typeof map !== 'undefined' && map !== null) {
-                    map.invalidateSize();
-                    console.log("Map size refreshed on load.");
+                // This checks if 'map' exists AND if it has the Leaflet resize function
+                if (window.map && typeof window.map.invalidateSize === 'function') {
+                    window.map.invalidateSize();
+                    console.log("Map layout fixed.");
                 } else {
-                    console.warn("Map object not found. Ensure map.js initializes 'map'.");
+                    console.log("Map object not yet ready or named differently.");
                 }
-            }, 800);
+            }, 1000);
         });
     })();
     </script>
-    
-    <!-- IMPORTANT: Ensure map.js is loaded AFTER the HTML map div exists -->
-    <script src="JS/map.js"></script>
 </body>
 </html>
