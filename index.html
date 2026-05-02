@@ -219,31 +219,30 @@
             let data = (type === 'customer') ? masterCustomerData[index] : masterProductData[index];
             const fields = document.getElementById('modalFields');
             
-            // Build HTML
-            fields.innerHTML = Object.keys(data).filter(k => !k.startsWith('_')).map(k => `
-                <div class="form-group">
-                    <label>${(k.toLowerCase().includes('slip') || k.toLowerCase().includes('po')) ? 'Delivery Slip' : k}</label>
-                    <input type="text" data-key="${k}">
-                </div>
-            `).join('');
+            // FIX START: Map table headers directly to cell data to ensure 1:1 match
+            const tableId = (type === 'customer') ? 'customerTable' : 'productTable';
+            const table = document.getElementById(tableId);
+            const headers = Array.from(table.querySelectorAll('thead th')).slice(1); // Skip 'Edit'
+            const rowCells = Array.from(table.querySelectorAll('tbody tr'))[index].querySelectorAll('td');
+            const cells = Array.from(rowCells).slice(1); // Skip Edit button cell
 
-            // ADDITIVE FIX START: Handle Undefined by stripping whitespace/quotes and checking live DOM
+            fields.innerHTML = headers.map((th, i) => {
+                const headerText = th.innerText.trim();
+                const cellValue = cells[i] ? cells[i].innerText.trim() : "";
+                return `
+                    <div class="form-group">
+                        <label>${headerText}</label>
+                        <input type="text" value="${cellValue}" data-header="${headerText}">
+                    </div>
+                `;
+            }).join('');
+
+            // Force DOM values to update
             const inputs = fields.querySelectorAll('input');
             inputs.forEach(input => {
-                const key = input.getAttribute('data-key');
-                let val = data[key];
-                
-                // If the direct key is undefined, search for a matching key regardless of formatting
-                if (val === undefined || val === "undefined") {
-                    const cleanKey = key.replace(/["\s]/g, '').toLowerCase();
-                    const realKey = Object.keys(data).find(k => k.replace(/["\s]/g, '').toLowerCase() === cleanKey);
-                    val = realKey ? data[realKey] : "";
-                }
-
-                input.setAttribute('value', val); 
-                input.value = val;               
+                input.value = input.getAttribute('value');
             });
-            // ADDITIVE FIX END
+            // FIX END
 
             document.getElementById('crudModal').style.display = 'flex';
         };
