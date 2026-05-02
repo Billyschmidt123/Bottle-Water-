@@ -94,7 +94,7 @@
         async function fetchProducts() {
             try {
                 const files = await ghFetch('Products');
-                const file = files.find(f => f.name.endsWith('.csv'));
+                const file = files.find(f => f.name.toLowerCase().endsWith('.csv'));
                 if (file) {
                     const res = await fetch(file.download_url);
                     const text = await res.text();
@@ -141,29 +141,39 @@
 
         document.getElementById('addItemBtn').onclick = () => {
             const container = document.getElementById('basketItems');
+            if (masterProductData.length === 0) return alert("Product list is still loading or empty.");
+
             const itemDiv = document.createElement('div');
             itemDiv.className = 'basket-item';
             
-            // Strictly pull from "Item" column as per CSV structure
-            let options = masterProductData.map(p => `<option value="${p['Item']}">${p['Item']}</option>`).join('');
+            // Find the header named exactly "Item" (case-insensitive)
+            const headers = Object.keys(masterProductData[0]);
+            const itemKey = headers.find(h => h.toLowerCase() === "item") || headers[1] || headers[0];
+            
+            let options = masterProductData.map(p => {
+                const name = p[itemKey] || "Unknown";
+                return `<option value="${name}">${name}</option>`;
+            }).join('');
             
             itemDiv.innerHTML = `
                 <select class="p-sel" style="flex:2"><option value="">Select Item...</option>${options}</select>
                 <select class="u-sel" style="flex:1"><option value="">Unit</option></select>
                 <input type="number" class="q-inp" placeholder="Qty" style="width:50px;">
-                <button onclick="this.parentElement.remove()" style="color:red; background:none; border:none; cursor:pointer;">X</button>
+                <button onclick="this.parentElement.remove()" style="color:red; background:none; border:none; cursor:pointer;"><i class="fas fa-trash"></i></button>
             `;
             
             const pSel = itemDiv.querySelector('.p-sel');
             const uSel = itemDiv.querySelector('.u-sel');
             
             pSel.onchange = (e) => {
-                const found = masterProductData.find(p => p['Item'] === e.target.value);
+                const found = masterProductData.find(p => p[itemKey] === e.target.value);
                 uSel.innerHTML = '<option value="">Unit</option>';
-                // Check all possible unit and price columns from your CSV
+                
+                // Units based on image_86737f.png and image_86733c.png
                 ['Case', 'Box', 'Sleeve', 'bottle', 'Slieve'].forEach(u => {
-                    if (found && found[u] && found[u].trim() !== "" && found[u].trim().toLowerCase() !== "na") {
-                        uSel.innerHTML += `<option value="${u}">${u}</option>`;
+                    const header = headers.find(h => h.toLowerCase() === u.toLowerCase());
+                    if (found && header && found[header] && found[header].trim() !== "" && found[header].trim().toLowerCase() !== "na") {
+                        uSel.innerHTML += `<option value="${header}">${header}</option>`;
                     }
                 });
             };
@@ -173,7 +183,7 @@
         async function start() {
             const dropdown = document.getElementById('routeDropdownMap');
             const files = await ghFetch('routes');
-            files.filter(f => f.name.endsWith('.csv')).forEach(file => {
+            files.filter(f => f.name.toLowerCase().endsWith('.csv')).forEach(file => {
                 const opt = document.createElement('option');
                 opt.value = file.download_url;
                 opt.textContent = file.name.replace('.csv', '');
