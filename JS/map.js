@@ -24,6 +24,7 @@ window.processCSV = function(csvText) {
         let data = {};
         headers.forEach((h, i) => data[h] = vals[i] ? vals[i].trim() : "");
         
+        // Supports latitude/longitude regardless of column capitalization
         const lat = parseFloat(data.latitude || data.lat);
         const lng = parseFloat(data.longitude || data.lng || data.long);
 
