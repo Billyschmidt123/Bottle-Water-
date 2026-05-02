@@ -11,7 +11,6 @@ function initMap() {
 }
 
 window.processCSV = function(csvText) {
-    // Remove old markers
     markers.forEach(m => map.removeLayer(m));
     markers = [];
 
