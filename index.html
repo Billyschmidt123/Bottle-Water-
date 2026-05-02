@@ -3,25 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogiFlow Delivery System - Fixed Split</title>
+    <title>LogiFlow Delivery System - Fixed Header</title>
     
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow: hidden; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow: hidden; height: 100vh; }
         
-        /* Rigid Header */
+        /* Rigid Topbar - Now housing the info */
         .topbar {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
-            height: 70px;
+            height: 75px;
             z-index: 1000;
             background: white;
-            padding: 0 20px;
+            padding: 0 15px;
             border-bottom: 2px solid #007bff;
             display: flex;
             justify-content: space-between;
@@ -29,24 +29,35 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
-        /* Fixed Split Container */
+        .topbar-left, .topbar-right { display: flex; align-items: center; gap: 10px; }
+        
+        /* Central Info Display */
+        .topbar-center {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            font-size: 0.9rem;
+            color: #333;
+            background: #f8f9fa;
+            margin: 0 20px;
+            padding: 8px 15px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
         .app-container { 
             display: flex; 
             width: 100vw; 
-            height: calc(100vh - 70px); 
-            margin-top: 70px; 
+            height: calc(100vh - 75px); 
+            margin-top: 75px; 
         }
 
-        #mapPanel { 
-            flex: 0 0 70%; /* Stays exactly 70% */
-            height: 100%; 
-            position: relative; 
-        }
-
+        #mapPanel { flex: 0 0 70%; height: 100%; position: relative; }
         #map { width: 100%; height: 100%; background-color: #ddd; }
 
         #sidebar { 
-            flex: 0 0 30%; /* Stays exactly 30% */
+            flex: 0 0 30%; 
             height: 100%; 
             border-left: 2px solid #ccc; 
             overflow-y: auto; 
@@ -55,59 +66,57 @@
 
         .btn-top {
             padding: 8px 12px;
-            margin-left: 5px;
             background: #007bff;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: bold;
+            white-space: nowrap;
         }
         .btn-start { background: #28a745; }
         .btn-finish { background: #dc3545; }
         .btn-optimize { background: #6f42c1; }
         .btn-manager { background: #495057; }
 
-        /* Modal Styles */
-        .manager-overlay, .order-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
-        .manager-menu-content, .order-content { background: white; padding: 25px; border-radius: 8px; width: 90%; max-width: 1000px; max-height: 90vh; overflow-y: auto; }
+        .stop-card { background: white; margin: 10px; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; border-left: 6px solid #007bff; }
         
-        .basket-item { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; padding: 10px; background: #fff; border: 1px solid #ddd; border-radius: 5px; }
-        .stop-card { background: white; margin: 10px; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; border-left: 6px solid #007bff; transition: transform 0.1s; }
-        .stop-card:hover { transform: scale(1.02); }
+        /* Modal */
+        .order-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
+        .order-content { background: white; padding: 25px; border-radius: 8px; width: 90%; max-width: 900px; }
     </style>
 </head>
 <body>
 
     <header class="topbar">
         <div class="topbar-left">
-            <span style="font-weight: bold; font-size: 1.2rem; color: #007bff; margin-right: 15px;">LogiFlow</span>
-            <select id="routeDropdownMap"><option value="">-- Select Route --</option></select>
-            <button class="btn-top btn-start">START ROUTE</button>
-            <button class="btn-top btn-finish">FINISH ROUTE</button>
-            <button class="btn-top btn-optimize">OPTIMIZE ROUTE</button>
+            <span style="font-weight: bold; color: #007bff;">LogiFlow</span>
+            <select id="routeDropdownMap" style="padding: 5px;"><option value="">-- Route --</option></select>
+            <button class="btn-top btn-start">START</button>
+            <button class="btn-top btn-optimize">OPTIMIZE</button>
         </div>
+
+        <!-- Integrated Info Bar -->
+        <div class="topbar-center">
+            <div><i class="fas fa-map-marker-alt" style="color:#007bff"></i> <span id="currentAddress">Select a stop...</span></div>
+            <div><i class="fas fa-phone" style="color:#28a745"></i> <span id="currentPhone">--</span></div>
+        </div>
+
         <div class="topbar-right">
-            <button id="openManagerBtn" class="btn-top btn-manager"><i class="fas fa-user-gear"></i> MANAGER MENU</button>
-            <button class="btn-top" onclick="window.location.reload()" style="background:#6c757d">REFRESH</button>
+            <button id="openManagerBtn" class="btn-top btn-manager">MANAGER</button>
+            <button class="btn-top" onclick="window.location.reload()" style="background:#6c757d"><i class="fas fa-sync"></i></button>
         </div>
     </header>
-
-    <!-- Simple Info Bar Inside Map Area -->
-    <div style="position: absolute; top: 85px; left: 20px; z-index: 999; background: white; padding: 10px 20px; border-radius: 5px; border: 1px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: flex; gap: 20px;">
-        <div><i class="fas fa-map-marker-alt" style="color:#007bff"></i> <span id="currentAddress">Select a stop...</span></div>
-        <div><i class="fas fa-phone" style="color:#28a745"></i> <span id="currentPhone">--</span></div>
-    </div>
 
     <div class="app-container">
         <div id="mapPanel">
             <div id="map"></div>
         </div>
         <aside id="sidebar">
-            <div id="sidebarContent" style="padding: 20px;">
-                <h3 style="text-align: center; color: #666;">Route Stops</h3>
-                <p style="text-align: center; font-size: 0.9rem; color: #888;">Please select a route from the top menu to populate stops.</p>
+            <div id="sidebarContent">
+                <h3 style="text-align: center; color: #666; margin-top: 20px;">Route Stops</h3>
+                <p style="text-align: center; font-size: 0.85rem; color: #888;">Select a route to begin.</p>
             </div>
         </aside>
     </div>
@@ -118,19 +127,19 @@
             <h2 id="orderCompanyName">Stop Details</h2>
             <hr>
             <div style="display: flex; gap: 20px;">
-                <div style="flex: 1; border: 1px solid #eee; padding: 15px; border-radius: 8px;">
-                    <h4 style="color:#007bff"><i class="fas fa-tint"></i> Water</h4>
+                <div style="flex: 1;">
+                    <h4 style="color:#007bff">Water</h4>
                     <div id="waterBasketItems"></div>
-                    <button id="addWaterBtn" class="btn-top" style="background:#007bff; width:100%">+ Add Water</button>
+                    <button id="addWaterBtn" class="btn-top" style="width:100%">+ Add Water</button>
                 </div>
-                <div style="flex: 1; border: 1px solid #eee; padding: 15px; border-radius: 8px;">
-                    <h4 style="color:#6f42c1"><i class="fas fa-coffee"></i> Coffee</h4>
+                <div style="flex: 1;">
+                    <h4 style="color:#6f42c1">Coffee</h4>
                     <div id="coffeeBasketItems"></div>
                     <button id="addCoffeeBtn" class="btn-top" style="background:#6f42c1; width:100%">+ Add Coffee</button>
                 </div>
             </div>
             <div style="text-align: right; margin-top: 20px;">
-                <button class="btn-top btn-start">Complete Delivery</button>
+                <button class="btn-top btn-start">Complete</button>
                 <button onclick="document.getElementById('orderModal').style.display='none'" class="btn-top btn-finish">Cancel</button>
             </div>
         </div>
@@ -174,7 +183,7 @@
                     if (file.name.toLowerCase().includes('water')) waterProducts = data;
                     if (file.name.toLowerCase().includes('coffee')) coffeeProducts = data;
                 }
-            } catch (e) { console.error("Load Error:", e); }
+            } catch (e) { console.error("Data Load Error"); }
         }
 
         function createOrderRow(containerId, list, units) {
@@ -185,8 +194,8 @@
             div.innerHTML = `
                 <select class="p-sel" style="flex:2"><option value="">Item...</option>${opts}</select>
                 <select class="u-sel" style="flex:1"><option value="">Unit</option></select>
-                <input type="number" class="q-inp" placeholder="Qty" style="width:50px;">
-                <button onclick="this.parentElement.remove()" style="color:red; background:none; border:none; cursor:pointer;"><i class="fas fa-trash"></i></button>
+                <input type="number" class="q-inp" placeholder="Qty" style="width:40px;">
+                <button onclick="this.parentElement.remove()" style="color:red; background:none; border:none;"><i class="fas fa-trash"></i></button>
             `;
             const pSel = div.querySelector('.p-sel');
             const uSel = div.querySelector('.u-sel');
@@ -229,7 +238,7 @@
 
         function buildStopCards(csv) {
             const sidebar = document.getElementById('sidebarContent');
-            sidebar.innerHTML = '<h3 style="text-align: center; color: #666;">Route Stops</h3>';
+            sidebar.innerHTML = '<h3 style="text-align: center; color: #666; margin-top: 20px;">Route Stops</h3>';
             const lines = csv.split('\n').filter(l => l.trim());
             const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
             lines.slice(1).forEach(line => {
