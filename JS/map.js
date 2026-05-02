@@ -1,19 +1,18 @@
-// map.js - Build 15
+// map.js
 let map;
 let markers = [];
 
 function initMap() {
-    map = L.map('map').setView([55.1707, -118.7947], 13); // Grande Prairie coords
+    // Defaulting to Grande Prairie area
+    map = L.map('map').setView([55.1707, -118.7947], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap'
     }).addTo(map);
-    console.log("LogiFlow Map: Initialized successfully.");
 }
 
-// Attach to window so index.html can see it
 window.processCSV = function(csvText) {
-    // Clear existing markers
-    markers.forEach(marker => map.removeLayer(marker));
+    // Remove old markers
+    markers.forEach(m => map.removeLayer(m));
     markers = [];
 
     const lines = csvText.split('\n').filter(l => l.trim());
@@ -23,19 +22,18 @@ window.processCSV = function(csvText) {
         const vals = line.split(',');
         let data = {};
         headers.forEach((h, i) => data[h] = vals[i] ? vals[i].trim() : "");
+        
+        const lat = parseFloat(data.latitude || data.lat);
+        const lng = parseFloat(data.longitude || data.lng || data.long);
 
-        // Logic to handle plotting if Lat/Lng exist, or just log for now
-        if (data.latitude && data.longitude) {
-            const marker = L.marker([data.latitude, data.longitude])
-                .addTo(map)
-                .bindPopup(`<b>${data.company}</b><br>${data.address}`);
-            markers.push(marker);
+        if (!isNaN(lat) && !isNaN(lng)) {
+            const m = L.marker([lat, lng]).addTo(map).bindPopup(data.company || "Delivery Stop");
+            markers.push(m);
         }
     });
 
     if (markers.length > 0) {
-        const group = new L.featureGroup(markers);
-        map.fitBounds(group.getBounds());
+        map.fitBounds(L.featureGroup(markers).getBounds());
     }
 };
 
