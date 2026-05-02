@@ -219,20 +219,24 @@
             let data = (type === 'customer') ? masterCustomerData[index] : masterProductData[index];
             const fields = document.getElementById('modalFields');
             
-            // Additive Fix: Generate fields and explicitly ensure value attribute is set
+            // Build the HTML for the fields
             fields.innerHTML = Object.keys(data).filter(k => !k.startsWith('_')).map(k => `
                 <div class="form-group">
                     <label>${(k.toLowerCase().includes('slip') || k.toLowerCase().includes('po')) ? 'Delivery Slip' : k}</label>
-                    <input type="text" value="${data[k]}" data-key="${k}">
+                    <input type="text" data-key="${k}">
                 </div>
             `).join('');
 
-            // Validation check: Ensure the values are live in the DOM after generation
+            // ADDITIVE FIX START: Explicitly set values after HTML generation to ensure display
             const inputs = fields.querySelectorAll('input');
             inputs.forEach(input => {
                 const key = input.getAttribute('data-key');
-                input.value = data[key];
+                if (data[key] !== undefined) {
+                    input.setAttribute('value', data[key]); // Sets the attribute
+                    input.value = data[key];               // Sets the live DOM property
+                }
             });
+            // ADDITIVE FIX END
 
             document.getElementById('crudModal').style.display = 'flex';
         };
