@@ -91,5 +91,231 @@
 
     <script src="JS/loader.js?v=1"></script>
 
+    <!-- FIX ADDED: Manager button wiring + module loader + route JSON cache system (additive-only) -->
+    <script>
+    (function () {
+        // ---- Additive module loader for MODULES/*.html ----
+        if (typeof window.loadModule !== 'function') {
+            window.loadModule = function (moduleName) {
+                var container = document.getElementById('sidebarContent');
+                if (!container || !moduleName) return;
+
+                var url = 'MODULES/' + moduleName + '.html';
+                fetch(url + '?cacheBust=' + Date.now(), { cache: 'no-store' })
+                    .then(function (res) {
+                        if (!res.ok) {
+                            throw new Error('Failed to load module: ' + url + ' (' + res.status + ')');
+                        }
+                        return res.text();
+                    })
+                    .then(function (html) {
+                        container.innerHTML = html;
+
+                        // Execute any <script> tags inside the loaded module HTML
+                        var temp = document.createElement('div');
+                        temp.innerHTML = html;
+                        var scripts = temp.querySelectorAll('script');
+                        scripts.forEach(function (oldScript) {
+                            var newScript = document.createElement('script');
+                            if (oldScript.src) {
+                                newScript.src = oldScript.src;
+                            } else {
+                                newScript.textContent = oldScript.textContent;
+                            }
+                            document.body.appendChild(newScript);
+                        });
+                    })
+                    .catch(function (err) {
+                        console.error(err);
+                    });
+            };
+        }
+
+        // ---- Manager button wiring (handles duplicate IDs) ----
+        function initManagerButtons() {
+            var buttons = document.querySelectorAll('#openManagerBtn');
+            if (!buttons || !buttons.length) return;
+
+            function onManagerClick(event) {
+                if (event && event.preventDefault) {
+                    event.preventDefault();
+                }
+                if (typeof window.loadModule === 'function') {
+                    // Use the confirmed module name: manager-portal.html
+                    window.loadModule('manager-portal');
+                }
+            }
+
+            buttons.forEach(function (btn) {
+                if (btn && !btn.__logiflowManagerBound) {
+                    btn.addEventListener('click', onManagerClick);
+                    btn.__logiflowManagerBound = true;
+                }
+            });
+        }
+
+        // ---- Route JSON cache system (GitHub-based, additive-only) ----
+        var ROUTE_CACHE_KEY = 'logiflowRouteCache_v1';
+
+        // Simple CSV parser (no quoted fields support; good enough for basic route CSVs)
+        function parseCSV(text) {
+            if (!text) return [];
+            var lines = text.split(/\r?\n/).filter(function (l) { return l.trim().length > 0; });
+            if (lines.length === 0) return [];
+            var headers = lines[0].split(',').map(function (h) { return h.trim(); });
+            var rows = [];
+            for (var i = 1; i < lines.length; i++) {
+                var parts = lines[i].split(',');
+                if (parts.length === 1 && parts[0].trim() === '') continue;
+                var obj = {};
+                for (var j = 0; j < headers.length; j++) {
+                    obj[headers[j]] = (parts[j] || '').trim();
+                }
+                rows.push(obj);
+            }
+            return rows;
+        }
+
+        function saveRouteCache(cache) {
+            try {
+                localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
+            } catch (e) {
+                // ignore storage errors
+            }
+        }
+
+        function loadRouteCache() {
+            try {
+                var raw = localStorage.getItem(ROUTE_CACHE_KEY);
+                if (!raw) return null;
+                return JSON.parse(raw);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function populateRouteDropdown(routes) {
+            var dropdown = document.getElementById('routeDropdownMap');
+            if (!dropdown) return;
+
+            // Clear existing options except the first placeholder
+            while (dropdown.options.length > 1) {
+                dropdown.remove(1);
+            }
+
+            if (!routes || !routes.length) return;
+
+            routes.forEach(function (route) {
+                var opt = document.createElement('option');
+                opt.value = route.id || route.name || '';
+                opt.textContent = route.name || route.id || 'Unnamed route';
+                dropdown.appendChild(opt);
+            });
+        }
+
+        // Expected manifest file (you create this in the repo):
+        // ROUTES/routes-manifest.json
+        // {
+        //   "routes": [
+        //     { "id": "R1", "name": "Route 1", "file": "ROUTES/Week 1/route1.csv" },
+        //     { "id": "R2", "name": "Route 2", "file": "ROUTES/Week 2/route2.csv" }
+        //   ]
+        // }
+        function fetchRouteManifest() {
+            var url = 'ROUTES/routes-manifest.json?cacheBust=' + Date.now();
+            return fetch(url, { cache: 'no-store' }).then(function (res) {
+                if (!res.ok) {
+                    throw new Error('Failed to load route manifest: ' + res.status);
+                }
+                return res.json();
+            });
+        }
+
+        function fetchRouteCSV(routeDef) {
+            var url = routeDef.file + (routeDef.file.indexOf('?') === -1 ? '?cacheBust=' + Date.now() : '&cacheBust=' + Date.now());
+            return fetch(url, { cache: 'no-store' })
+                .then(function (res) {
+                    if (!res.ok) {
+                        throw new Error('Failed to load route CSV: ' + routeDef.file);
+                    }
+                    return res.text();
+                })
+                .then(function (text) {
+                    var stops = parseCSV(text);
+                    return {
+                        id: routeDef.id || routeDef.name || '',
+                        name: routeDef.name || routeDef.id || '',
+                        file: routeDef.file,
+                        stops: stops
+                    };
+                });
+        }
+
+        function refreshRoutesFromGitHub() {
+            return fetchRouteManifest()
+                .then(function (manifest) {
+                    if (!manifest || !manifest.routes || !manifest.routes.length) {
+                        return { routes: [] };
+                    }
+                    var promises = manifest.routes.map(function (routeDef) {
+                        return fetchRouteCSV(routeDef).catch(function () {
+                            // If a single route fails, skip it but continue others
+                            return null;
+                        });
+                    });
+                    return Promise.all(promises).then(function (results) {
+                        var routes = results.filter(function (r) { return !!r; });
+                        var cache = { routes: routes, refreshedAt: new Date().toISOString() };
+                        saveRouteCache(cache);
+                        populateRouteDropdown(routes);
+                        // expose for other scripts if needed
+                        window.logiflowRouteCache = cache;
+                        return cache;
+                    });
+                })
+                .catch(function () {
+                    // On failure, keep whatever cache exists
+                    var existing = loadRouteCache();
+                    if (existing) {
+                        populateRouteDropdown(existing.routes);
+                        window.logiflowRouteCache = existing;
+                        return existing;
+                    }
+                    return { routes: [] };
+                });
+        }
+
+        function initRouteSystem() {
+            // Load from cache first for speed
+            var cached = loadRouteCache();
+            if (cached && cached.routes && cached.routes.length) {
+                populateRouteDropdown(cached.routes);
+                window.logiflowRouteCache = cached;
+            }
+
+            // Always refresh from GitHub on startup to keep data fresh
+            refreshRoutesFromGitHub();
+
+            // Wire up Refresh button
+            var refreshBtn = document.getElementById('refreshRoutesBtn');
+            if (refreshBtn && !refreshBtn.__logiflowRoutesBound) {
+                refreshBtn.addEventListener('click', function (event) {
+                    if (event && event.preventDefault) {
+                        event.preventDefault();
+                    }
+                    refreshRoutesFromGitHub();
+                });
+                refreshBtn.__logiflowRoutesBound = true;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            initManagerButtons();
+            initRouteSystem();
+        });
+    })();
+    </script>
+    <!-- END FIX ADDED: Manager button wiring + module loader + route JSON cache system -->
+
 </body>
 </html>
