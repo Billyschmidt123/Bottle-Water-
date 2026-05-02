@@ -76,31 +76,38 @@
 
     <script>
     (function () {
-        // --- ADMIN SECURITY BRIDGE ---
-        const XOR_CIPHER = (str, key) => {
-            return str.split('').map((char, i) => 
-                String.fromCharCode(char.charCodeAt(0) ^ key.charCodeAt(i % key.length))
-            ).join('');
+        // Simple XOR decoder
+        const decodeToken = (encoded, key) => {
+            try {
+                return atob(encoded).split('').map((char, i) => 
+                    String.fromCharCode(char.charCodeAt(0) ^ key.charCodeAt(i % key.length))
+                ).join('');
+            } catch(e) { return null; }
         };
 
-        // Your scrambled token protected by your password
-        const SCRAMBLED_DATA = "V1tbS08ZFlFVAhZfUFBZVFRfVlxOEQoNCF5SWFBfXF9eVFRZVF1UWFtfWVhRXl1N"; 
+        // Your specific scrambled token
+        const SCRAMBLED = "V1tbS08ZFlFVAhZfUFBZVFRfVlxOEQoNCF5SWFBfXF9eVFRZVF1UWFtfWVhRXl1N"; 
         
         let activeToken = localStorage.getItem('logiflow_gh_token');
         
-        // If the device is new or wiped, ask for the short password
-        if (!activeToken || activeToken === "null") {
-            const driverPass = prompt("LogiFlow: Enter Route Access Password:");
-            if (driverPass) {
-                try {
-                    const decoded = XOR_CIPHER(atob(SCRAMBLED_DATA), driverPass);
-                    if (decoded.startsWith('github_pat')) {
-                        localStorage.setItem('logiflow_gh_token', decoded);
-                        activeToken = decoded;
-                    } else {
-                        alert("Access Denied: Incorrect password.");
-                    }
-                } catch(e) { alert("Access Denied."); }
+        // Force the prompt if no token is saved
+        if (!activeToken || activeToken === "null" || activeToken === "undefined") {
+            const driverPass = prompt("LogiFlow Security: Enter Route Access Password:");
+            
+            // Clean the input to remove accidental spaces
+            const cleanPass = (driverPass || "").trim();
+
+            if (cleanPass === "2026!") {
+                const result = decodeToken(SCRAMBLED, "2026!");
+                if (result && result.startsWith("github_pat")) {
+                    localStorage.setItem('logiflow_gh_token', result);
+                    activeToken = result;
+                } else {
+                    alert("System Error: Failed to unlock the key. Contact Admin.");
+                }
+            } else if (driverPass !== null) {
+                alert("Incorrect password. Please try again.");
+                window.location.reload(); // Refresh to try again
             }
         }
 
@@ -110,14 +117,22 @@
             BASE_RAW: 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/'
         };
 
+        // Standard fetch wrapper
         async function safeFetch(url, options = {}) {
             if (!GITHUB_CONFIG.TOKEN) return null;
             try {
-                const response = await fetch(url, options);
+                const response = await fetch(url, {
+                    ...options,
+                    headers: { 
+                        ...(options.headers || {}),
+                        'Authorization': `token ${GITHUB_CONFIG.TOKEN}`
+                    }
+                });
                 return response;
             } catch (e) { return null; }
         }
 
+        // CSV to Stop Card Logic
         function parseCSVToStopCards(text) {
             const lines = text.split(/\r?\n/).filter(l => l.trim());
             if (!lines.length) return [];
@@ -135,11 +150,11 @@
         window.refreshRoutesFromGitHub = async function() {
             try {
                 const res = await safeFetch(GITHUB_CONFIG.BASE_RAW + 'routes/routes-manifest.json?cb=' + Date.now());
-                if (!res || res.status === 404) return;
-
-                const manifest = await res.json();
-                populateRouteDropdown(manifest.routes);
-            } catch (e) { console.warn("List refresh failed."); }
+                if (res && res.ok) {
+                    const manifest = await res.json();
+                    populateRouteDropdown(manifest.routes);
+                }
+            } catch (e) { console.warn("List sync failed."); }
         };
 
         document.getElementById('routeDropdownMap').addEventListener('change', async (e) => {
@@ -153,18 +168,15 @@
             if (res && res.ok) {
                 const csvText = await res.text();
                 const stopCards = parseCSVToStopCards(csvText);
-                sidebar.innerHTML = `<div style="padding: 20px;">Loaded ${stopCards.length} stop cards for ${fileName}.</div>`;
-                console.log("Technician ready with stop cards:", stopCards);
+                sidebar.innerHTML = `<div style="padding: 20px;">Loaded ${stopCards.length} stop cards.</div>`;
             }
         });
 
         window.syncRouteListFromGitHubDir = async function() {
             const API_URL = `https://api.github.com/repos/${GITHUB_CONFIG.REPO}/contents/routes`;
             try {
-                const res = await safeFetch(API_URL, {
-                    headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}` }
-                });
-                if (!res || !res.ok) throw new Error("Sync denied.");
+                const res = await safeFetch(API_URL);
+                if (!res || !res.ok) throw new Error("GitHub Connection Failed.");
 
                 const data = await res.json();
                 const csvFiles = data.filter(f => f.name.endsWith('.csv')).map(f => ({
@@ -176,21 +188,24 @@
                 const manifest = { updatedAt: new Date().toISOString(), routes: csvFiles };
                 await pushManifestToGitHub(manifest);
                 await window.refreshRoutesFromGitHub();
-                alert(`Found ${csvFiles.length} routes.`);
-            } catch (e) { alert("Sync Error."); }
+                alert(`Success: Found ${csvFiles.length} routes.`);
+            } catch (e) { alert("Sync Error: " + e.message); }
         };
 
         async function pushManifestToGitHub(manifest) {
             const path = 'routes/routes-manifest.json';
             const url = `https://api.github.com/repos/${GITHUB_CONFIG.REPO}/contents/${path}`;
-            const getRes = await safeFetch(url, { headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}` } });
+            const getRes = await safeFetch(url);
             const sha = getRes && getRes.ok ? (await getRes.json()).sha : null;
 
             await fetch(url, {
                 method: 'PUT',
-                headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}`, 'Content-Type': 'application/json' },
+                headers: { 
+                    'Authorization': `token ${GITHUB_CONFIG.TOKEN}`, 
+                    'Content-Type': 'application/json' 
+                },
                 body: JSON.stringify({
-                    message: "Logiflow Update",
+                    message: "Logiflow: Syncing Routes",
                     content: btoa(JSON.stringify(manifest, null, 2)),
                     sha: sha
                 })
@@ -212,6 +227,7 @@
         document.getElementById('refreshGitHubListBtn').addEventListener('click', window.syncRouteListFromGitHubDir);
         document.getElementById('refreshRoutesBtn').addEventListener('click', window.refreshRoutesFromGitHub);
 
+        // Run on startup
         window.refreshRoutesFromGitHub();
     })();
     </script>
