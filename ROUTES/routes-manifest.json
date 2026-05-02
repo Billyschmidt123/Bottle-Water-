@@ -1,0 +1,29 @@
+{
+    "routes": [
+        {
+            "id": "dawson-creek-new-",
+            "name": "Dawson creek new ",
+            "file": "routes/Others-20260423T171847Z-3-001/Dawson creek new .csv"
+        },
+        {
+            "id": "fox-creek---valleyview-",
+            "name": "Fox Creek - Valleyview ",
+            "file": "routes/Others-20260423T171847Z-3-001/Fox Creek - Valleyview .csv"
+        },
+        {
+            "id": "north",
+            "name": "North",
+            "file": "routes/Others-20260423T171847Z-3-001/North.csv"
+        },
+        {
+            "id": "salt",
+            "name": "Salt",
+            "file": "routes/Others-20260423T171847Z-3-001/Salt.csv"
+        },
+        {
+            "id": "valleyview",
+            "name": "Valleyview",
+            "file": "routes/Others-20260423T171847Z-3-001/Valleyview.csv"
+        }
+    ]
+}
