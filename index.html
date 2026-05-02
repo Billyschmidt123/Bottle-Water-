@@ -245,10 +245,16 @@
 
             return fetch(GITHUB_RAW_BASE + manifestPath + '?cb=' + Date.now())
                 .then(res => {
-                    if (!res.ok) throw new Error('Manifest not found on GitHub');
+                    // --- MODIFIED: SILENTLY HANDLE MISSING MANIFEST ---
+                    if (!res.ok) {
+                        console.warn("Manifest not found on GitHub. Application will use cached routes until 'Refresh Route List' is clicked.");
+                        return { routes: [] };
+                    }
                     return res.json();
                 })
                 .then(manifest => {
+                    if (!manifest.routes || manifest.routes.length === 0) return loadRouteCache();
+
                     const promises = manifest.routes.map(r => {
                         const targetPath = 'routes/' + r.file;
                         
@@ -264,6 +270,7 @@
                     return Promise.all(promises);
                 })
                 .then(results => {
+                    if (!results) return;
                     const routes = results.filter(r => r !== null);
                     const cache = { routes: routes, updatedAt: new Date().toISOString() };
                     localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
@@ -273,7 +280,7 @@
                 });
         };
 
-        // --- ADDED: SPECIFIC FUNCTION TO FETCH ROUTE FILE LIST FROM GITHUB DIRECTORY ---
+        // --- FIXED: IMPROVED ERROR HANDLING FOR DIRECTORY SYNC ---
         window.syncRouteListFromGitHubDir = async function() {
             const GITHUB_REPO = 'Billyschmidt123/Bottle-Water-';
             const DIR_PATH = 'routes';
@@ -281,28 +288,32 @@
 
             try {
                 const res = await fetch(API_URL);
-                if (!res.ok) throw new Error("Failed to fetch directory from GitHub");
+                if (!res.ok) throw new Error("Could not access routes folder on GitHub.");
                 
                 const files = await res.json();
-                // Filter for .csv files and map to route objects
                 const csvFiles = files.filter(f => f.name.endsWith('.csv')).map(f => ({
                     id: f.name.replace('.csv', ''),
                     name: f.name.replace('.csv', ''),
                     file: f.name
                 }));
 
+                if (csvFiles.length === 0) {
+                    alert("No CSV files found in the 'routes' folder on GitHub.");
+                    return;
+                }
+
                 const routelist = {
                     updatedAt: new Date().toISOString(),
                     routes: csvFiles
                 };
 
-                // Trigger full sync with the discovered files
+                // Push new manifest then refresh
                 await window.pushRouteListToGitHub(routelist);
                 await window.refreshRoutesFromGitHub();
-                alert(`Route list refreshed. ${csvFiles.length} routes found in GitHub directory.`);
+                alert(`Success: ${csvFiles.length} routes imported from GitHub directory.`);
             } catch (e) {
                 console.error(e);
-                alert("Error refreshing route list from GitHub directory.");
+                alert("Error: " + e.message);
             }
         };
 
@@ -327,14 +338,13 @@
                 populateRouteDropdown(cached.routes);
             }
             
-            window.refreshRoutesFromGitHub().catch(e => console.warn("Sync failed: " + e));
+            window.refreshRoutesFromGitHub().catch(e => console.warn("Initial sync check: " + e));
 
             document.getElementById('refreshRoutesBtn').addEventListener('click', (e) => {
                 e.preventDefault();
                 window.refreshRoutesFromGitHub().then(() => alert("Routes Updated")).catch(err => alert("Update failed: " + err));
             });
 
-            // ADDED: EVENT LISTENER FOR NEW GITHUB REFRESH BUTTON
             document.getElementById('refreshGitHubListBtn').addEventListener('click', () => {
                 window.syncRouteListFromGitHubDir();
             });
@@ -382,7 +392,7 @@
                     method: 'PUT',
                     headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        message: "Auto-update route manifest from Importer",
+                        message: "Auto-update route manifest",
                         content: btoa(JSON.stringify(routelist, null, 2)),
                         sha: sha
                     })
@@ -393,7 +403,7 @@
                 } else {
                     console.error("GitHub API response error:", await putRes.text());
                 }
-            } catch(e) { console.warn("GitHub Sync failed. Check network or repository permissions.", e); }
+            } catch(e) { console.warn("GitHub Sync failed.", e); }
         };
 
         document.getElementById('localFileImporter').addEventListener('change', function(e) {
@@ -439,7 +449,7 @@
                         window.pushRouteListToGitHub(routelist);
 
                         setTimeout(() => {
-                            alert(`Import Complete. ${files.length} files loaded, sorted, and pushed to GitHub.`);
+                            alert(`Import Complete. ${files.length} files loaded and synced.`);
                             progressContainer.style.display = 'none';
                             progressBar.style.width = '0%';
                         }, 500);
