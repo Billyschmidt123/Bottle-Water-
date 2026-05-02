@@ -20,6 +20,7 @@
         #uploadProgressContainer { width: 100%; background: #eee; border-radius: 5px; margin: 10px 0; display: none; }
         #uploadProgressBar { width: 0%; height: 20px; background: #28a745; border-radius: 5px; text-align: center; color: white; line-height: 20px; font-size: 12px; transition: width 0.3s; }
         .local-upload-btn { background: #28a745 !important; color: white !important; }
+        .github-refresh-btn { background: #6f42c1 !important; color: white !important; }
     </style>
 </head>
 
@@ -36,6 +37,12 @@
         <div class="topbar-right">
             <!-- NEW LOCAL FILE PICKER ADDED -->
             <input type="file" id="localFileImporter" multiple accept=".csv" style="display:none;">
+            
+            <!-- ADDED: REFRESH ROUTE LIST BUTTON -->
+            <button id="refreshGitHubListBtn" class="btn-top github-refresh-btn">
+                <i class="fab fa-github"></i> Refresh Route List
+            </button>
+
             <button class="btn-top local-upload-btn" onclick="document.getElementById('localFileImporter').click()">
                 <i class="fas fa-file-import"></i> Import From Local Drive
             </button>
@@ -233,7 +240,6 @@
         window.refreshRoutesFromGitHub = function() {
             console.log("Syncing with GitHub...");
             
-            // --- MODIFIED: UPDATED GITHUB REPO URL FOR MANIFEST FETCHING ---
             const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/';
             const manifestPath = 'routes/routes-manifest.json';
 
@@ -265,7 +271,39 @@
                     populateRouteDropdown(routes);
                     return cache;
                 });
-            // --- END MODIFIED FETCH LOGIC ---
+        };
+
+        // --- ADDED: SPECIFIC FUNCTION TO FETCH ROUTE FILE LIST FROM GITHUB DIRECTORY ---
+        window.syncRouteListFromGitHubDir = async function() {
+            const GITHUB_REPO = 'Billyschmidt123/Bottle-Water-';
+            const DIR_PATH = 'routes';
+            const API_URL = `https://api.github.com/repos/${GITHUB_REPO}/contents/${DIR_PATH}`;
+
+            try {
+                const res = await fetch(API_URL);
+                if (!res.ok) throw new Error("Failed to fetch directory from GitHub");
+                
+                const files = await res.json();
+                // Filter for .csv files and map to route objects
+                const csvFiles = files.filter(f => f.name.endsWith('.csv')).map(f => ({
+                    id: f.name.replace('.csv', ''),
+                    name: f.name.replace('.csv', ''),
+                    file: f.name
+                }));
+
+                const routelist = {
+                    updatedAt: new Date().toISOString(),
+                    routes: csvFiles
+                };
+
+                // Trigger full sync with the discovered files
+                await window.pushRouteListToGitHub(routelist);
+                await window.refreshRoutesFromGitHub();
+                alert(`Route list refreshed. ${csvFiles.length} routes found in GitHub directory.`);
+            } catch (e) {
+                console.error(e);
+                alert("Error refreshing route list from GitHub directory.");
+            }
         };
 
         function loadRouteCache() {
@@ -295,6 +333,11 @@
                 e.preventDefault();
                 window.refreshRoutesFromGitHub().then(() => alert("Routes Updated")).catch(err => alert("Update failed: " + err));
             });
+
+            // ADDED: EVENT LISTENER FOR NEW GITHUB REFRESH BUTTON
+            document.getElementById('refreshGitHubListBtn').addEventListener('click', () => {
+                window.syncRouteListFromGitHubDir();
+            });
         }
 
         window.closeModal = function() {
@@ -320,14 +363,12 @@
             } catch(e) { console.error("Invalid JSON provided"); return false; }
         };
 
-        // --- ADDED: GITHUB SYNC UTILITY WITH USER CREDENTIALS ---
         window.pushRouteListToGitHub = async function(routelist) {
             const GITHUB_TOKEN = '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';
             const GITHUB_REPO = 'Billyschmidt123/Bottle-Water-';
             const FILE_PATH = 'routes/routes-manifest.json';
 
             try {
-                // 1. Get current file SHA to allow overwrite
                 const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
                     headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
                 });
@@ -337,7 +378,6 @@
                     sha = fileData.sha;
                 }
                 
-                // 2. Push Update to manifest
                 const putRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
                     method: 'PUT',
                     headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
@@ -396,7 +436,6 @@
                         window.logiflowRouteCache = cache;
                         populateRouteDropdown(routes);
 
-                        // --- ADDED: AUTO-PUSH TO GITHUB ON IMPORT ---
                         window.pushRouteListToGitHub(routelist);
 
                         setTimeout(() => {
