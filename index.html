@@ -174,7 +174,6 @@
             cursor: pointer;
             font-weight: bold;
         }
-        /* FIX ADDITION: TOGGLE BUTTON STYLE */
         .toggle-view-btn {
             margin-left: 10px;
             font-size: 0.75rem;
@@ -225,6 +224,22 @@
             
             <div id="productPane" class="sub-menu-pane">
                 <h3>Product Maintenance</h3>
+                <!-- FIX ADDITION: PRODUCT TOOLBAR AND TABLE -->
+                <div class="maint-toolbar">
+                    <button class="add-btn" id="addNewProdBtn"><i class="fas fa-plus"></i> Add New Product</button>
+                    <select id="productCategoryFilter" class="filter-select">
+                        <option value="all">All Categories</option>
+                        <option value="coffee.csv">Coffee</option>
+                        <option value="water.csv">Water</option>
+                    </select>
+                    <input type="text" id="prodSearch" class="search-input" placeholder="Search Products...">
+                </div>
+                <div class="table-container">
+                    <table class="maint-table" id="productTable">
+                        <thead id="prodTableHead"></thead>
+                        <tbody id="prodTableBody"></tbody>
+                    </table>
+                </div>
                 <button class="close-btn backToMain">Back to Menu</button>
             </div>
 
@@ -248,7 +263,7 @@
 
     <div id="crudModal" class="crud-modal">
         <div class="crud-content">
-            <h3 id="modalTitle">Customer File Maintenance</h3>
+            <h3 id="modalTitle">File Maintenance</h3>
             <div id="modalFields" class="form-grid"></div>
             
             <div class="form-grid" style="margin-top:10px;">
@@ -265,7 +280,7 @@
                 </div>
             </div>
 
-            <div class="scheduling-section">
+            <div class="scheduling-section" id="modalSchedulingSection">
                 <h4>Scheduling & Route Assignments</h4>
                 <div id="currentRoutesList" style="margin-bottom: 10px;"></div>
                 <div class="form-group" style="max-width: 300px;">
@@ -300,8 +315,11 @@
         const REPO = 'Billyschmidt123/Bottle-Water-';
         let activeToken = localStorage.getItem('logiflow_gh_token');
         let masterCustomerData = [];
+        let masterProductData = []; // FIX ADDITION
         let currentEditIndex = null;
+        let currentEditType = 'customer'; // FIX ADDITION
         let routeFileHashes = {};
+        let productFileHashes = {}; // FIX ADDITION
 
         if (!activeToken) {
             const pass = prompt("LogiFlow Security: Enter Password:");
@@ -356,17 +374,64 @@
             } catch (e) { console.error("Error hooking up tables", e); }
         }
 
+        // FIX ADDITION: PRODUCT MAINTENANCE LOGIC
+        async function loadProductMaintenance() {
+            const head = document.getElementById('prodTableHead');
+            const body = document.getElementById('prodTableBody');
+            masterProductData = [];
+            head.innerHTML = "";
+            
+            const productFiles = ['coffee.csv', 'water.csv'];
+            
+            try {
+                for (let fileName of productFiles) {
+                    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/products/${fileName}`, {
+                        headers: { 'Authorization': `token ${activeToken}` }
+                    });
+                    const file = await res.json();
+                    productFileHashes[fileName] = file.sha;
+
+                    const csvRes = await fetch(file.download_url);
+                    const text = await csvRes.text();
+                    const lines = text.split(/\r?\n/).filter(l => l.trim());
+                    const headers = lines[0].split(',');
+                    
+                    if (head.innerHTML === "") {
+                        head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                    }
+
+                    for (let i = 1; i < lines.length; i++) {
+                        const values = lines[i].split(',');
+                        const entry = { _file: fileName };
+                        headers.forEach((h, idx) => entry[h] = values[idx] || "");
+                        masterProductData.push(entry);
+                    }
+                }
+                renderProductTable(masterProductData);
+            } catch (e) { console.error("Error loading products", e); }
+        }
+
         function renderCustomerTable(data) {
             const body = document.getElementById('custTableBody');
             body.innerHTML = data.map((row, idx) => `
                 <tr>
-                    <td><button class="edit-row-btn" onclick="openCrudModal(${idx})"><i class="fas fa-edit"></i></button></td>
+                    <td><button class="edit-row-btn" onclick="openCrudModal(${idx}, 'customer')"><i class="fas fa-edit"></i></button></td>
                     ${Object.keys(row).filter(k => k !== '_route').map(k => `<td>${row[k]}</td>`).join('')}
                 </tr>
             `).join('');
         }
 
-        // FIX ADDITION: TOGGLE LOGIC
+        // FIX ADDITION: RENDER PRODUCT TABLE
+        function renderProductTable(data) {
+            const body = document.getElementById('prodTableBody');
+            body.innerHTML = data.map((row, idx) => `
+                <tr>
+                    <td><button class="edit-row-btn" onclick="openCrudModal(${idx}, 'product')"><i class="fas fa-edit"></i></button></td>
+                    ${Object.keys(row).filter(k => k !== '_file').map(k => `<td>${row[k]}</td>`).join('')}
+                </tr>
+            `).join('');
+        }
+
         window.toggleRouteView = function(btn) {
             if (btn.innerText === "Deactivate") {
                 btn.innerText = "Activate";
@@ -377,27 +442,35 @@
             }
         };
 
-        window.openCrudModal = function(index) {
+        window.openCrudModal = function(index, type) {
             currentEditIndex = index;
-            const data = masterCustomerData[index];
+            currentEditType = type;
+            const data = (type === 'customer') ? masterCustomerData[index] : masterProductData[index];
             const modal = document.getElementById('crudModal');
             const fields = document.getElementById('modalFields');
             const routeList = document.getElementById('currentRoutesList');
+            const schedSection = document.getElementById('modalSchedulingSection');
             
-            fields.innerHTML = Object.keys(data).filter(k => k !== '_route').map(k => `
+            document.getElementById('modalTitle').innerText = (type === 'customer') ? 'Customer File Maintenance' : 'Product File Maintenance';
+            
+            fields.innerHTML = Object.keys(data).filter(k => k !== '_route' && k !== '_file').map(k => `
                 <div class="form-group">
                     <label>${k}</label>
                     <input type="text" value="${data[k]}" data-key="${k}" id="field_${k}">
                 </div>
             `).join('');
             
-            // FIX ADDITION: RENDER WITH DEACTIVATE BUTTON
-            routeList.innerHTML = `
-                <div class="route-chip">
-                    ${data._route} 
-                    <button class="toggle-view-btn toggle-active" onclick="toggleRouteView(this)">Deactivate</button>
-                    <span class="remove-route" onclick="removeRouteFromCust('${data._route}')">×</span>
-                </div>`;
+            if (type === 'customer') {
+                schedSection.style.display = 'block';
+                routeList.innerHTML = `
+                    <div class="route-chip">
+                        ${data._route} 
+                        <button class="toggle-view-btn toggle-active" onclick="toggleRouteView(this)">Deactivate</button>
+                        <span class="remove-route" onclick="removeRouteFromCust('${data._route}')">×</span>
+                    </div>`;
+            } else {
+                schedSection.style.display = 'none';
+            }
             
             modal.style.display = 'flex';
         };
@@ -408,40 +481,45 @@
             btn.innerText = "Saving...";
             btn.disabled = true;
 
-            const originalData = masterCustomerData[currentEditIndex];
-            const fileName = originalData._route;
+            const originalData = (currentEditType === 'customer') ? masterCustomerData[currentEditIndex] : masterProductData[currentEditIndex];
+            const fileName = (currentEditType === 'customer') ? originalData._route : originalData._file;
+            const folder = (currentEditType === 'customer') ? 'routes' : 'products';
+            const hash = (currentEditType === 'customer') ? routeFileHashes[fileName] : productFileHashes[fileName];
             
             const updatedEntry = { ...originalData };
             document.querySelectorAll('#modalFields input').forEach(input => {
                 updatedEntry[input.getAttribute('data-key')] = input.value;
             });
 
-            const fileData = masterCustomerData.filter(c => c._route === fileName);
+            const fileData = (currentEditType === 'customer') 
+                ? masterCustomerData.filter(c => c._route === fileName)
+                : masterProductData.filter(p => p._file === fileName);
+
             const entryIndexInFile = fileData.findIndex(c => JSON.stringify(c) === JSON.stringify(originalData));
             if (entryIndexInFile !== -1) fileData[entryIndexInFile] = updatedEntry;
 
-            const headers = Object.keys(updatedEntry).filter(k => k !== '_route');
+            const headers = Object.keys(updatedEntry).filter(k => k !== '_route' && k !== '_file');
             const csvContent = headers.join(',') + '\n' + 
                 fileData.map(row => headers.map(h => row[h]).join(',')).join('\n');
 
             try {
-                const res = await fetch(`https://api.github.com/repos/${REPO}/contents/routes/${fileName}`, {
+                const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${folder}/${fileName}`, {
                     method: 'PUT',
                     headers: { 
                         'Authorization': `token ${activeToken}`,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        message: `Update customer in ${fileName}`,
+                        message: `Update ${currentEditType} in ${fileName}`,
                         content: btoa(csvContent),
-                        sha: routeFileHashes[fileName]
+                        sha: hash
                     })
                 });
 
                 if (res.ok) {
-                    alert("Customer Information Saved Successfully.");
+                    alert("Information Saved Successfully.");
                     document.getElementById('crudModal').style.display = 'none';
-                    loadCustomerMaintenance();
+                    if (currentEditType === 'customer') loadCustomerMaintenance(); else loadProductMaintenance();
                 } else { alert("Failed to save. Check permissions."); }
             } catch (err) { alert("Error connecting to GitHub."); }
             
@@ -457,10 +535,26 @@
             renderCustomerTable(filtered);
         });
 
+        // FIX ADDITION: PRODUCT SEARCH
+        document.getElementById('prodSearch').addEventListener('input', (e) => {
+            const val = e.target.value.toLowerCase();
+            const filtered = masterProductData.filter(p => 
+                Object.values(p).some(v => v.toLowerCase().includes(val))
+            );
+            renderProductTable(filtered);
+        });
+
         document.getElementById('routeFilter').addEventListener('change', (e) => {
             const val = e.target.value;
             const filtered = val === 'all' ? masterCustomerData : masterCustomerData.filter(c => c._route === val);
             renderCustomerTable(filtered);
+        });
+
+        // FIX ADDITION: PRODUCT CATEGORY FILTER
+        document.getElementById('productCategoryFilter').addEventListener('change', (e) => {
+            const val = e.target.value;
+            const filtered = val === 'all' ? masterProductData : masterProductData.filter(p => p._file === val);
+            renderProductTable(filtered);
         });
 
         document.getElementById('cancelCrudBtn').addEventListener('click', () => {
@@ -477,6 +571,12 @@
             document.getElementById('managerGrid').style.display = 'none';
             document.getElementById('customerPane').classList.add('active-pane');
             loadCustomerMaintenance();
+        });
+        // FIX ADDITION: PRODUCT MAINT BUTTON HOOK
+        document.getElementById('prodMaintBtn').addEventListener('click', () => {
+            document.getElementById('managerGrid').style.display = 'none';
+            document.getElementById('productPane').classList.add('active-pane');
+            loadProductMaintenance();
         });
         document.querySelectorAll('.backToMain').forEach(btn => {
             btn.addEventListener('click', () => {
