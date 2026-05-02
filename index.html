@@ -339,31 +339,40 @@
             } catch(e) { console.error("Invalid JSON provided"); return false; }
         };
 
-        // --- ADDED: GITHUB SYNC UTILITY ---
+        // --- ADDED: GITHUB SYNC UTILITY WITH USER CREDENTIALS ---
         window.pushRouteListToGitHub = async function(routelist) {
-            const GITHUB_TOKEN = 'Y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'; // Replace with your PAT
-            const GITHUB_REPO = 'billyschmidt123/YOUR_REPO'; // Replace with your repo path
+            const GITHUB_TOKEN = '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';
+            const GITHUB_REPO = 'Billyschmidt123/Bottle-Water-';
             const FILE_PATH = 'routes/routes-manifest.json';
 
             try {
-                // 1. Get current file SHA
+                // 1. Get current file SHA to allow overwrite
                 const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
                     headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
                 });
-                const fileData = await getRes.json();
+                let sha = null;
+                if (getRes.ok) {
+                    const fileData = await getRes.json();
+                    sha = fileData.sha;
+                }
                 
-                // 2. Push Update
+                // 2. Push Update to manifest
                 const putRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
                     method: 'PUT',
                     headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         message: "Auto-update route manifest from Importer",
                         content: btoa(JSON.stringify(routelist, null, 2)),
-                        sha: fileData.sha
+                        sha: sha
                     })
                 });
-                if (putRes.ok) console.log("GitHub Manifest Updated successfully.");
-            } catch(e) { console.warn("GitHub Sync failed. Ensure Token and Repo path are set.", e); }
+                
+                if (putRes.ok) {
+                    console.log("GitHub Manifest Updated successfully.");
+                } else {
+                    console.error("GitHub API response error:", await putRes.text());
+                }
+            } catch(e) { console.warn("GitHub Sync failed. Check network or repository permissions.", e); }
         };
 
         document.getElementById('localFileImporter').addEventListener('change', function(e) {
@@ -406,11 +415,11 @@
                         window.logiflowRouteCache = cache;
                         populateRouteDropdown(routes);
 
-                        // --- ADDED: AUTO-PUSH TO GITHUB ---
+                        // --- ADDED: AUTO-PUSH TO GITHUB ON IMPORT ---
                         window.pushRouteListToGitHub(routelist);
 
                         setTimeout(() => {
-                            alert(`Import Complete. ${files.length} files loaded and sorted.`);
+                            alert(`Import Complete. ${files.length} files loaded, sorted, and pushed to GitHub.`);
                             progressContainer.style.display = 'none';
                             progressBar.style.width = '0%';
                         }, 500);
