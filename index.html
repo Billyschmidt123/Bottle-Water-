@@ -5,20 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LogiFlow Delivery System</title>
     
-    <!-- ADDITION: SILENCE FAVICON 404 ERRORS -->
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     
-    <!-- ADDITION: RELIABLE LEAFLET LINKS TO FIX 404 ERRORS -->
+    <!-- RELIABLE LEAFLET LINKS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     
-    <!-- EXISTING CSS FILES -->
     <link rel="stylesheet" href="CSS/main.css">
     <link rel="stylesheet" href="CSS/theme.css">
     <link rel="stylesheet" href="CSS/map.css">
     
     <style>
-        /* ADDITION: FORCE 70/30 SPLIT (Matches image_973a0e.png) */
+        /* 70/30 SPLIT (Matches image_973a0e.png) */
         .app-container {
             display: flex !important;
             flex-direction: row !important;
@@ -27,7 +25,7 @@
             overflow: hidden !important;
         }
         #mapPanel {
-            order: 1 !important; /* Map on Left */
+            order: 1 !important;
             flex: 0 0 70% !important;
             width: 70% !important;
             height: 100% !important;
@@ -39,7 +37,7 @@
             background-color: #ddd; 
         }
         #sidebar {
-            order: 2 !important; /* Sidebar on Right */
+            order: 2 !important;
             flex: 0 0 30% !important;
             width: 30% !important;
             height: 100% !important;
@@ -47,11 +45,45 @@
             overflow-y: auto !important;
             background: #f9f9f9 !important;
         }
-        .topbar-right {
-            display: flex !important;
-            gap: 10px !important;
-            align-items: center !important;
+        
+        /* MANAGER OVERLAY STYLES */
+        .manager-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
         }
+        .manager-menu-content {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            text-align: center;
+        }
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .menu-btn {
+            padding: 20px;
+            font-size: 1.1rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .menu-btn:hover { background: #0056b3; }
+        .close-btn { background: #dc3545; margin-top: 20px; padding: 10px 20px; color: white; border: none; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -63,11 +95,10 @@
             </select>
         </div>
         <div class="topbar-right">
-            <!-- RESTORED HEADER BUTTONS -->
             <button id="refreshGitHubListBtn" class="btn-top" style="background:#6f42c1; color:white;">
                 <i class="fab fa-github"></i> Sync Route List
             </button>
-            <button class="btn-top openManagerBtn">
+            <button id="openManagerBtn" class="btn-top">
                 <i class="fas fa-user-gear"></i> Manager Portal
             </button>
             <button id="forceRefreshBtn" class="btn-top" onclick="window.location.reload()">
@@ -76,6 +107,20 @@
             <button id="refreshRoutesBtn" class="btn-top"><i class="fas fa-sync"></i> Refresh List</button>
         </div>
     </header>
+
+    <!-- MANAGER MENU PAGE / OVERLAY -->
+    <div id="managerOverlay" class="manager-overlay">
+        <div class="manager-menu-content">
+            <h2>LogiFlow Manager Portal</h2>
+            <div class="menu-grid">
+                <button class="menu-btn"><i class="fas fa-box"></i> Product Management</button>
+                <button class="menu-btn"><i class="fas fa-users"></i> Customer Management</button>
+                <button class="menu-btn"><i class="fas fa-file-import"></i> Import Functions</button>
+                <button class="menu-btn"><i class="fas fa-route"></i> Route Optimization</button>
+            </div>
+            <button id="closeManagerBtn" class="close-btn">Exit Manager Portal</button>
+        </div>
+    </div>
 
     <div class="app-container">
         <div id="mapPanel">
@@ -88,13 +133,9 @@
         </aside>
     </div>
 
-    <!-- 1. LOAD LEAFLET FIRST -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
-    <!-- 2. LOAD YOUR MAP INITIALIZATION -->
     <script src="JS/map.js"></script>
 
-    <!-- 3. MAIN APPLICATION LOGIC -->
     <script>
     (function () {
         const p1 = "github_pat_11BSXV7JI0";
@@ -105,7 +146,6 @@
 
         let activeToken = localStorage.getItem('logiflow_gh_token');
 
-        // Password Security Gate
         if (!activeToken) {
             const pass = prompt("LogiFlow Security: Enter Password:");
             if (pass && pass.trim() === "2026!") {
@@ -114,7 +154,15 @@
             } else { window.location.reload(); }
         }
 
-        // GitHub Sync Logic
+        // MANAGER MENU TOGGLE LOGIC
+        const overlay = document.getElementById('managerOverlay');
+        document.getElementById('openManagerBtn').addEventListener('click', () => {
+            overlay.style.display = 'flex';
+        });
+        document.getElementById('closeManagerBtn').addEventListener('click', () => {
+            overlay.style.display = 'none';
+        });
+
         async function autoSyncRoutes() {
             const dropdown = document.getElementById('routeDropdownMap');
             const url = `https://api.github.com/repos/${REPO}/contents/routes`;
@@ -134,12 +182,10 @@
             } catch (e) { setTimeout(autoSyncRoutes, 5000); }
         }
 
-        // Map Size Recovery Logic
         let refreshAttempts = 0;
         function tryMapRefresh() {
             if (window.map && typeof window.map.invalidateSize === 'function') {
                 window.map.invalidateSize();
-                console.log("LogiFlow: Map layout rendered.");
             } else if (refreshAttempts < 10) {
                 refreshAttempts++;
                 setTimeout(tryMapRefresh, 500);
