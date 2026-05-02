@@ -381,6 +381,9 @@
                         <h2>Master Customer Database</h2>
                         <div>
                             <input type="text" id="fullSearch" placeholder="Search Database..." style="padding:10px; width:300px; border:1px solid #ccc; border-radius:4px;" onkeyup="window.filterFullTable()">
+                            <button class="btn-top" onclick="window.syncCustomersToGitHub()" style="background:#6f42c1; color:white;">
+                                <i class="fas fa-cloud-upload-alt"></i> Sync All to GitHub
+                            </button>
                             <button class="btn-top" onclick="document.getElementById('fullPageOverlay').style.display='none'">Close Table</button>
                         </div>
                     </div>
@@ -525,7 +528,46 @@
             alert("Database Updated and synced to all local route files.");
         };
 
-        // --- END ADDITIONS ---
+        // --- NEW ADDITION: SYNC CUSTOMERS TO GITHUB ---
+        window.syncCustomersToGitHub = async function() {
+            const cache = window.logiflowRouteCache;
+            if (!cache || !cache.routes) return;
+            
+            const GITHUB_TOKEN = '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';
+            const GITHUB_REPO = 'Billyschmidt123/Bottle-Water-';
+            
+            if(!confirm("This will overwrite the CSV files on GitHub for all modified routes. Continue?")) return;
+
+            try {
+                for (const route of cache.routes) {
+                    const FILE_PATH = `routes/${route.file}`;
+                    const headers = Object.keys(route.stops[0]).join(',');
+                    const rows = route.stops.map(s => Object.values(s).join(',')).join('\n');
+                    const csvContent = headers + '\n' + rows;
+
+                    // Get SHA for update
+                    const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
+                        headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
+                    });
+                    let sha = getRes.ok ? (await getRes.json()).sha : null;
+
+                    // Push to GitHub
+                    await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
+                        method: 'PUT',
+                        headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message: `Update customer data for ${route.name}`,
+                            content: btoa(csvContent),
+                            sha: sha
+                        })
+                    });
+                }
+                alert("All customer changes pushed to GitHub successfully.");
+            } catch(e) {
+                alert("GitHub Sync Failed: " + e.message);
+            }
+        };
+        // --- END NEW ADDITION ---
 
         document.addEventListener('DOMContentLoaded', () => {
             initManagerButtons();
