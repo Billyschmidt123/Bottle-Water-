@@ -366,7 +366,7 @@
                     }
                 }
                 renderCustomerTable(masterCustomerData);
-            } catch (e) { console.error("Error hooking up tables", e); }
+            } catch (e) { console.error("Error loading customers", e); }
         }
 
         async function loadProductMaintenance() {
@@ -384,23 +384,22 @@
                     });
                     
                     if (!res.ok) continue;
-
                     const file = await res.json();
                     productFileHashes[fileName] = file.sha;
 
                     const csvRes = await fetch(file.download_url);
                     const text = await csvRes.text();
-                    
-                    if (text.trim().startsWith('<')) continue;
-
                     const lines = text.split(/\r?\n/).filter(l => l.trim());
+                    
                     if (lines.length > 0) {
                         const headers = lines[0].split(',');
+                        // Always filter out PO-related fields from Product tables
+                        const filteredHeaders = headers.filter(h => h !== "Purchase Order" && h !== "Delivery Slip");
+                        
                         if (head.innerHTML === "") {
-                            // Filter out PO/Slip from product maintenance table headers
-                            const filteredHeaders = headers.filter(h => h !== "Purchase Order" && h !== "Delivery Slip");
                             head.innerHTML = `<tr><th>Edit</th>${filteredHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
                         }
+                        
                         for (let i = 1; i < lines.length; i++) {
                             const values = lines[i].split(',');
                             const entry = { _file: fileName };
@@ -458,9 +457,10 @@
             
             document.getElementById('modalTitle').innerText = (type === 'customer') ? 'Customer File Maintenance' : 'Product File Maintenance';
             
+            // Only show keys from Row 1, and exclude PO fields from Product Modal
             fields.innerHTML = Object.keys(data)
                 .filter(k => k !== '_route' && k !== '_file')
-                .filter(k => type === 'customer' || (k !== "Purchase Order" && k !== "Delivery Slip")) // Hide PO/Slip in Product Modal
+                .filter(k => type === 'customer' || (k !== "Purchase Order" && k !== "Delivery Slip"))
                 .map(k => `
                 <div class="form-group">
                     <label>${k === "Purchase Order" ? "Delivery Slip" : k}</label>
@@ -612,18 +612,7 @@
             } catch (e) { setTimeout(autoSyncRoutes, 5000); }
         }
 
-        let refreshAttempts = 0;
-        function tryMapRefresh() {
-            if (window.map && typeof window.map.invalidateSize === 'function') {
-                window.map.invalidateSize();
-            } else if (refreshAttempts < 10) {
-                refreshAttempts++;
-                setTimeout(tryMapRefresh, 500);
-            }
-        }
-
         autoSyncRoutes().catch(() => {});
-        window.addEventListener('load', tryMapRefresh);
     })();
     </script>
 </body>
