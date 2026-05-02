@@ -87,6 +87,15 @@
             <button style="padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 3px;">FINISH ROUTE</button>
             <button style="padding: 5px 10px; background: #17a2b8; color: white; border: none; border-radius: 3px;">DIRECTIONS</button>
             <button style="padding: 5px 10px; background: #6f42c1; color: white; border: none; border-radius: 3px;">OPTIMIZE ROUTE</button>
+            
+            <!-- [FIX ADDED]: MANAGER MENU AND REFRESH BUTTONS -->
+            <button id="topManagerBtn" style="padding: 5px 10px; background: #495057; color: white; border: none; border-radius: 3px; cursor: pointer;">
+                <i class="fas fa-user-shield"></i> MANAGER MENU
+            </button>
+            <button id="topRefreshBtn" style="padding: 5px 10px; background: #6c757d; color: white; border: none; border-radius: 3px; cursor: pointer;">
+                <i class="fas fa-sync"></i> FORCE REFRESH
+            </button>
+
             <div style="margin-left: auto; display: flex; gap: 15px; font-size: 0.9rem;">
                 <span><i class="fas fa-user-shield"></i> Manager Portal</span>
                 <span onclick="location.reload()" style="cursor:pointer;"><i class="fas fa-sync"></i> Force Refresh</span>
@@ -118,10 +127,11 @@
         <div class="manager-menu-content">
             <h2 style="text-align: center;">Manager Portal</h2>
             <div class="menu-grid">
-                <button class="menu-btn"><i class="fas fa-box"></i> Products</button>
-                <button class="menu-btn"><i class="fas fa-users"></i> Customers</button>
+                <!-- [FIXED]: ADDED IDs FOR FUNCTIONALITY -->
+                <button id="prodMaintBtn" class="menu-btn"><i class="fas fa-box"></i> Product Maintenance</button>
+                <button id="custMaintBtn" class="menu-btn"><i class="fas fa-users"></i> Customer Maintenance</button>
             </div>
-            <div style="text-align: center;"><button class="close-btn">Exit</button></div>
+            <div style="text-align: center;"><button id="closeManagerBtn" class="close-btn">Exit</button></div>
         </div>
     </div>
 
@@ -137,6 +147,48 @@
         window.addEventListener('load', () => {
             if (window.map) window.map.invalidateSize();
         });
+
+        // [FIX ADDED]: MANAGER MENU LOGIC
+        const managerOverlay = document.getElementById('managerOverlay');
+        const topManagerBtn = document.getElementById('topManagerBtn');
+        const closeManagerBtn = document.getElementById('closeManagerBtn');
+        const topRefreshBtn = document.getElementById('topRefreshBtn');
+        const prodMaintBtn = document.getElementById('prodMaintBtn');
+        const custMaintBtn = document.getElementById('custMaintBtn');
+
+        if (topManagerBtn) {
+            topManagerBtn.addEventListener('click', () => {
+                managerOverlay.style.display = 'flex';
+            });
+        }
+
+        if (closeManagerBtn) {
+            closeManagerBtn.addEventListener('click', () => {
+                managerOverlay.style.display = 'none';
+            });
+        }
+
+        if (topRefreshBtn) {
+            topRefreshBtn.addEventListener('click', () => {
+                location.reload();
+            });
+        }
+
+        if (prodMaintBtn) {
+            prodMaintBtn.addEventListener('click', () => {
+                console.log("Manager: Opening Product Maintenance...");
+                // Add your Product Maintenance logic here
+                alert("Opening Product Maintenance...");
+            });
+        }
+
+        if (custMaintBtn) {
+            custMaintBtn.addEventListener('click', () => {
+                console.log("Manager: Opening Customer Maintenance...");
+                // Add your Customer Maintenance logic here
+                alert("Opening Customer Maintenance...");
+            });
+        }
     })();
     </script>
 </body>
