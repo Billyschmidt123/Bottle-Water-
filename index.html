@@ -15,11 +15,11 @@
     <link rel="stylesheet" href="CSS/map.css?v=1">
     <link rel="stylesheet" href="CSS/modal.css?v=1">
     <link rel="stylesheet" href="CSS/manager.css?v=1">
-    <!-- ADDED STYLES FOR PROGRESS TRACKER -->
+    <!-- ADDED STYLES FOR PROGRESS TRACKER AND UPLOAD UI -->
     <style>
         #uploadProgressContainer { width: 100%; background: #eee; border-radius: 5px; margin: 10px 0; display: none; }
         #uploadProgressBar { width: 0%; height: 20px; background: #28a745; border-radius: 5px; text-align: center; color: white; line-height: 20px; font-size: 12px; transition: width 0.3s; }
-        .upload-section { padding: 15px; border: 2px dashed #007bff; border-radius: 8px; margin: 10px; background: #f8f9fa; }
+        .local-upload-btn { background: #28a745 !important; color: white !important; }
     </style>
 </head>
 
@@ -34,13 +34,11 @@
         </div>
 
         <div class="topbar-right">
-            <!-- NEW UPLOAD INTERFACE ADDED TO HEADER AREA -->
-            <div id="bulkUploadControls" style="display:inline-block; margin-right:10px; vertical-align: middle;">
-                <input type="file" id="bulkFilePicker" multiple accept=".csv" style="display:none;">
-                <button class="btn-top" onclick="document.getElementById('bulkFilePicker').click()">
-                    <i class="fas fa-upload"></i> Upload Routes (28)
-                </button>
-            </div>
+            <!-- NEW LOCAL FILE PICKER ADDED -->
+            <input type="file" id="localFileImporter" multiple accept=".csv" style="display:none;">
+            <button class="btn-top local-upload-btn" onclick="document.getElementById('localFileImporter').click()">
+                <i class="fas fa-file-import"></i> Import From Local Drive
+            </button>
 
             <button class="btn-top openManagerBtn">
                 <i class="fas fa-user-gear"></i> Manager Portal
@@ -53,8 +51,8 @@
     </header>
 
     <div class="app-container">
-        <!-- PROGRESS BAR DISPLAY AREA -->
-        <div id="uploadProgressContainer">
+        <!-- ADDED PROGRESS TRACKER UI -->
+        <div id="uploadProgressContainer" style="position: absolute; top: 60px; left: 50%; transform: translateX(-50%); width: 300px; z-index: 9999;">
             <div id="uploadProgressBar">0%</div>
         </div>
 
@@ -320,8 +318,8 @@
             } catch(e) { console.error("Invalid JSON provided"); return false; }
         };
 
-        // --- NEW BULK UPLOAD AND PROGRESS LOGIC ADDED BELOW ---
-        document.getElementById('bulkFilePicker').addEventListener('change', function(e) {
+        // --- ADDED: LOCAL FILE SCANNER AND PROGRESS TRACKER ---
+        document.getElementById('localFileImporter').addEventListener('change', function(e) {
             const files = Array.from(e.target.files);
             if (files.length === 0) return;
 
@@ -348,23 +346,24 @@
                     processedCount++;
                     const percent = Math.round((processedCount / files.length) * 100);
                     progressBar.style.width = percent + '%';
-                    progressBar.innerText = `Processing: ${percent}% (${processedCount}/${files.length})`;
+                    progressBar.innerText = `${percent}% (${processedCount}/${files.length})`;
 
                     if (processedCount === files.length) {
-                        // Create the routelist file structure in memory
+                        // Generate routelist logic
                         const routelist = {
                             updatedAt: new Date().toISOString(),
                             routes: routes.map(r => ({ id: r.id, name: r.name, file: r.file }))
                         };
+                        console.log("Generated routelist:", routelist);
 
-                        // Update the system cache and dropdowns
-                        const cache = { routes: routes, updatedAt: new Date().toISOString() };
+                        // Update cache and UI
+                        const cache = { routes: routes, updatedAt: new Date().toISOString(), source: 'local' };
                         localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
                         window.logiflowRouteCache = cache;
                         populateRouteDropdown(routes);
 
                         setTimeout(() => {
-                            alert(`Success: ${files.length} routes imported and routelist created.`);
+                            alert(`Import Complete. ${files.length} local files loaded.`);
                             progressContainer.style.display = 'none';
                             progressBar.style.width = '0%';
                         }, 500);
