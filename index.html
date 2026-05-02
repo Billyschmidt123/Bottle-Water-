@@ -21,34 +21,22 @@
         .local-upload-btn { background: #28a745 !important; color: white !important; }
         .github-refresh-btn { background: #6f42c1 !important; color: white !important; }
         
-        /* NEW CUSTOMER MANAGEMENT STYLES */
         .mgmt-table-container { width: 100%; overflow-x: auto; margin-top: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .mgmt-table { width: 100%; border-collapse: collapse; min-width: 800px; }
         .mgmt-table th, .mgmt-table td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
         .mgmt-table th { background: #f8f9fa; position: sticky; top: 0; }
         .status-pill { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
-        .status-active { background: #d4edda; color: #155724; }
-        .status-inactive { background: #f8d7da; color: #721c24; }
         .mgmt-actions button { margin-right: 5px; padding: 5px 10px; cursor: pointer; border: none; border-radius: 4px; }
         .btn-edit { background: #ffc107; color: #000; }
         .btn-toggle { background: #17a2b8; color: #fff; }
         .btn-delete { background: #dc3545; color: #fff; }
-        .mgmt-filter-bar { display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap; }
-        .mgmt-filter-bar input, .mgmt-filter-bar select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
 
-        /* ADDITION: FULL PAGE OVERLAY & MODAL STYLES */
         #fullPageOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f7f6; z-index: 10000; overflow-y: auto; padding: 40px; }
+        #productOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f7f6; z-index: 10000; overflow-y: auto; padding: 40px; }
         #mgmtModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; align-items: center; justify-content: center; }
         .modal-content { background: white; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; padding: 25px; border-radius: 8px; position: relative; }
-        .modal-section { border-top: 1px solid #eee; margin-top: 15px; padding-top: 15px; }
         .route-chip { display: inline-block; background: #e9ecef; padding: 5px 10px; border-radius: 15px; margin: 3px; font-size: 12px; }
-        
-        /* CLEAN PROFESSIONAL STYLES FOR TABLE OVERLAY */
         .overlay-header { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; border-left: 5px solid #007bff; }
-        .table-action-left { width: 50px; text-align: center; }
-
-        /* ADDITION: PRODUCT MANAGEMENT STYLES */
-        #productOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f7f6; z-index: 10000; overflow-y: auto; padding: 40px; }
     </style>
 </head>
 
@@ -66,11 +54,11 @@
             <input type="file" id="localFileImporter" multiple accept=".csv" style="display:none;">
             
             <button id="refreshGitHubListBtn" class="btn-top github-refresh-btn">
-                <i class="fab fa-github"></i> Refresh Route List
+                <i class="fab fa-github"></i> Sync All Data
             </button>
 
             <button class="btn-top local-upload-btn" onclick="document.getElementById('localFileImporter').click()">
-                <i class="fas fa-file-import"></i> Import From Local Drive
+                <i class="fas fa-file-import"></i> Local Import
             </button>
 
             <button class="btn-top openManagerBtn">
@@ -84,7 +72,7 @@
     </header>
 
     <div class="app-container">
-        <div id="uploadProgressContainer" style="position: absolute; top: 60px; left: 50%; transform: translateX(-50%); width: 300px; z-index: 9999;">
+        <div id="uploadProgressContainer">
             <div id="uploadProgressBar">0%</div>
         </div>
 
@@ -96,7 +84,6 @@
                     <button id="btnNextStop" class="btn-top btn-small">Forward <i class="fas fa-arrow-right"></i></button>
                     <button id="btnStartRoute" class="btn-top btn-small btn-success"><i class="fas fa-play"></i> Start</button>
                     <button id="btnFinishRoute" class="btn-top btn-small btn-warning"><i class="fas fa-flag-checkered"></i> Finish</button>
-                    <button id="btnDirections" class="btn-top btn-small"><i class="fas fa-route"></i> Directions</button>
                 </div>
             </div>
             <div id="map"></div>
@@ -105,748 +92,151 @@
         <aside id="sidebar">
             <div id="sidebarContent">
                 <div style="padding: 20px; text-align: center; color: #666;">
-                    Select a route to view delivery details.
+                    Checking for updates...
                 </div>
             </div>
         </aside>
     </div>
 
-    <!-- ADDITION: FULL PAGE TABLE OVERLAY AND MODAL CONTAINER -->
     <div id="fullPageOverlay"></div>
-    <!-- ADDITION: PRODUCT TABLE OVERLAY -->
     <div id="productOverlay"></div>
-
-    <div id="mgmtModal">
-        <div class="modal-content" id="modalBody"></div>
-    </div>
-
-    <div id="modalContainer"></div>
+    <div id="mgmtModal"><div class="modal-content" id="modalBody"></div></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="JS/loader.js?v=1"></script>
 
     <script>
     (function () {
-        const ROUTE_CACHE_KEY = 'logiflowRouteCache_v1';
+        const CACHE_KEYS = {
+            ROUTES: 'logiflowRouteCache_v1',
+            PRODUCTS: 'logiflowProductCache_v1',
+            CUSTOMERS: 'logiflowCustomerMaster_v1'
+        };
 
         window.loadModule = function (moduleName) {
             const container = document.getElementById('sidebarContent');
-            if (!container) return;
-
-            const url = 'MODULES/' + moduleName + '.html';
-            fetch(url + '?cb=' + Date.now())
-                .then(res => {
-                    if (!res.ok) throw new Error('Module load failed');
-                    return res.text();
-                })
+            fetch('MODULES/' + moduleName + '.html?cb=' + Date.now())
+                .then(res => res.text())
                 .then(html => {
                     container.innerHTML = html;
-                    const temp = document.createElement('div');
-                    temp.innerHTML = html;
-                    temp.querySelectorAll('script').forEach(oldScript => {
-                        const newScript = document.createElement('script');
-                        if (oldScript.src) newScript.src = oldScript.src;
-                        else newScript.textContent = oldScript.textContent;
-                        document.body.appendChild(newScript);
-                    });
-                    
-                    if (window.logiflowRouteCache) {
-                        populateRouteDropdown(window.logiflowRouteCache.routes);
-                    }
-
-                    // ADDITION: Inject Maintenance Buttons when Manager Portal is loaded
                     if (moduleName === 'manager-portal') {
-                        // Using a repeating interval to ensure buttons appear even if the DOM takes a moment to settle
-                        let checkCount = 0;
-                        const checkInterval = setInterval(() => {
-                            const sideContent = document.getElementById('sidebarContent');
-                            if (sideContent && sideContent.innerHTML.length > 100) {
-                                injectMgmtButton();
-                                injectProductMgmtButton();
-                                clearInterval(checkInterval);
-                            }
-                            if (checkCount > 10) clearInterval(checkInterval);
-                            checkCount++;
-                        }, 200);
+                        setTimeout(() => { injectMgmtButtons(); }, 300);
                     }
-                })
-                .catch(err => console.error(err));
+                });
         };
 
-        function initManagerButtons() {
-            document.querySelectorAll('.openManagerBtn').forEach(btn => {
-                if (!btn.__bound) {
-                    btn.addEventListener('click', () => window.loadModule('manager-portal'));
-                    btn.__bound = true;
-                }
-            });
+        async function initRouteSystem() {
+            console.log("System initialization started...");
+            
+            // 1. Load what we have in storage immediately so the UI isn't blank
+            loadLocalRecoveryData();
+
+            // 2. Immediately try to fetch the newest data from GitHub (The "Source of Truth")
+            try {
+                console.log("Checking for online updates...");
+                await window.refreshRoutesFromGitHub();
+                await window.loadProductsFromGitHub();
+                console.log("Update check complete. Using latest online versions.");
+            } catch (e) {
+                console.warn("Online update failed (offline?). Using local backup data.");
+            }
         }
 
+        function loadLocalRecoveryData() {
+            const cachedRoutes = localStorage.getItem(CACHE_KEYS.ROUTES);
+            if (cachedRoutes) {
+                window.logiflowRouteCache = JSON.parse(cachedRoutes);
+                populateRouteDropdown(window.logiflowRouteCache.routes);
+            }
+
+            const cachedProducts = localStorage.getItem(CACHE_KEYS.PRODUCTS);
+            if (cachedProducts) window._productData = JSON.parse(cachedProducts);
+
+            const cachedCustomers = localStorage.getItem(CACHE_KEYS.CUSTOMERS);
+            if (cachedCustomers) window._fullTableData = JSON.parse(cachedCustomers);
+        }
+
+        window.refreshRoutesFromGitHub = async function() {
+            const BASE = 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/';
+            const res = await fetch(BASE + 'routes/routes-manifest.json?cb=' + Date.now());
+            if (!res.ok) return;
+            
+            const manifest = await res.json();
+            const routePromises = manifest.routes.map(async r => {
+                const csvRes = await fetch(BASE + 'routes/' + r.file + '?cb=' + Date.now());
+                const csvText = await csvRes.text();
+                return { ...r, stops: parseCSV(csvText) };
+            });
+
+            const updatedRoutes = await Promise.all(routePromises);
+            const cache = { routes: updatedRoutes, updatedAt: new Date().toISOString() };
+            
+            // Save to memory and local storage
+            window.logiflowRouteCache = cache;
+            localStorage.setItem(CACHE_KEYS.ROUTES, JSON.stringify(cache));
+            populateRouteDropdown(updatedRoutes);
+        };
+
+        window.loadProductsFromGitHub = async function() {
+            const BASE = 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/Products/';
+            const [coffee, water] = await Promise.all([
+                fetch(BASE + 'coffee.csv?cb=' + Date.now()).then(r => r.text()),
+                fetch(BASE + 'Water.csv?cb=' + Date.now()).then(r => r.text())
+            ]);
+
+            const data = { coffee: parseCSV(coffee), water: parseCSV(water) };
+            window._productData = data;
+            localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(data));
+        };
+
         function parseCSV(text) {
-            if (!text) return [];
-            const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
-            if (lines.length === 0) return [];
+            const lines = text.split(/\r?\n/).filter(l => l.trim());
+            if (!lines.length) return [];
             const headers = lines[0].split(',').map(h => h.trim());
             return lines.slice(1).map(line => {
-                const parts = line.split(',');
+                const values = line.split(',');
                 const obj = {};
-                headers.forEach((h, i) => obj[h] = (parts[i] || '').trim());
+                headers.forEach((h, i) => obj[h] = (values[i] || '').trim());
                 return obj;
             });
         }
 
         function populateRouteDropdown(routes) {
-            if (!Array.isArray(routes)) return;
-            const selectors = ['#routeDropdownMap', '#routeDropdown'];
-            const dayOrder = { "monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4, "friday": 5, "saturday": 6, "sunday": 7 };
-            
-            const sortedRoutes = [...routes].sort((a, b) => {
-                const nameA = (a.name || "").toLowerCase();
-                const nameB = (b.name || "").toLowerCase();
-                const weekA = parseInt((nameA.match(/week\s*(\d+)/) || [0, 0])[1]);
-                const weekB = parseInt((nameB.match(/week\s*(\d+)/) || [0, 0])[1]);
-                if (weekA !== weekB) return weekA - weekB;
-                let dayA = 0; let dayB = 0;
-                Object.keys(dayOrder).forEach(d => { if(nameA.includes(d)) dayA = dayOrder[d]; });
-                Object.keys(dayOrder).forEach(d => { if(nameB.includes(d)) dayB = dayOrder[d]; });
-                return dayA - dayB || nameA.localeCompare(nameB);
-            });
-
-            selectors.forEach(selector => {
-                const dropdown = document.querySelector(selector);
-                if (!dropdown) return;
-                while (dropdown.options.length > 1) dropdown.remove(1);
-                sortedRoutes.forEach(route => {
-                    const opt = document.createElement('option');
-                    opt.value = route.file || route.id || route.name;
-                    opt.textContent = route.name || route.id;
-                    dropdown.appendChild(opt);
-                });
+            const dropdown = document.querySelector('#routeDropdownMap');
+            if (!dropdown) return;
+            while (dropdown.options.length > 1) dropdown.remove(1);
+            routes.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r.file;
+                opt.textContent = r.name;
+                dropdown.appendChild(opt);
             });
         }
 
-        window.refreshRoutesFromGitHub = function() {
-            const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/';
-            const manifestPath = 'routes/routes-manifest.json';
-
-            return fetch(GITHUB_RAW_BASE + manifestPath + '?cb=' + Date.now())
-                .then(res => {
-                    if (!res.ok) {
-                        console.warn("Manifest not found on GitHub yet.");
-                        return { routes: [] };
-                    }
-                    return res.json();
-                })
-                .then(manifest => {
-                    if (!manifest.routes || manifest.routes.length === 0) return [];
-                    const promises = manifest.routes.map(r => {
-                        const targetPath = 'routes/' + r.file;
-                        return fetch(GITHUB_RAW_BASE + targetPath + '?cb=' + Date.now())
-                            .then(res => res.ok ? res.text() : null)
-                            .then(csv => csv ? ({ ...r, stops: parseCSV(csv) }) : null)
-                            .catch(() => null);
-                    });
-                    return Promise.all(promises);
-                })
-                .then(results => {
-                    const safeResults = Array.isArray(results) ? results : [];
-                    const routes = safeResults.filter(r => r !== null);
-                    if (routes.length > 0) {
-                        const cache = { routes: routes, updatedAt: new Date().toISOString() };
-                        localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
-                        window.logiflowRouteCache = cache;
-                        populateRouteDropdown(routes);
-                    }
-                    return safeResults;
-                })
-                .catch(err => console.log("Initial load check: ", err));
-        };
-
-        window.syncRouteListFromGitHubDir = async function() {
-            const GITHUB_REPO = 'Billyschmidt123/Bottle-Water-';
-            const DIR_PATH = 'routes';
-            const API_URL = `https://api.github.com/repos/${GITHUB_REPO}/contents/${DIR_PATH}`;
-            try {
-                const res = await fetch(API_URL);
-                if (!res.ok) throw new Error("Folder access failed.");
-                const files = await res.json();
-                const csvFiles = files.filter(f => f.name.endsWith('.csv')).map(f => ({
-                    id: f.name.replace('.csv', ''),
-                    name: f.name.replace('.csv', ''),
-                    file: f.name
-                }));
-                if (csvFiles.length === 0) return alert("No CSVs found.");
-                
-                const routelist = { updatedAt: new Date().toISOString(), routes: csvFiles };
-                await window.pushRouteListToGitHub(routelist);
-                await window.refreshRoutesFromGitHub();
-                alert(`Synced ${csvFiles.length} routes from GitHub directory.`);
-            } catch (e) { alert("Sync Error: " + e.message); }
-        };
-
-        function initRouteSystem() {
-            let cached = (function(){ try { return JSON.parse(localStorage.getItem(ROUTE_CACHE_KEY)); } catch(e){return null;}})();
-            if (cached) {
-                window.logiflowRouteCache = cached;
-                populateRouteDropdown(cached.routes);
-            }
-            window.refreshRoutesFromGitHub().catch(() => {});
-            document.getElementById('refreshGitHubListBtn').addEventListener('click', () => window.syncRouteListFromGitHubDir());
-        }
-
-        window.pushRouteListToGitHub = async function(routelist) {
-            const GITHUB_TOKEN = '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';
-            const GITHUB_REPO = 'Billyschmidt123/Bottle-Water-';
-            const FILE_PATH = 'routes/routes-manifest.json';
-            try {
-                const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
-                    headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
-                });
-                let sha = getRes.ok ? (await getRes.json()).sha : null;
-                await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
-                    method: 'PUT',
-                    headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: "Update route manifest",
-                        content: btoa(JSON.stringify(routelist, null, 2)),
-                        sha: sha
-                    })
-                });
-            } catch(e) { console.error("GitHub push failed"); }
-        };
-
-        document.getElementById('localFileImporter').addEventListener('change', function(e) {
-            const files = Array.from(e.target.files);
-            if (files.length === 0) return;
-
-            const progressContainer = document.getElementById('uploadProgressContainer');
-            const progressBar = document.getElementById('uploadProgressBar');
-            progressContainer.style.display = 'block';
-
-            let routes = [];
-            let processedCount = 0;
-
-            files.forEach((file) => {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    const stops = parseCSV(event.target.result);
-                    routes.push({ id: file.name.replace('.csv', ''), name: file.name.replace('.csv', ''), file: file.name, stops: stops });
-                    processedCount++;
-                    progressBar.style.width = Math.round((processedCount / files.length) * 100) + '%';
-
-                    if (processedCount === files.length) {
-                        const cache = { routes: routes, updatedAt: new Date().toISOString() };
-                        localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
-                        window.logiflowRouteCache = cache;
-                        populateRouteDropdown(routes);
-                        
-                        progressContainer.style.display = 'none';
-
-                        const confirmSync = confirm(`Loaded ${files.length} routes. Generate Route List JSON and sync to GitHub?`);
-                        if (confirmSync) {
-                            const routelist = { updatedAt: new Date().toISOString(), routes: routes.map(r => ({ id: r.id, name: r.name, file: r.file })) };
-                            window.pushRouteListToGitHub(routelist).then(() => {
-                                alert("Success: Route List created and synced.");
-                            });
-                        }
-                    }
-                };
-                reader.readAsText(file);
-            });
-        });
-
-        // --- CUSTOMER MAINTENANCE LOGIC ---
-
-        function injectMgmtButton() {
-            const container = document.getElementById('sidebarContent');
-            if (container && !container.querySelector('.customer-mgmt-trigger')) {
-                const btn = document.createElement('button');
-                btn.className = 'btn-top customer-mgmt-trigger';
-                btn.style.width = '100%';
-                btn.style.marginTop = '10px';
-                btn.style.background = '#007bff';
-                btn.style.color = '#fff';
-                btn.innerHTML = '<i class="fas fa-table"></i> Open Full Customer Table';
-                btn.onclick = () => window.openFullPageTable();
-                container.appendChild(btn);
-            }
-        }
-
-        window.openFullPageTable = function() {
-            const overlay = document.getElementById('fullPageOverlay');
-            if (!window.logiflowRouteCache || !window.logiflowRouteCache.routes) return alert("Import data first.");
-
-            let allUniqueStops = {}; 
-            let headers = [];
-
-            window.logiflowRouteCache.routes.forEach(route => {
-                route.stops.forEach(stop => {
-                    const key = stop.Address + (stop.Company || '');
-                    if (!allUniqueStops[key]) {
-                        if (headers.length === 0) headers = Object.keys(stop);
-                        allUniqueStops[key] = { ...stop, _routes: [] };
-                    }
-                    allUniqueStops[key]._routes.push({ id: route.id, name: route.name, status: stop.Status });
-                });
-            });
-
-            window._fullTableData = Object.values(allUniqueStops);
-            overlay.style.display = 'block';
-
-            overlay.innerHTML = `
-                <div style="max-width:1400px; margin:auto;">
-                    <div class="overlay-header">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div>
-                                <h1 style="margin:0; font-size:24px; color:#333;">Master Customer Database</h1>
-                                <p style="margin:5px 0 0 0; color:#666;">View and manage all customer stops across all imported routes.</p>
-                            </div>
-                            <div style="display:flex; gap:10px;">
-                                <button class="btn-top" onclick="window.syncCustomersToGitHub()" style="background:#6f42c1; color:white;">
-                                    <i class="fas fa-cloud-upload-alt"></i> Sync All to GitHub
-                                </button>
-                                <button class="btn-top" style="background:#666;" onclick="document.getElementById('fullPageOverlay').style.display='none'">
-                                    <i class="fas fa-times"></i> Close Table
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div style="display:flex; gap:15px; margin-top:20px; background:#f9f9f9; padding:15px; border-radius:4px;">
-                            <div style="flex:1;">
-                                <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:5px;">Search Customers</label>
-                                <input type="text" id="fullSearch" placeholder="Search by name, address, or phone..." style="padding:10px; width:100%; border:1px solid #ddd; border-radius:4px;" onkeyup="window.filterFullTable()">
-                            </div>
-                            <div style="width:250px;">
-                                <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:5px;">Filter by Route</label>
-                                <select id="fullRouteFilter" style="padding:10px; width:100%; border:1px solid #ddd; border-radius:4px;" onchange="window.filterFullTable()">
-                                    <option value="">All Routes</option>
-                                    ${window.logiflowRouteCache.routes.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mgmt-table-container">
-                        <table class="mgmt-table">
-                            <thead>
-                                <tr>
-                                    <th class="table-action-left">Edit</th>
-                                    ${headers.map(h => `<th>${h}</th>`).join('')}
-                                    <th>Assigned Routes</th>
-                                </tr>
-                            </thead>
-                            <tbody id="fullTableBody">
-                                ${renderFullRows(window._fullTableData, headers)}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-        };
-
-        function renderFullRows(data, headers) {
-            return data.map((stop, idx) => `
-                <tr>
-                    <td class="table-action-left">
-                        <button class="btn-edit" style="width:35px; height:35px; border-radius:50%;" onclick="window.openEditModal(${idx})">
-                            <i class="fas fa-pen"></i>
-                        </button>
-                    </td>
-                    ${headers.map(h => `<td>${stop[h] || ''}</td>`).join('')}
-                    <td>${stop._routes.map(r => `<span class="route-chip" style="${r.status==='Inactive'?'text-decoration:line-through;opacity:0.5':''}">${r.name}</span>`).join('')}</td>
-                </tr>
-            `).join('');
-        }
-
-        window.filterFullTable = function() {
-            const term = document.getElementById('fullSearch').value.toLowerCase();
-            const routeId = document.getElementById('fullRouteFilter').value;
-            
-            const filtered = window._fullTableData.filter(s => {
-                const searchMatch = Object.values(s).some(v => String(v).toLowerCase().includes(term));
-                const routeMatch = !routeId || s._routes.some(r => r.id === routeId);
-                return searchMatch && routeMatch;
-            });
-            
-            const headers = Object.keys(window._fullTableData[0]).filter(k => !k.startsWith('_'));
-            document.getElementById('fullTableBody').innerHTML = renderFullRows(filtered, headers);
-        };
-
-        window.openEditModal = function(index) {
-            const stop = window._fullTableData[index];
-            const modal = document.getElementById('mgmtModal');
-            const body = document.getElementById('modalBody');
-            const headers = Object.keys(stop).filter(k => !k.startsWith('_'));
-            const allRoutes = window.logiflowRouteCache.routes;
-
-            modal.style.display = 'flex';
-            body.innerHTML = `
-                <h3>Edit Customer Profile</h3>
-                <form id="modalEditForm">
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                        ${headers.map(h => `
-                            <div>
-                                <label style="display:block; font-size:11px; color:#666;">${h}</label>
-                                <input type="text" name="${h}" value="${stop[h] || ''}" style="width:100%; padding:5px;">
-                            </div>
-                        `).join('')}
-                    </div>
-
-                    <div class="modal-section">
-                        <h4>Scheduled Routes</h4>
-                        <div id="modalRouteList">
-                            ${stop._routes.map((r, rIdx) => `
-                                <div style="display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; padding:8px; margin-bottom:5px; border-radius:4px;">
-                                    <span>${r.name}</span>
-                                    <div>
-                                        <button type="button" class="btn-toggle" onclick="window.toggleRouteInModal(${index}, ${rIdx})">${r.status==='Inactive'?'Activate':'Deactivate'}</button>
-                                        <button type="button" class="btn-delete" onclick="window.removeRouteInModal(${index}, ${rIdx})"><i class="fas fa-trash"></i></button>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                        <div style="margin-top:10px;">
-                            <label>Assign to Route:</label>
-                            <select id="modalRouteAdd" style="width:70%; padding:5px;">
-                                <option value="">-- Choose Route --</option>
-                                ${allRoutes.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
-                            </select>
-                            <button type="button" class="btn-top btn-success" onclick="window.addRouteToStop(${index})">Add</button>
-                        </div>
-                    </div>
-
-                    <div style="margin-top:20px; display:flex; gap:10px;">
-                        <button type="button" class="btn-top btn-success" style="flex:1;" onclick="window.saveMasterChange(${index})">Save All Changes</button>
-                        <button type="button" class="btn-top" onclick="document.getElementById('mgmtModal').style.display='none'">Cancel</button>
-                    </div>
-                </form>
-            `;
-        };
-
-        window.toggleRouteInModal = function(stopIdx, routeIdx) {
-            const stop = window._fullTableData[stopIdx];
-            stop._routes[routeIdx].status = stop._routes[routeIdx].status === 'Inactive' ? 'Active' : 'Inactive';
-            window.openEditModal(stopIdx);
-        };
-
-        window.removeRouteInModal = function(stopIdx, routeIdx) {
-            if(!confirm("Remove from this route?")) return;
-            window._fullTableData[stopIdx]._routes.splice(routeIdx, 1);
-            window.openEditModal(stopIdx);
-        };
-
-        window.addRouteToStop = function(stopIdx) {
-            const routeId = document.getElementById('modalRouteAdd').value;
-            if(!routeId) return;
-            const route = window.logiflowRouteCache.routes.find(r => r.id === routeId);
-            window._fullTableData[stopIdx]._routes.push({ id: route.id, name: route.name, status: 'Active' });
-            window.openEditModal(stopIdx);
-        };
-
-        window.saveMasterChange = function(index) {
-            const formData = new FormData(document.getElementById('modalEditForm'));
-            const updatedData = {};
-            formData.forEach((v, k) => updatedData[k] = v);
-            
-            const masterStop = window._fullTableData[index];
-            const originalRoutes = masterStop._routes;
-
-            window.logiflowRouteCache.routes.forEach(route => {
-                route.stops = route.stops.filter(s => {
-                    const match = (s.Address === masterStop.Address);
-                    return !match || originalRoutes.some(r => r.id === route.id);
-                });
-
-                const assigned = originalRoutes.find(r => r.id === route.id);
-                if (assigned) {
-                    const existing = route.stops.find(s => s.Address === masterStop.Address);
-                    if (existing) {
-                        Object.assign(existing, updatedData);
-                        existing.Status = assigned.status;
-                    } else {
-                        route.stops.push({ ...updatedData, Status: assigned.status });
-                    }
-                }
-            });
-
-            localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(window.logiflowRouteCache));
-            document.getElementById('mgmtModal').style.display = 'none';
-            window.openFullPageTable();
-            alert("Database Updated and synced to all local route files.");
-        };
-
-        window.syncCustomersToGitHub = async function() {
-            const cache = window.logiflowRouteCache;
-            if (!cache || !cache.routes) return;
-            
-            const GITHUB_TOKEN = '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';
-            const GITHUB_REPO = 'Billyschmidt123/Bottle-Water-';
-            
-            if(!confirm("This will overwrite the CSV files on GitHub for all modified routes. Continue?")) return;
-
-            try {
-                for (const route of cache.routes) {
-                    const FILE_PATH = `routes/${route.file}`;
-                    const headers = Object.keys(route.stops[0]).join(',');
-                    const rows = route.stops.map(s => Object.values(s).join(',')).join('\n');
-                    const csvContent = headers + '\n' + rows;
-
-                    const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
-                        headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
-                    });
-                    let sha = getRes.ok ? (await getRes.json()).sha : null;
-
-                    await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
-                        method: 'PUT',
-                        headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            message: `Update customer data for ${route.name}`,
-                            content: btoa(csvContent),
-                            sha: sha
-                        })
-                    });
-                }
-                alert("All customer changes pushed to GitHub successfully.");
-            } catch(e) {
-                alert("GitHub Sync Failed: " + e.message);
-            }
-        };
-
-        // --- ADDITION: PRODUCT MAINTENANCE LOGIC ---
-
-        function injectProductMgmtButton() {
-            const container = document.getElementById('sidebarContent');
-            if (container && !container.querySelector('.product-mgmt-trigger')) {
-                const btn = document.createElement('button');
-                btn.className = 'btn-top product-mgmt-trigger';
-                btn.style.width = '100%';
-                btn.style.marginTop = '10px';
-                btn.style.background = '#28a745';
-                btn.style.color = '#fff';
-                btn.innerHTML = '<i class="fas fa-boxes-stacked"></i> Open Product Maintenance';
-                btn.onclick = () => window.openProductTable();
-                container.appendChild(btn);
-            }
-        }
-
-        window.openProductTable = async function() {
-            const overlay = document.getElementById('productOverlay');
-            overlay.style.display = 'block';
-
-            // Load initial product data if not loaded
-            if (!window._productData) {
-                await window.loadProductsFromGitHub();
-            }
-
-            renderProductUI();
-        };
-
-        window.loadProductsFromGitHub = async function() {
-            const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/Products/';
-            try {
-                const [coffeeRes, waterRes] = await Promise.all([
-                    fetch(GITHUB_RAW_BASE + 'coffee.csv' + '?cb=' + Date.now()),
-                    fetch(GITHUB_RAW_BASE + 'Water.csv' + '?cb=' + Date.now())
-                ]);
-
-                window._productData = {
-                    coffee: parseCSV(await coffeeRes.text()),
-                    water: parseCSV(await waterRes.text())
-                };
-            } catch (e) {
-                alert("Failed to load product files from GitHub.");
-            }
-        };
-
-        function renderProductUI() {
-            const overlay = document.getElementById('productOverlay');
-            const type = window._currentProductType || 'coffee';
-            const data = window._productData[type];
-            const headers = data.length > 0 ? Object.keys(data[0]) : [];
-
-            overlay.innerHTML = `
-                <div style="max-width:1400px; margin:auto;">
-                    <div class="overlay-header" style="border-left-color:#28a745;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div>
-                                <h1 style="margin:0; font-size:24px; color:#333;">Product Maintenance</h1>
-                                <p style="margin:5px 0 0 0; color:#666;">Manage inventory and pricing for Coffee and Water products.</p>
-                            </div>
-                            <div style="display:flex; gap:10px;">
-                                <button class="btn-top" onclick="window.syncProductsToGitHub()" style="background:#6f42c1; color:white;">
-                                    <i class="fas fa-cloud-upload-alt"></i> Sync Products to GitHub
-                                </button>
-                                <button class="btn-top" style="background:#666;" onclick="document.getElementById('productOverlay').style.display='none'">
-                                    <i class="fas fa-times"></i> Close
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div style="display:flex; gap:15px; margin-top:20px; background:#f9f9f9; padding:15px; border-radius:4px;">
-                            <div style="width:250px;">
-                                <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:5px;">Product Category</label>
-                                <select id="productTypeFilter" style="padding:10px; width:100%; border:1px solid #ddd; border-radius:4px;" onchange="window.switchProductType(this.value)">
-                                    <option value="coffee" ${type === 'coffee' ? 'selected' : ''}>Coffee Products</option>
-                                    <option value="water" ${type === 'water' ? 'selected' : ''}>Water Products</option>
-                                </select>
-                            </div>
-                            <div style="flex:1;">
-                                <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:5px;">Search Products</label>
-                                <input type="text" id="productSearch" placeholder="Search by name, SKU, or description..." style="padding:10px; width:100%; border:1px solid #ddd; border-radius:4px;" onkeyup="window.filterProductTable()">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mgmt-table-container">
-                        <table class="mgmt-table">
-                            <thead>
-                                <tr>
-                                    <th class="table-action-left">Edit</th>
-                                    ${headers.map(h => `<th>${h}</th>`).join('')}
-                                </tr>
-                            </thead>
-                            <tbody id="productTableBody">
-                                ${renderProductRows(data, headers)}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderProductRows(data, headers) {
-            return data.map((item, idx) => `
-                <tr>
-                    <td class="table-action-left">
-                        <button class="btn-edit" style="width:35px; height:35px; border-radius:50%;" onclick="window.openProductEditModal(${idx})">
-                            <i class="fas fa-pen"></i>
-                        </button>
-                    </td>
-                    ${headers.map(h => `<td>${item[h] || ''}</td>`).join('')}
-                </tr>
-            `).join('');
-        }
-
-        window.switchProductType = function(val) {
-            window._currentProductType = val;
-            renderProductUI();
-        };
-
-        window.filterProductTable = function() {
-            const term = document.getElementById('productSearch').value.toLowerCase();
-            const type = window._currentProductType || 'coffee';
-            const data = window._productData[type];
-            if (!data || data.length === 0) return;
-            const headers = Object.keys(data[0]);
-
-            const filtered = data.filter(item => 
-                Object.values(item).some(v => String(v).toLowerCase().includes(term))
-            );
-
-            document.getElementById('productTableBody').innerHTML = renderProductRows(filtered, headers);
-        };
-
-        window.openProductEditModal = function(idx) {
-            const type = window._currentProductType || 'coffee';
-            const item = window._productData[type][idx];
-            const modal = document.getElementById('mgmtModal');
-            const body = document.getElementById('modalBody');
-            const headers = Object.keys(item);
-
-            modal.style.display = 'flex';
-            body.innerHTML = `
-                <h3>Edit Product Details</h3>
-                <form id="productEditForm">
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                        ${headers.map(h => `
-                            <div>
-                                <label style="display:block; font-size:11px; color:#666;">${h}</label>
-                                <input type="text" name="${h}" value="${item[h] || ''}" style="width:100%; padding:5px;">
-                            </div>
-                        `).join('')}
-                    </div>
-
-                    <div style="margin-top:20px; display:flex; gap:10px;">
-                        <button type="button" class="btn-top btn-success" style="flex:1;" onclick="window.saveProductChange(${idx})">Update Product</button>
-                        <button type="button" class="btn-top" onclick="document.getElementById('mgmtModal').style.display='none'">Cancel</button>
-                    </div>
-                </form>
-            `;
-        };
-
-        window.saveProductChange = function(idx) {
-            const type = window._currentProductType || 'coffee';
-            const formData = new FormData(document.getElementById('productEditForm'));
-            const updatedItem = {};
-            formData.forEach((v, k) => updatedItem[k] = v);
-
-            window._productData[type][idx] = updatedItem;
-            document.getElementById('mgmtModal').style.display = 'none';
-            renderProductUI();
-            alert("Product information updated locally. Click Sync to push to GitHub.");
-        };
-
-        window.syncProductsToGitHub = async function() {
-            if (!window._productData) return;
-            
-            const GITHUB_TOKEN = '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';
-            const GITHUB_REPO = 'Billyschmidt123/Bottle-Water-';
-            
-            if(!confirm("Push product changes to GitHub?")) return;
-
-            try {
-                const types = ['coffee', 'water'];
-                for (const type of types) {
-                    const fileName = type === 'coffee' ? 'coffee.csv' : 'Water.csv';
-                    const FILE_PATH = `Products/${fileName}`;
-                    const data = window._productData[type];
-                    
-                    if (!data || data.length === 0) continue;
-
-                    const headers = Object.keys(data[0]).join(',');
-                    const rows = data.map(item => Object.values(item).join(',')).join('\n');
-                    const csvContent = headers + '\n' + rows;
-
-                    const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
-                        headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
-                    });
-                    let sha = getRes.ok ? (await getRes.json()).sha : null;
-
-                    await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
-                        method: 'PUT',
-                        headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            message: `Update ${type} products`,
-                            content: btoa(csvContent),
-                            sha: sha
-                        })
-                    });
-                }
-                alert("Product data synced to GitHub.");
-            } catch(e) {
-                alert("Product Sync Failed: " + e.message);
-            }
-        };
-
-        initRouteSystem();
-        initManagerButtons();
-        
-        // --- ADDITION: PERSISTENT UI OBSERVER ---
-        // This mutation observer ensures that if the sidebar content changes (e.g. Manager Portal is opened), 
-        // the Product Maintenance button is re-injected if it is missing.
-        const observer = new MutationObserver((mutations) => {
+        function injectMgmtButtons() {
             const sidebar = document.getElementById('sidebarContent');
-            if (sidebar && sidebar.innerText.includes('Manager Portal')) {
-                if (!sidebar.querySelector('.product-mgmt-trigger')) {
-                    injectProductMgmtButton();
-                }
-            }
-        });
-        const sidebarEl = document.getElementById('sidebarContent');
-        if (sidebarEl) {
-            observer.observe(sidebarEl, { childList: true, subtree: true });
+            if (!sidebar) return;
+            
+            const html = `
+                <div style="margin-top:20px; border-top:1px solid #ddd; padding-top:10px;">
+                    <button class="btn-top" style="width:100%; margin-bottom:10px; background:#007bff; color:white;" onclick="window.openFullPageTable()">
+                        <i class="fas fa-users"></i> Customer Database
+                    </button>
+                    <button class="btn-top" style="width:100%; background:#28a745; color:white;" onclick="window.openProductTable()">
+                        <i class="fas fa-boxes"></i> Product Maintenance
+                    </button>
+                </div>
+            `;
+            sidebar.insertAdjacentHTML('beforeend', html);
         }
+
+        document.getElementById('refreshGitHubListBtn').addEventListener('click', async () => {
+            await initRouteSystem();
+            alert("All data synchronized with the online master files.");
+        });
+
+        // Run system initialization on open
+        initRouteSystem();
     })();
     </script>
 </body>
