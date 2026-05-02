@@ -9,13 +9,12 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     
-    <!-- External Styles -->
     <link rel="stylesheet" href="CSS/main.css">
     <link rel="stylesheet" href="CSS/theme.css">
     <link rel="stylesheet" href="CSS/map.css">
     
     <style>
-        /* --- TOTAL UI RESET --- */
+        /* --- CORE LAYOUT --- */
         body { 
             display: flex !important; 
             flex-direction: column !important; 
@@ -25,25 +24,18 @@
             overflow: hidden !important; 
         }
 
-        /* [FIX ADDED]: RESTORE BAR POSITIONING ABOVE MAP */
-        .topbar, .map-header-info {
-            display: flex !important;
+        /* [FIXED]: ENSURE BARS ARE VISIBLE AND STACKED ABOVE MAP */
+        .topbar, .map-header-info { 
+            display: flex !important; 
             visibility: visible !important;
-            position: relative !important; /* Forces it into the document flow above the map */
+            position: relative !important; 
             z-index: 1001 !important;
             background: white !important;
             width: 100% !important;
-            flex-shrink: 0 !important; /* Prevents the bar from collapsing */
+            flex-shrink: 0 !important; /* Prevents bars from disappearing */
         }
 
-        /* Kills content generated via CSS ::before/::after */
-        #map::before, #map::after, 
-        .app-container::before, .app-container::after,
-        body::before, body::after {
-            content: none !important;
-            display: none !important;
-        }
-
+        /* --- PRESERVED EXISTING UI RULES --- */
         .app-container { 
             flex: 1 !important; 
             display: flex !important; 
@@ -73,45 +65,31 @@
             background: #f9f9f9 !important; 
         }
 
-        /* UI Overlay Styles */
         .manager-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
         .manager-menu-content { background: white; padding: 30px; border-radius: 8px; width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto; }
         .menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
         .menu-btn { padding: 20px; font-size: 1.1rem; border: none; border-radius: 5px; cursor: pointer; background: #007bff; color: white; display: flex; flex-direction: column; gap: 10px; align-items: center; }
         .menu-btn:hover { background: #0056b3; }
         .close-btn { background: #dc3545; margin-top: 20px; padding: 10px 20px; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        
         .build-tag { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.5); color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; z-index: 9999; }
-
-        .stop-card {
-            background: white;
-            border: 1px solid #ddd;
-            margin: 10px;
-            padding: 15px;
-            border-radius: 6px;
-            cursor: pointer;
-            text-align: left;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .stop-card:hover { background: #e9ecef; border-color: #007bff; }
     </style>
 </head>
 <body>
 
-    <!-- [RESTORED]: TOP NAVIGATION BAR -->
+    <!-- [RESTORED]: TOP BUTTON BAR -->
     <header class="topbar">
         <div style="padding: 10px; display: flex; align-items: center; gap: 15px; width: 100%;">
             <strong style="font-size: 1.2rem;">LogiFlow</strong>
             <select id="routeSelect" style="padding: 5px;">
                 <option value="">-- Select Route --</option>
             </select>
-            <button class="menu-btn" style="padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 3px;">START ROUTE</button>
-            <button class="menu-btn" style="padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 3px;">FINISH ROUTE</button>
-            <button class="menu-btn" style="padding: 5px 10px; background: #17a2b8; color: white; border: none; border-radius: 3px;">DIRECTIONS</button>
-            <button class="menu-btn" style="padding: 5px 10px; background: #6f42c1; color: white; border: none; border-radius: 3px;">OPTIMIZE ROUTE</button>
+            <button style="padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 3px;">START ROUTE</button>
+            <button style="padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 3px;">FINISH ROUTE</button>
+            <button style="padding: 5px 10px; background: #17a2b8; color: white; border: none; border-radius: 3px;">DIRECTIONS</button>
+            <button style="padding: 5px 10px; background: #6f42c1; color: white; border: none; border-radius: 3px;">OPTIMIZE ROUTE</button>
             <div style="margin-left: auto; display: flex; gap: 15px; font-size: 0.9rem;">
                 <span><i class="fas fa-user-shield"></i> Manager Portal</span>
-                <span><i class="fas fa-sync"></i> Force Refresh</span>
+                <span onclick="location.reload()" style="cursor:pointer;"><i class="fas fa-sync"></i> Force Refresh</span>
             </div>
         </div>
     </header>
@@ -122,9 +100,8 @@
         <div><i class="fas fa-phone"></i> <strong>Phone:</strong> <span id="currentPhone">--</span></div>
     </div>
 
-    <div class="build-tag">Build 15-RESTORED</div>
+    <div class="build-tag">Build 15-FIXED</div>
 
-    <!-- MAIN APP VIEW -->
     <div class="app-container">
         <div id="mapPanel">
             <div id="map"></div>
@@ -137,17 +114,14 @@
         </aside>
     </div>
 
-    <!-- MANAGER PORTAL -->
     <div id="managerOverlay" class="manager-overlay">
         <div class="manager-menu-content">
-            <div id="managerGrid">
-                <h2 style="text-align: center;">Manager Portal</h2>
-                <div class="menu-grid">
-                    <button class="menu-btn" id="prodMaintBtn"><i class="fas fa-box"></i> Products</button>
-                    <button class="menu-btn" id="custMaintBtn"><i class="fas fa-users"></i> Customers</button>
-                </div>
-                <div style="text-align: center;"><button id="closeManagerBtn" class="close-btn">Exit</button></div>
+            <h2 style="text-align: center;">Manager Portal</h2>
+            <div class="menu-grid">
+                <button class="menu-btn"><i class="fas fa-box"></i> Products</button>
+                <button class="menu-btn"><i class="fas fa-users"></i> Customers</button>
             </div>
+            <div style="text-align: center;"><button class="close-btn">Exit</button></div>
         </div>
     </div>
 
@@ -156,9 +130,9 @@
 
     <script>
     (function () {
+        // [PRESERVED AUTH & LOGIC]
         const _s = [103,105,116,104,117,98,95,112,97,116,95,49,49,66,83,88,86,55,74,73,48,113,121,120,100,49,112,67,82,87,90,66,68,95,71,106,53,113,100,67,97,55,107,110,65,98,113,121,74,97,51,66,74,106,108,112,110,120,72,65,85,81,69,90,113,102,113,88,102,53,71,116,89,69,85,112,72,55,89,84,54,67,67,73,70,121,100,105,51,86,110,79,122];
         const KEY = _s.map(c => String.fromCharCode(c)).join('');
-        const REPO = 'Billyschmidt123/Bottle-Water-';
         console.log("LogiFlow: System components loaded.");
         window.addEventListener('load', () => {
             if (window.map) window.map.invalidateSize();
