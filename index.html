@@ -96,11 +96,12 @@
                 const files = await ghFetch('Products');
                 const csvFiles = files.filter(f => f.name.toLowerCase().endsWith('.csv'));
                 
-                // Combine data from all product CSVs (Water and Coffee)
                 for (const file of csvFiles) {
                     const res = await fetch(file.download_url);
                     const text = await res.text();
                     const lines = text.split('\n').filter(l => l.trim());
+                    if (lines.length < 2) continue;
+
                     const headers = lines[0].split(',').map(h => h.trim());
                     
                     const fileData = lines.slice(1).map(line => {
@@ -116,19 +117,18 @@
 
         document.getElementById('addItemBtn').onclick = () => {
             const container = document.getElementById('basketItems');
-            if (masterProductData.length === 0) return alert("Still loading products...");
+            if (masterProductData.length === 0) return alert("Still loading product files...");
 
             const itemDiv = document.createElement('div');
             itemDiv.className = 'basket-item';
             
-            // Find the "Item" key safely regardless of case
-            const firstEntry = masterProductData[0];
-            const headers = Object.keys(firstEntry);
-            const itemKey = headers.find(h => h.toLowerCase() === "item") || headers[0];
+            // Priority column is "Item" from your screenshots
+            const firstEntryHeaders = Object.keys(masterProductData[0]);
+            const itemKey = firstEntryHeaders.find(h => h.toLowerCase() === "item") || "Item";
             
             let options = masterProductData.map(p => {
-                const name = p[itemKey] || "Unknown";
-                return `<option value="${name}">${name}</option>`;
+                const val = p[itemKey] || "Unknown Item";
+                return `<option value="${val}">${val}</option>`;
             }).join('');
             
             itemDiv.innerHTML = `
@@ -145,12 +145,15 @@
                 const found = masterProductData.find(p => p[itemKey] === e.target.value);
                 uSel.innerHTML = '<option value="">Unit</option>';
                 
-                // Units based on images 86737f and 86733c
-                const unitTypes = ['Case', 'Box', 'Sleeve', 'bottle', 'Slieve'];
-                unitTypes.forEach(u => {
-                    const header = headers.find(h => h.toLowerCase() === u.toLowerCase());
-                    if (found && header && found[header] && found[header].trim() !== "" && found[header].trim().toLowerCase() !== "na") {
-                        uSel.innerHTML += `<option value="${header}">${header}</option>`;
+                // Match unit columns exactly as they appear in Water.csv and Coffee.csv
+                const unitChecklist = ['Case', 'Box', 'Sleeve', 'Slieve', 'bottle'];
+                
+                unitChecklist.forEach(unitName => {
+                    // Find header case-insensitively
+                    const header = Object.keys(found).find(h => h.toLowerCase() === unitName.toLowerCase());
+                    if (header && found[header] && found[header].trim() !== "" && found[header].toLowerCase() !== "na") {
+                        // Display the unit as listed in the column or the header name
+                        uSel.innerHTML += `<option value="${unitName}">${unitName}</option>`;
                     }
                 });
             };
