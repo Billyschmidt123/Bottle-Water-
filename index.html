@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LogiFlow Delivery System</title>
+    <!-- Favicon link dropped as requested -->
     <link rel="stylesheet" href="ASSETS/LEAFLET/leaflet.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="CSS/main.css">
@@ -11,7 +12,7 @@
     <link rel="stylesheet" href="CSS/map.css">
     
     <style>
-        /* ADDITION START: FORCE 70/30 SPLIT WITH SIDEBAR ON RIGHT */
+        /* ADDITION: FORCE 70/30 SPLIT WITH SIDEBAR ON RIGHT (Matches image_973a0e.png) */
         .app-container {
             display: flex !important;
             flex-direction: row !important;
@@ -19,13 +20,13 @@
             height: calc(100vh - 60px) !important;
         }
         #mapPanel {
-            order: 1 !important; /* Forces Map to the Left */
+            order: 1 !important; /* Map on the Left */
             flex: 0 0 70% !important;
             width: 70% !important;
             height: 100% !important;
         }
         #sidebar {
-            order: 2 !important; /* Forces Sidebar to the Right */
+            order: 2 !important; /* Sidebar on the Right */
             flex: 0 0 30% !important;
             width: 30% !important;
             height: 100% !important;
@@ -39,7 +40,6 @@
             gap: 10px !important;
             align-items: center !important;
         }
-        /* ADDITION END */
     </style>
 </head>
 <body>
@@ -51,7 +51,7 @@
             </select>
         </div>
         <div class="topbar-right">
-            <!-- ADDITION START: RESTORED HEADER BUTTONS -->
+            <!-- RESTORED HEADER BUTTONS -->
             <button id="refreshGitHubListBtn" class="btn-top" style="background:#6f42c1; color:white;">
                 <i class="fab fa-github"></i> Sync Route List
             </button>
@@ -61,7 +61,6 @@
             <button id="forceRefreshBtn" class="btn-top" onclick="window.location.reload()">
                 <i class="fas fa-sync-alt"></i> Force Refresh
             </button>
-            <!-- ADDITION END -->
             <button id="refreshRoutesBtn" class="btn-top"><i class="fas fa-sync"></i> Refresh List</button>
         </div>
     </header>
@@ -149,12 +148,11 @@
 
         document.getElementById('refreshRoutesBtn').addEventListener('click', autoSyncRoutes);
 
-        /* ADDITION START: BIND RESTORED SYNC BUTTON */
+        /* BIND RESTORED SYNC BUTTON */
         const syncBtn = document.getElementById('refreshGitHubListBtn');
         if(syncBtn) {
             syncBtn.addEventListener('click', autoSyncRoutes);
         }
-        /* ADDITION END */
         
         // Start the auto-sync immediately
         autoSyncRoutes();
