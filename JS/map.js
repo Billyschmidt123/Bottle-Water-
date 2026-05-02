@@ -1,9 +1,7 @@
-// map.js
 let map;
 let markers = [];
 
 function initMap() {
-    // Defaulting to Grande Prairie area
     map = L.map('map').setView([55.1707, -118.7947], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
@@ -24,7 +22,6 @@ window.processCSV = function(csvText) {
         let data = {};
         headers.forEach((h, i) => data[h] = vals[i] ? vals[i].trim() : "");
         
-        // Supports latitude/longitude regardless of column capitalization
         const lat = parseFloat(data.latitude || data.lat);
         const lng = parseFloat(data.longitude || data.lng || data.long);
 
