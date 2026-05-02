@@ -50,8 +50,8 @@
         .btn-refresh { background: #6c757d; }
 
         /* Maintenance & Modals */
-        .manager-overlay, .order-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
-        .manager-menu-content, .order-content { background: white; padding: 25px; border-radius: 8px; width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto; }
+        .manager-overlay, .order-modal, .crud-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
+        .manager-menu-content, .order-content, .crud-content { background: white; padding: 25px; border-radius: 8px; width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto; }
         
         .menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
         .menu-btn { padding: 20px; font-size: 1.1rem; border: none; border-radius: 5px; cursor: pointer; background: #007bff; color: white; display: flex; flex-direction: column; gap: 10px; align-items: center; }
@@ -65,9 +65,11 @@
         .product-section { margin-top: 15px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; background: #fff; }
         
         .stop-card { background: white; margin: 10px; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; border-left: 5px solid #007bff; }
+        .build-tag { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.5); color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; z-index: 9999; }
     </style>
 </head>
 <body>
+    <div class="build-tag">Build 15-COMBINED</div>
 
     <header class="topbar">
         <div class="topbar-left">
@@ -79,7 +81,7 @@
         </div>
         <div class="topbar-right">
             <button id="openManagerBtn" class="btn-top btn-manager"><i class="fas fa-user-gear"></i> MANAGER MENU</button>
-            <button class="btn-top btn-refresh" onclick="window.location.reload()"><i class="fas fa-sync-alt"></i> REFRESH</button>
+            <button class="btn-top btn-refresh" onclick="window.location.reload()"><i class="fas fa-sync-alt"></i> FORCE REFRESH</button>
         </div>
     </header>
 
@@ -89,7 +91,7 @@
         <div><i class="fas fa-phone"></i> <strong>Phone:</strong> <span id="currentPhone">--</span></div>
     </div>
 
-    <!-- Reverted Order Modal -->
+    <!-- Order Modal -->
     <div id="orderModal" class="order-modal">
         <div class="order-content">
             <h2 id="orderCompanyName">Stop Details</h2>
@@ -120,7 +122,7 @@
                     <button class="menu-btn" id="prodMaintBtn"><i class="fas fa-box"></i> Product Maintenance</button>
                     <button class="menu-btn" id="custMaintBtn"><i class="fas fa-users"></i> Customer Maintenance</button>
                 </div>
-                <div style="text-align: center;"><button id="closeManagerBtn" class="btn-top btn-finish" style="margin-top:20px;">Exit</button></div>
+                <div style="text-align: center;"><button id="closeManagerBtn" class="btn-top btn-finish" style="margin-top:20px; padding:10px 20px;">Exit Manager Portal</button></div>
             </div>
             
             <div id="productPane" class="sub-menu-pane">
@@ -131,14 +133,25 @@
                         <tbody id="prodTableBody"></tbody>
                     </table>
                 </div>
-                <button class="btn-top btn-refresh backToMain" style="margin-top:15px;">Back</button>
+                <button class="btn-top btn-refresh backToMain" style="margin-top:15px;">Back to Menu</button>
+            </div>
+
+            <div id="customerPane" class="sub-menu-pane">
+                <h3>Customer Maintenance</h3>
+                <div class="table-container">
+                    <table class="maint-table" id="customerTable">
+                        <thead id="custTableHead"></thead>
+                        <tbody id="customerTableBody"></tbody>
+                    </table>
+                </div>
+                <button class="btn-top btn-refresh backToMain" style="margin-top:15px;">Back to Menu</button>
             </div>
         </div>
     </div>
 
     <div class="app-container">
         <div id="mapPanel"><div id="map"></div></div>
-        <aside id="sidebar"><div id="sidebarContent" style="padding: 20px; text-align: center;">Select a route.</div></aside>
+        <aside id="sidebar"><div id="sidebarContent" style="padding: 20px; text-align: center;">Select a route to view stop cards.</div></aside>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -168,18 +181,37 @@
                     const text = await res.text();
                     const lines = text.split('\n').filter(l => l.trim());
                     if (lines.length < 2) continue;
+
                     const headers = lines[0].split(',').map(h => h.trim());
                     const data = lines.slice(1).map(line => {
                         let obj = {};
                         const vals = line.split(',');
                         headers.forEach((h, i) => obj[h] = vals[i] ? vals[i].trim() : "");
+                        // Rule: Always use Column 2 (index 1) for the Item Name
                         obj.itemName = vals[1] ? vals[1].trim() : obj[headers[1]];
                         return obj;
                     });
+
                     if (file.name.toLowerCase().includes('water')) waterProducts = data;
                     if (file.name.toLowerCase().includes('coffee')) coffeeProducts = data;
                 }
-            } catch (e) { console.error("Load Error:", e); }
+            } catch (e) { console.error("Data Load Error:", e); }
+        }
+
+        // Maintenance Logic
+        document.getElementById('prodMaintBtn').onclick = () => {
+            document.getElementById('managerGrid').style.display = 'none';
+            document.getElementById('productPane').classList.add('active-pane');
+            renderProductMaint();
+        };
+
+        function renderProductMaint() {
+            const head = document.getElementById('prodTableHead');
+            const body = document.getElementById('prodTableBody');
+            head.innerHTML = "<tr><th>Item (Col 2)</th><th>Units Available</th></tr>";
+            body.innerHTML = [...waterProducts, ...coffeeProducts].map(p => `
+                <tr><td>${p.itemName}</td><td>Verified</td></tr>
+            `).join('');
         }
 
         function createOrderRow(containerId, list, units) {
@@ -191,7 +223,7 @@
                 <select class="p-sel" style="flex:2"><option value="">Select Item...</option>${opts}</select>
                 <select class="u-sel" style="flex:1"><option value="">Unit</option></select>
                 <input type="number" class="q-inp" placeholder="Qty" style="width:60px;">
-                <button onclick="this.parentElement.remove()" style="color:red; background:none; border:none;"><i class="fas fa-trash"></i></button>
+                <button onclick="this.parentElement.remove()" style="color:red; background:none; border:none; cursor:pointer;"><i class="fas fa-trash"></i></button>
             `;
             const pSel = div.querySelector('.p-sel');
             const uSel = div.querySelector('.u-sel');
@@ -212,8 +244,15 @@
         document.getElementById('addWaterBtn').onclick = () => createOrderRow('waterBasketItems', waterProducts, ['bottle', 'Case', 'Sleive']);
         document.getElementById('addCoffeeBtn').onclick = () => createOrderRow('coffeeBasketItems', coffeeProducts, ['Box', 'Case']);
 
+        // UI Listeners
         document.getElementById('openManagerBtn').onclick = () => document.getElementById('managerOverlay').style.display = 'flex';
         document.getElementById('closeManagerBtn').onclick = () => document.getElementById('managerOverlay').style.display = 'none';
+        document.querySelectorAll('.backToMain').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('.sub-menu-pane').forEach(p => p.classList.remove('active-pane'));
+                document.getElementById('managerGrid').style.display = 'block';
+            };
+        });
 
         async function init() {
             const dropdown = document.getElementById('routeDropdownMap');
@@ -251,11 +290,14 @@
                     document.getElementById('currentAddress').innerText = data.address || "N/A";
                     document.getElementById('currentPhone').innerText = data.phone || "--";
                     document.getElementById('orderCompanyName').innerText = data.company || "Details";
+                    document.getElementById('waterBasketItems').innerHTML = "";
+                    document.getElementById('coffeeBasketItems').innerHTML = "";
                     document.getElementById('orderModal').style.display = 'flex';
                 };
                 sidebar.appendChild(card);
             });
         }
+
         init();
     })();
     </script>
