@@ -132,7 +132,6 @@
 
                 routes.forEach(route => {
                     const opt = document.createElement('option');
-                    // MODIFICATION ADDED HERE: Ensure we use the 'file' path from JSON for the value
                     opt.value = route.file || route.id || route.name;
                     opt.textContent = route.name || route.id;
                     dropdown.appendChild(opt);
@@ -142,7 +141,6 @@
 
         window.refreshRoutesFromGitHub = function() {
             console.log("Syncing with GitHub...");
-            // MODIFICATION: Using the routes-manifest.json exactly as named
             const manifestUrl = 'ROUTES/routes-manifest.json?cb=' + Date.now();
             
             return fetch(manifestUrl)
@@ -151,10 +149,16 @@
                     return res.json();
                 })
                 .then(manifest => {
-                    // MODIFICATION: Recursively processing routes defined in manifest
                     const promises = manifest.routes.map(r => {
-                        // --- FIX ADDED HERE: Ensure subdirectory paths (like "Others/") are correctly prefixed for GitHub fetch ---
+                        // --- FIX ADDED HERE: Robust path handling for timestamped folders ---
                         let targetPath = r.file;
+                        
+                        // Check if it's an "Others" route that needs the full folder name from your repo
+                        if (targetPath.includes('Others/') && !targetPath.includes('Others-20260423T171847Z')) {
+                             targetPath = targetPath.replace('Others/', 'Others-20260423T171847Z-3-001/');
+                        }
+
+                        // Ensure ROUTES/ prefix
                         if (targetPath && !targetPath.startsWith('ROUTES/')) {
                             targetPath = 'ROUTES/' + targetPath;
                         }
