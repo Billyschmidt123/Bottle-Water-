@@ -60,8 +60,10 @@
             background: white;
             padding: 30px;
             border-radius: 8px;
-            width: 90%;
-            max-width: 600px;
+            width: 95%;
+            max-width: 1000px;
+            max-height: 90vh;
+            overflow-y: auto;
             text-align: center;
         }
         .menu-grid {
@@ -85,9 +87,22 @@
         .menu-btn:hover { background: #0056b3; }
         .close-btn { background: #dc3545; margin-top: 20px; padding: 10px 20px; color: white; border: none; border-radius: 4px; }
 
-        /* ADDITION: SUB-MENU STYLING */
         .sub-menu-pane { display: none; text-align: left; }
         .active-pane { display: block !important; }
+
+        /* ADDITION: MAINTENANCE TABLE STYLES */
+        .maint-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 0.9rem;
+        }
+        .maint-table th, .maint-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .maint-table th { background-color: #f2f2f2; }
     </style>
 </head>
 <body>
@@ -117,22 +132,48 @@
         <div class="manager-menu-content" id="mainMenuContent">
             <h2>LogiFlow Manager Portal</h2>
             <div class="menu-grid" id="managerGrid">
-                <!-- ADDITION: ID added to buttons for maintenance logic -->
                 <button class="menu-btn" id="prodMaintBtn"><i class="fas fa-box"></i> Product Management</button>
                 <button class="menu-btn" id="custMaintBtn"><i class="fas fa-users"></i> Customer Management</button>
                 <button class="menu-btn"><i class="fas fa-file-import"></i> Import Functions</button>
                 <button class="menu-btn"><i class="fas fa-route"></i> Route Optimization</button>
             </div>
             
-            <!-- ADDITION: MAINTENANCE SUB-PAGES -->
             <div id="productPane" class="sub-menu-pane">
                 <h3>Product Maintenance</h3>
-                <p>Loading Product Inventory...</p>
+                <!-- ADDITION: PRODUCT TABLE -->
+                <table class="maint-table" id="productTable">
+                    <thead>
+                        <tr>
+                            <th>Item Name</th>
+                            <th>Category</th>
+                            <th>Stock Level</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>5 Gallon Water</td><td>Bottled Water</td><td>120</td><td><button>Edit</button></td></tr>
+                        <tr><td>Hot Tub Filter</td><td>Maintenance</td><td>45</td><td><button>Edit</button></td></tr>
+                    </tbody>
+                </table>
                 <button class="close-btn backToMain">Back to Menu</button>
             </div>
             <div id="customerPane" class="sub-menu-pane">
                 <h3>Customer Maintenance</h3>
-                <p>Loading Customer Records...</p>
+                <!-- ADDITION: CUSTOMER TABLE -->
+                <table class="maint-table" id="customerTable">
+                    <thead>
+                        <tr>
+                            <th>Customer Name</th>
+                            <th>Service Address</th>
+                            <th>Contact</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Grande Prairie Hospital</td><td>11234 100 Ave</td><td>780-555-0199</td><td>Active</td></tr>
+                        <tr><td>Central Park Hot Tubs</td><td>9912 108 St</td><td>780-555-0122</td><td>Active</td></tr>
+                    </tbody>
+                </table>
                 <button class="close-btn backToMain">Back to Menu</button>
             </div>
 
@@ -172,7 +213,6 @@
             } else { window.location.reload(); }
         }
 
-        // MANAGER MENU TOGGLE LOGIC
         const overlay = document.getElementById('managerOverlay');
         document.getElementById('openManagerBtn').addEventListener('click', () => {
             overlay.style.display = 'flex';
@@ -181,7 +221,6 @@
             overlay.style.display = 'none';
         });
 
-        // ADDITION: MAINTENANCE BUTTON LOGIC
         document.getElementById('prodMaintBtn').addEventListener('click', () => {
             document.getElementById('managerGrid').style.display = 'none';
             document.getElementById('productPane').classList.add('active-pane');
