@@ -28,13 +28,12 @@
             width: 70% !important;
             height: 100% !important;
             position: relative !important;
+            background-color: #ddd; /* Visible placeholder */
         }
-        /* ADDITION: Forced height and visibility for the map container */
         #map {
             width: 100% !important;
             height: 100% !important;
-            min-height: 100% !important;
-            background-color: #e0e0e0; /* Grey placeholder while loading */
+            z-index: 10 !important; /* Ensure map stays on top of the panel background */
         }
         #sidebar {
             order: 2 !important;
@@ -76,7 +75,6 @@
 
     <div class="app-container">
         <div id="mapPanel">
-            <!-- The map target -->
             <div id="map"></div>
         </div>
         <aside id="sidebar">
@@ -107,16 +105,11 @@
         async function autoSyncRoutes() {
             const dropdown = document.getElementById('routeDropdownMap');
             const url = `https://api.github.com/repos/${REPO}/contents/routes`;
-            
             try {
-                const res = await fetch(url, {
-                    headers: { 'Authorization': `token ${activeToken}` }
-                });
-                
+                const res = await fetch(url, { headers: { 'Authorization': `token ${activeToken}` } });
                 if (res.ok) {
                     const files = await res.json();
                     const csvFiles = files.filter(f => f.name.endsWith('.csv'));
-                    
                     while (dropdown.options.length > 1) dropdown.remove(1);
                     csvFiles.forEach(f => {
                         const opt = document.createElement('option');
@@ -125,9 +118,7 @@
                         dropdown.appendChild(opt);
                     });
                 }
-            } catch (e) {
-                setTimeout(autoSyncRoutes, 5000);
-            }
+            } catch (e) { setTimeout(autoSyncRoutes, 5000); }
         }
 
         document.getElementById('routeDropdownMap').addEventListener('change', async (e) => {
@@ -135,7 +126,6 @@
             if (!file) return;
             const sidebar = document.getElementById('sidebarContent');
             sidebar.innerHTML = 'Loading stop cards...';
-
             const url = `https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/routes/${file}`;
             try {
                 const res = await fetch(url, { headers: { 'Authorization': `token ${activeToken}` } });
@@ -148,23 +138,29 @@
         });
 
         document.getElementById('refreshRoutesBtn').addEventListener('click', autoSyncRoutes);
-
-        const syncBtn = document.getElementById('refreshGitHubListBtn');
-        if(syncBtn) {
-            syncBtn.addEventListener('click', autoSyncRoutes);
-        }
         
+        const syncBtn = document.getElementById('refreshGitHubListBtn');
+        if(syncBtn) { syncBtn.addEventListener('click', autoSyncRoutes); }
+
+        // Start the process
         autoSyncRoutes().catch(() => {});
 
-        /* ADDITION: MAP RESIZE TRIGGER */
-        // We wait a split second for the flexbox to render, then tell Leaflet to check its size
-        setTimeout(() => {
-            if (typeof map !== 'undefined' && map !== null) {
-                map.invalidateSize();
-                console.log("Map size recalculated.");
-            }
-        }, 500);
+        /* FIX: ENSURE LEAFLET LOADS AFTER LAYOUT */
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                // If the map object is globally defined in your map.js, this will wake it up
+                if (typeof map !== 'undefined' && map !== null) {
+                    map.invalidateSize();
+                    console.log("Map size refreshed on load.");
+                } else {
+                    console.warn("Map object not found. Ensure map.js initializes 'map'.");
+                }
+            }, 800);
+        });
     })();
     </script>
+    
+    <!-- IMPORTANT: Ensure map.js is loaded AFTER the HTML map div exists -->
+    <script src="JS/map.js"></script>
 </body>
 </html>
