@@ -7,36 +7,54 @@
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="CSS/main.css">
     
     <style>
-        .app-container { display: flex; flex-direction: row; width: 100%; height: calc(100vh - 60px); overflow: hidden; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #f4f7f6; }
+        .topbar { background: #fff; padding: 10px 20px; border-bottom: 2px solid #007bff; display: flex; justify-content: space-between; align-items: center; height: 70px; box-sizing: border-box; }
+        .address-bar { flex-grow: 1; margin: 0 20px; position: relative; }
+        .address-bar input { width: 100%; padding: 10px; border-radius: 20px; border: 1px solid #ccc; padding-left: 35px; }
+        .address-bar i { position: absolute; left: 12px; top: 12px; color: #888; }
+
+        .app-container { display: flex; flex-direction: row; width: 100%; height: calc(100vh - 70px); overflow: hidden; }
         #mapPanel { flex: 0 0 70%; height: 100%; position: relative; }
         #map { width: 100%; height: 100%; background-color: #ddd; }
-        #sidebar { flex: 0 0 30%; height: 100%; border-left: 1px solid #ccc; overflow-y: auto; background: #f9f9f9; }
+        #sidebar { flex: 0 0 30%; height: 100%; border-left: 1px solid #ccc; overflow-y: auto; background: #fff; }
         
-        .order-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; justify-content: center; align-items: center; background: rgba(0,0,0,0.7); }
-        .order-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 900px; max-height: 90vh; overflow-y: auto; }
+        .order-modal, .manager-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; justify-content: center; align-items: center; background: rgba(0,0,0,0.8); }
+        .order-content, .manager-content { background: white; padding: 25px; border-radius: 12px; width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto; }
 
-        .topbar { background: #fff; padding: 10px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center; height: 60px; box-sizing: border-box; }
-        .btn-top { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
-        
-        .stop-card { background: white; margin: 10px; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; border-left: 5px solid #007bff; }
-        .basket-item { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #dee2e6; }
+        .btn-top { padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: bold; margin-left: 5px; transition: 0.3s; }
+        .btn-refresh { background: #6c757d; }
+        .btn-manager { background: #343a40; }
+        .btn-save { background: #28a745; }
+
+        .stop-card { background: white; margin: 12px; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer; border-left: 6px solid #007bff; }
+        .basket-item { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; padding: 12px; background: #f8f9fa; border-radius: 6px; border: 1px solid #dee2e6; }
         
         .product-section { margin-top: 15px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; background: #fff; }
         .water-header { color: #007bff; font-weight: bold; font-size: 1.1rem; margin-bottom: 10px; }
         .coffee-header { color: #6f42c1; font-weight: bold; font-size: 1.1rem; margin-bottom: 10px; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        table th, table td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        table th { background: #f1f1f1; }
     </style>
 </head>
 <body>
     <header class="topbar">
-        <div>
-            <b style="font-size: 1.2rem; margin-right: 20px;">LogiFlow</b>
-            <select id="routeDropdownMap"><option value="">-- Select Route --</option></select>
+        <div style="display:flex; align-items:center;">
+            <b style="font-size: 1.4rem; color:#007bff; margin-right: 20px;">LogiFlow</b>
+            <select id="routeDropdownMap" style="padding:8px; border-radius:5px;"><option value="">-- Select Route --</option></select>
         </div>
+
+        <div class="address-bar">
+            <i class="fas fa-search"></i>
+            <input type="text" id="addressSearch" placeholder="Search address or customer...">
+        </div>
+
         <div>
-            <button class="btn-top" style="background:#6c757d" onclick="window.location.reload()">REFRESH</button>
+            <button class="btn-top btn-refresh" onclick="location.reload(true)">FORCE REFRESH</button>
+            <button class="btn-top btn-manager" onclick="openManager()">MANAGER</button>
         </div>
     </header>
 
@@ -44,29 +62,53 @@
         <div class="order-content">
             <h2 id="orderCompanyName">Stop Details</h2>
             <hr>
-            
             <div class="product-section">
                 <div class="water-header"><i class="fas fa-tint"></i> Water Products</div>
                 <div id="waterBasketItems"></div>
-                <button id="addWaterBtn" style="background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">+ Add Water</button>
+                <button id="addWaterBtn" class="btn-top" style="background: #007bff;">+ Add Water</button>
             </div>
-
             <div class="product-section">
                 <div class="coffee-header"><i class="fas fa-coffee"></i> Coffee Products</div>
                 <div id="coffeeBasketItems"></div>
-                <button id="addCoffeeBtn" style="background: #6f42c1; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">+ Add Coffee</button>
+                <button id="addCoffeeBtn" class="btn-top" style="background: #6f42c1;">+ Add Coffee</button>
+            </div>
+            <div style="text-align: right; margin-top: 20px;">
+                <button id="saveOrderBtn" class="btn-top btn-save">Save Order</button>
+                <button onclick="closeModal('orderModal')" class="btn-top" style="background:#dc3545;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manager Maintenance Modal -->
+    <div id="managerModal" class="manager-modal">
+        <div class="manager-content">
+            <h2>Manager Portal - Maintenance</h2>
+            <div style="border-bottom: 1px solid #ccc; margin-bottom: 20px;">
+                <button onclick="showTab('customerTab')" class="btn-top" style="background:#007bff">Customer Maintenance</button>
+                <button onclick="showTab('productTab')" class="btn-top" style="background:#6f42c1">Product Maintenance</button>
             </div>
 
-            <div style="text-align: right; margin-top: 20px;">
-                <button id="saveOrderBtn" style="background: #28a745; color: white; border: none; padding: 12px 25px; border-radius: 4px; cursor: pointer;">Save Order</button>
-                <button onclick="document.getElementById('orderModal').style.display='none'" style="background:#dc3545; color:white; border:none; padding:12px 25px; border-radius:4px; cursor:pointer;">Close</button>
+            <div id="customerTab" class="m-tab">
+                <h3>Customer List</h3>
+                <div id="customerTableContainer"></div>
+                <button onclick="addRow('customer')" class="btn-top btn-save">+ Add New Customer</button>
+            </div>
+
+            <div id="productTab" class="m-tab" style="display:none">
+                <h3>Product Catalog</h3>
+                <div id="productTableContainer"></div>
+                <button onclick="addRow('product')" class="btn-top btn-save">+ Add New Product</button>
+            </div>
+
+            <div style="text-align: right; margin-top: 30px;">
+                <button onclick="closeModal('managerModal')" class="btn-top" style="background:#343a40">Close Manager Portal</button>
             </div>
         </div>
     </div>
 
     <div class="app-container">
         <div id="mapPanel"><div id="map"></div></div>
-        <aside id="sidebar"><div id="sidebarContent" style="padding: 15px;">Please select a route.</div></aside>
+        <aside id="sidebar"><div id="sidebarContent" style="padding: 15px;">Please select a route to begin.</div></aside>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -79,6 +121,7 @@
         
         let waterProducts = [];
         let coffeeProducts = [];
+        let currentRouteData = [];
 
         async function ghFetch(path) {
             const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
@@ -88,57 +131,62 @@
         }
 
         async function loadData() {
-            try {
-                const files = await ghFetch('Products');
-                for (const file of files) {
-                    if (!file.name.endsWith('.csv')) continue;
-                    const res = await fetch(file.download_url);
-                    const text = await res.text();
-                    const lines = text.split('\n').filter(l => l.trim());
-                    if (lines.length < 2) continue;
+            const files = await ghFetch('Products');
+            for (const file of files) {
+                if (!file.name.endsWith('.csv')) continue;
+                const res = await fetch(file.download_url);
+                const text = await res.text();
+                const lines = text.split('\n').filter(l => l.trim());
+                if (lines.length < 2) continue;
 
-                    const headers = lines[0].split(',').map(h => h.trim());
-                    
-                    const data = lines.slice(1).map(line => {
-                        let obj = {};
-                        const vals = line.split(',');
-                        headers.forEach((h, i) => {
-                            obj[h] = vals[i] ? vals[i].trim() : "";
-                        });
-                        // Use column 2 specifically as a fallback "itemName" property
-                        obj.itemName = vals[1] ? vals[1].trim() : obj[headers[1]];
-                        return obj;
-                    });
+                const headers = lines[0].split(',').map(h => h.trim());
+                const data = lines.slice(1).map(line => {
+                    let obj = {};
+                    const vals = line.split(',');
+                    headers.forEach((h, i) => obj[h] = vals[i] ? vals[i].trim() : "");
+                    obj.itemName = vals[1] ? vals[1].trim() : obj[headers[1]]; // Force Column 2
+                    return obj;
+                });
 
-                    if (file.name.toLowerCase().includes('water')) waterProducts = data;
-                    if (file.name.toLowerCase().includes('coffee')) coffeeProducts = data;
-                }
-            } catch (e) { console.error("Error loading CSVs:", e); }
+                if (file.name.toLowerCase().includes('water')) waterProducts = data;
+                if (file.name.toLowerCase().includes('coffee')) coffeeProducts = data;
+            }
+        }
+
+        // Manager Functions
+        window.openManager = () => { document.getElementById('managerModal').style.display = 'flex'; renderMaintenance(); };
+        window.closeModal = (id) => { document.getElementById(id).style.display = 'none'; };
+        window.showTab = (id) => { 
+            document.querySelectorAll('.m-tab').forEach(t => t.style.display = 'none');
+            document.getElementById(id).style.display = 'block';
+        };
+
+        function renderMaintenance() {
+            const prodCont = document.getElementById('productTableContainer');
+            let prodHtml = `<table><tr><th>Item (Col 2)</th><th>Units</th><th>Actions</th></tr>`;
+            [...waterProducts, ...coffeeProducts].forEach((p, idx) => {
+                prodHtml += `<tr><td>${p.itemName}</td><td>Available</td><td><button style="color:red">Delete</button></td></tr>`;
+            });
+            prodCont.innerHTML = prodHtml + `</table>`;
         }
 
         function createRow(containerId, list, units) {
             const container = document.getElementById(containerId);
             const div = document.createElement('div');
             div.className = 'basket-item';
-            
-            // Build options using the dedicated itemName (Column 2)
             let opts = list.map(p => `<option value="${p.itemName}">${p.itemName}</option>`).join('');
-            
             div.innerHTML = `
                 <select class="p-sel" style="flex:2"><option value="">Select Item...</option>${opts}</select>
                 <select class="u-sel" style="flex:1"><option value="">Unit</option></select>
                 <input type="number" class="q-inp" placeholder="Qty" style="width:60px;">
                 <button onclick="this.parentElement.remove()" style="color:red; background:none; border:none; cursor:pointer;"><i class="fas fa-trash"></i></button>
             `;
-            
             const pSel = div.querySelector('.p-sel');
             const uSel = div.querySelector('.u-sel');
-            
             pSel.onchange = (e) => {
                 const found = list.find(p => p.itemName === e.target.value);
                 uSel.innerHTML = '<option value="">Unit</option>';
                 if (!found) return;
-
                 units.forEach(u => {
                     const key = Object.keys(found).find(k => k.toLowerCase() === u.toLowerCase());
                     if (key && found[key] && found[key].toLowerCase() !== 'na' && found[key] !== "") {
@@ -175,14 +223,11 @@
             const sidebar = document.getElementById('sidebarContent');
             sidebar.innerHTML = "";
             const lines = csv.split('\n').filter(l => l.trim());
-            if (lines.length < 2) return;
-
             const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
             lines.slice(1).forEach(line => {
                 const vals = line.split(',');
                 let data = {};
                 headers.forEach((h, i) => data[h] = vals[i] ? vals[i].trim() : "");
-                
                 const card = document.createElement('div');
                 card.className = 'stop-card';
                 card.innerHTML = `<b>${data.company || 'Customer'}</b><br>${data.address || ''}`;
