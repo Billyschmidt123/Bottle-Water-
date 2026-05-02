@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="CSS/map.css">
     
     <style>
-        /* 70/30 SPLIT - FIXED SIDEBAR ON RIGHT */
+        /* 70/30 SPLIT (Matches image_973a0e.png) */
         .app-container {
             display: flex !important;
             flex-direction: row !important;
@@ -42,11 +42,6 @@
             border-left: 1px solid #ccc !important;
             overflow-y: auto !important;
             background: #f9f9f9 !important;
-        }
-        .topbar-right {
-            display: flex !important;
-            gap: 10px !important;
-            align-items: center !important;
         }
     </style>
 </head>
@@ -83,7 +78,9 @@
         </aside>
     </div>
 
-    <!-- Load the map logic BEFORE the cleanup script -->
+    <!-- 1. Load Leaflet Library -->
+    <script src="ASSETS/LEAFLET/leaflet.js"></script>
+    <!-- 2. Load your map initialization -->
     <script src="JS/map.js"></script>
 
     <script>
@@ -123,40 +120,26 @@
             } catch (e) { setTimeout(autoSyncRoutes, 5000); }
         }
 
-        document.getElementById('routeDropdownMap').addEventListener('change', async (e) => {
-            const file = e.target.value;
-            if (!file) return;
-            const sidebar = document.getElementById('sidebarContent');
-            sidebar.innerHTML = 'Loading stop cards...';
-            const url = `https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/routes/${file}`;
-            try {
-                const res = await fetch(url, { headers: { 'Authorization': `token ${activeToken}` } });
-                if (res.ok) {
-                    const text = await res.text();
-                    const lines = text.split(/\r?\n/).filter(l => l.trim());
-                    sidebar.innerHTML = `<div style="padding:15px;"><b>Route:</b> ${file}<br><b>Stops:</b> ${lines.length - 1}</div>`;
-                }
-            } catch (err) { sidebar.innerHTML = 'Error loading cards.'; }
-        });
+        // Logic for refreshing the map size
+        let refreshAttempts = 0;
+        function tryMapRefresh() {
+            if (window.map && typeof window.map.invalidateSize === 'function') {
+                window.map.invalidateSize();
+                console.log("Map size successfully refreshed.");
+            } else if (refreshAttempts < 10) {
+                refreshAttempts++;
+                console.log("Waiting for map object... attempt " + refreshAttempts);
+                setTimeout(tryMapRefresh, 500);
+            } else {
+                console.error("Map object not found after 5 seconds. Check JS/map.js variable names.");
+            }
+        }
 
         document.getElementById('refreshRoutesBtn').addEventListener('click', autoSyncRoutes);
-        const syncBtn = document.getElementById('refreshGitHubListBtn');
-        if(syncBtn) { syncBtn.addEventListener('click', autoSyncRoutes); }
-
         autoSyncRoutes().catch(() => {});
-
-        // SAFER MAP REFRESH
-        window.addEventListener('load', () => {
-            setTimeout(() => {
-                // This checks if 'map' exists AND if it has the Leaflet resize function
-                if (window.map && typeof window.map.invalidateSize === 'function') {
-                    window.map.invalidateSize();
-                    console.log("Map layout fixed.");
-                } else {
-                    console.log("Map object not yet ready or named differently.");
-                }
-            }, 1000);
-        });
+        
+        // Trigger the refresh loop
+        window.addEventListener('load', tryMapRefresh);
     })();
     </script>
 </body>
