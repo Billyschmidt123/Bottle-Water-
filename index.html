@@ -14,13 +14,6 @@
     <link rel="stylesheet" href="CSS/map.css?v=1">
     <link rel="stylesheet" href="CSS/modal.css?v=1">
     <link rel="stylesheet" href="CSS/manager.css?v=1">
-    
-    <style>
-        #uploadProgressContainer { width: 100%; background: #eee; border-radius: 5px; margin: 10px 0; display: none; }
-        #uploadProgressBar { width: 0%; height: 20px; background: #28a745; border-radius: 5px; text-align: center; color: white; line-height: 20px; font-size: 12px; transition: width 0.3s; }
-        .github-refresh-btn { background: #6f42c1 !important; color: white !important; }
-        #routeDropdownMap { margin-left:15px; padding:6px; border-radius:4px; border:1px solid #ccc; width: 200px; }
-    </style>
 </head>
 
 <body>
@@ -32,7 +25,7 @@
             </select>
         </div>
         <div class="topbar-right">
-            <button id="refreshGitHubListBtn" class="btn-top github-refresh-btn">
+            <button id="refreshGitHubListBtn" class="btn-top" style="background:#6f42c1; color:white;">
                 <i class="fab fa-github"></i> Sync Route List
             </button>
             <button class="btn-top openManagerBtn">
@@ -45,152 +38,119 @@
     </header>
 
     <div class="app-container">
-        <div id="uploadProgressContainer">
-            <div id="uploadProgressBar">0%</div>
-        </div>
-        <div id="mapPanel">
-            <div id="mapTopBar">
-                <div id="currentStopInfo">No stop selected</div>
-                <div id="mapControlButtons">
-                    <button id="btnPrevStop" class="btn-top btn-small"><i class="fas fa-arrow-left"></i> Back</button>
-                    <button id="btnNextStop" class="btn-top btn-small">Forward <i class="fas fa-arrow-right"></i></button>
-                    <button id="btnStartRoute" class="btn-top btn-small btn-success"><i class="fas fa-play"></i> Start</button>
-                    <button id="btnFinishRoute" class="btn-top btn-small btn-warning"><i class="fas fa-flag-checkered"></i> Finish</button>
-                </div>
-            </div>
-            <div id="map" style="height: 600px;"></div>
-        </div>
         <aside id="sidebar">
             <div id="sidebarContent">
-                <div style="padding: 20px; text-align: center; color: #666;">System Initializing...</div>
+                <div style="padding: 20px; text-align: center; color: #666;">Waiting for route selection...</div>
             </div>
         </aside>
+        <div id="mapPanel">
+            <div id="map" style="height: 600px;"></div>
+        </div>
     </div>
-
-    <div id="fullPageOverlay"></div>
-    <div id="productOverlay"></div>
-    <div id="mgmtModal"><div class="modal-content" id="modalBody"></div></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="JS/loader.js?v=1"></script>
 
     <script>
     (function () {
-        // Core decryption math
-        const xorDecode = (encoded, key) => {
+        // --- ADMIN ENCRYPTION BRIDGE ---
+        const decrypt = (enc, pwd) => {
             try {
-                return atob(encoded).split('').map((char, i) => 
-                    String.fromCharCode(char.charCodeAt(0) ^ key.charCodeAt(i % key.length))
-                ).join('');
-            } catch(e) { return null; }
+                const str = atob(enc);
+                let res = '';
+                for (let i = 0; i < str.length; i++) {
+                    res += String.fromCharCode(str.charCodeAt(i) ^ pwd.charCodeAt(i % pwd.length));
+                }
+                return res;
+            } catch (e) { return null; }
         };
 
-        // Scrambled version of your specific GitHub Token
-        const ENCODED_TOKEN = "V1tbS08ZFlFVAhZfUFBZVFRfVlxOEQoNCF5SWFBfXF9eVFRZVF1UWFtfWVhRXl1N"; 
-        const REQUIRED_PASS = "2026!"; // Hard-coded validation check
-        
-        let token = localStorage.getItem('logiflow_gh_token');
-        
-        // Validation loop to ensure the driver gets in
-        if (!token || token === "null") {
-            let entry = prompt("LogiFlow Security: Enter Route Access Password:");
-            
-            if (entry && entry.trim() === REQUIRED_PASS) {
-                const decrypted = xorDecode(ENCODED_TOKEN, REQUIRED_PASS);
-                if (decrypted && decrypted.startsWith("github_pat")) {
-                    localStorage.setItem('logiflow_gh_token', decrypted);
-                    token = decrypted;
+        // This is your key scrambled with "2026!"
+        const DATA = "V1tbS08ZFlFVAhZfUFBZVFRfVlxOEQoNCF5SWFBfXF9eVFRZVF1UWFtfWVhRXl1N";
+        let activeToken = localStorage.getItem('logiflow_gh_token');
+
+        // Logic to unlock the tablet for the field
+        if (!activeToken || activeToken === "null") {
+            const entry = prompt("LogiFlow Security: Enter Access Password:");
+            if (entry && entry.trim() === "2026!") {
+                const unlocked = decrypt(DATA, "2026!");
+                if (unlocked && unlocked.startsWith("github_pat")) {
+                    localStorage.setItem('logiflow_gh_token', unlocked);
+                    activeToken = unlocked;
                 } else {
-                    alert("Security Error: Key decryption failed. Please contact the administrator.");
+                    alert("Admin Alert: Key Corrupted. Re-copy the index.html file.");
                 }
             } else if (entry !== null) {
-                alert("Access Denied: Incorrect password.");
+                alert("Incorrect Password.");
                 window.location.reload();
             }
         }
 
         const GITHUB = {
-            KEY: token, 
+            TOKEN: activeToken,
             REPO: 'Billyschmidt123/Bottle-Water-',
-            RAW: 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/'
+            BASE: 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/'
         };
 
-        async function fetchGH(url, options = {}) {
-            if (!GITHUB.KEY) return null;
+        async function apiReq(url, opts = {}) {
+            if (!GITHUB.TOKEN) return null;
             try {
                 return await fetch(url, {
-                    ...options,
-                    headers: { ...(options.headers || {}), 'Authorization': `token ${GITHUB.KEY}` }
+                    ...opts,
+                    headers: { ...opts.headers, 'Authorization': `token ${GITHUB.TOKEN}` }
                 });
             } catch (e) { return null; }
         }
 
-        // Logic for Stop Cards
-        function processStopCards(text) {
-            const rows = text.split(/\r?\n/).filter(r => r.trim());
-            if (!rows.length) return [];
-            const cols = rows[0].split(',').map(c => c.trim());
-            return rows.slice(1).map(row => {
-                const vals = row.split(',');
-                const card = {};
-                cols.forEach((c, i) => { card[c] = (vals[i] || '').trim(); });
-                return card;
-            });
-        }
-
+        // --- STOP CARD LOADING ---
         window.refreshRoutesFromGitHub = async function() {
-            try {
-                const res = await fetchGH(GITHUB.RAW + 'routes/routes-manifest.json?cb=' + Date.now());
-                if (res && res.ok) {
-                    const manifest = await res.json();
-                    const dropdown = document.querySelector('#routeDropdownMap');
-                    while (dropdown.options.length > 1) dropdown.remove(1);
-                    manifest.routes.forEach(r => {
-                        const opt = document.createElement('option');
-                        opt.value = r.file;
-                        opt.textContent = r.name;
-                        dropdown.appendChild(opt);
-                    });
-                }
-            } catch (e) { console.error("Manifest refresh failed."); }
+            const res = await apiReq(GITHUB.BASE + 'routes/routes-manifest.json?cb=' + Date.now());
+            if (res && res.ok) {
+                const manifest = await res.json();
+                const dropdown = document.querySelector('#routeDropdownMap');
+                while (dropdown.options.length > 1) dropdown.remove(1);
+                manifest.routes.forEach(r => {
+                    const opt = document.createElement('option');
+                    opt.value = r.file;
+                    opt.textContent = r.name;
+                    dropdown.appendChild(opt);
+                });
+            }
         };
 
         document.getElementById('routeDropdownMap').addEventListener('change', async (e) => {
             const file = e.target.value;
             if (!file) return;
-
             const sidebar = document.getElementById('sidebarContent');
             sidebar.innerHTML = '<div style="padding: 20px;">Loading Stop Cards...</div>';
 
-            const res = await fetchGH(GITHUB.RAW + 'routes/' + file + '?cb=' + Date.now());
+            const res = await apiReq(GITHUB.BASE + 'routes/' + file + '?cb=' + Date.now());
             if (res && res.ok) {
-                const cards = processStopCards(await res.text());
-                sidebar.innerHTML = `<div style="padding: 20px;">Loaded ${cards.length} stop cards for field technician.</div>`;
+                const text = await res.text();
+                const lines = text.split(/\r?\n/).filter(l => l.trim());
+                sidebar.innerHTML = `<div style="padding: 20px;">Loaded ${lines.length - 1} stop cards.</div>`;
             }
         });
 
         document.getElementById('refreshGitHubListBtn').addEventListener('click', async () => {
-            const API = `https://api.github.com/repos/${GITHUB.REPO}/contents/routes`;
-            try {
-                const res = await fetchGH(API);
-                if (!res || !res.ok) throw new Error("GitHub access denied.");
+            const res = await apiReq(`https://api.github.com/repos/${GITHUB.REPO}/contents/routes`);
+            if (res && res.ok) {
                 const files = (await res.json()).filter(f => f.name.endsWith('.csv')).map(f => ({
                     id: f.name.replace('.csv', ''), name: f.name.replace('.csv', ''), file: f.name
                 }));
-                
                 const manifest = { updatedAt: new Date().toISOString(), routes: files };
                 const manifestUrl = `https://api.github.com/repos/${GITHUB.REPO}/contents/routes/routes-manifest.json`;
-                const getRes = await fetchGH(manifestUrl);
+                const getRes = await apiReq(manifestUrl);
                 const sha = getRes && getRes.ok ? (await getRes.json()).sha : null;
 
                 await fetch(manifestUrl, {
                     method: 'PUT',
-                    headers: { 'Authorization': `token ${GITHUB.KEY}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: "Update Manifest", content: btoa(JSON.stringify(manifest, null, 2)), sha })
+                    headers: { 'Authorization': `token ${GITHUB.TOKEN}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: "Sync Manifest", content: btoa(JSON.stringify(manifest, null, 2)), sha })
                 });
                 await window.refreshRoutesFromGitHub();
-                alert("Route list synced successfully.");
-            } catch (e) { alert("Sync failed: " + e.message); }
+                alert("Success: Route list updated.");
+            }
         });
 
         document.getElementById('refreshRoutesBtn').addEventListener('click', window.refreshRoutesFromGitHub);
