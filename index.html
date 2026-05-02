@@ -40,6 +40,23 @@
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
         .form-group input { width: 100%; padding: 8px; box-sizing: border-box; }
         .build-tag { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.5); color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; z-index: 9999; }
+
+        /* ADDITIVE FIX: RESTORE BUTTONS TO TOP OF MAP */
+        .topbar {
+            position: absolute !important;
+            top: 10px !important;
+            left: 50px !important;
+            right: 10px !important;
+            z-index: 1000 !important;
+            background: rgba(255, 255, 255, 0.9) !important;
+            padding: 10px !important;
+            border-radius: 8px !important;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2) !important;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            pointer-events: auto !important;
+        }
     </style>
 </head>
 <body>
@@ -277,6 +294,24 @@
         });
         
         document.getElementById('cancelCrudBtn').addEventListener('click', () => { document.getElementById('crudModal').style.display = 'none'; });
+
+        /* ADDITIVE FIX: RESTORE AUTOMATIC ROUTE LOADING */
+        async function initializeRoutes() {
+            try {
+                const dropdown = document.getElementById('routeDropdownMap');
+                const files = await ghFetch('routes');
+                files.filter(f => f.name.endsWith('.csv')).forEach(file => {
+                    const opt = document.createElement('option');
+                    opt.value = file.download_url;
+                    opt.textContent = file.name.replace('.csv', '');
+                    dropdown.appendChild(opt);
+                });
+            } catch (e) {
+                console.error("Route Init Failed", e);
+            }
+        }
+        initializeRoutes();
+
     })();
     </script>
 </body>
