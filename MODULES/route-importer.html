@@ -13,16 +13,12 @@
 
         <div id="githubFileBrowser" style="display:none; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fdfdfd;">
             <p style="font-size: 0.85em; margin-bottom: 5px;"><strong>Found in your folders:</strong></p>
-            <div id="fileListContainer" style="max-height: 200px; overflow-y: auto; font-size: 0.9em;">
-                <!-- Files will appear here with checkboxes -->
-            </div>
+            <div id="fileListContainer" style="max-height: 200px; overflow-y: auto; font-size: 0.9em;"></div>
             <button id="btnGenerateManifest" class="btn-success" style="width: 100%; margin-top: 15px;">Add Selected to Manifest</button>
         </div>
 
         <hr>
-        
         <div id="importStatus" style="margin-bottom: 10px; font-weight: bold; color: #007bff;"></div>
-        
         <label>Manifest Preview:</label>
         <textarea id="jsonPreview" style="width:100%; height:120px; font-family: monospace; font-size: 11px;"></textarea>
 
@@ -45,7 +41,7 @@
     const fileContainer = document.getElementById('fileListContainer');
     const jsonPreview = document.getElementById('jsonPreview');
 
-    // Updated to match your exact GitHub folder structure
+    // These MUST match the URL path in your browser when you click into the folders
     const routeFolders = [
         "routes/Others-20260423T171847Z-3-001",
         "routes/Week 1-20260423T171844Z-3-001/Week 1",
@@ -55,15 +51,24 @@
     ];
 
     async function fetchFolderFiles(path, token) {
+        // We encode the URI to handle spaces and special characters in your folder names
+        const cleanPath = encodeURI(path.trim());
+        console.log("Attempting to scan GitHub path:", cleanPath);
+        
         try {
-            const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+            const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${cleanPath}`, {
                 headers: { 'Authorization': `token ${token}` }
             });
-            if (!res.ok) return [];
+            
+            if (!res.ok) {
+                console.error(`GitHub API returned ${res.status} for path: ${cleanPath}`);
+                return [];
+            }
+            
             const data = await res.json();
             return data.filter(item => item.name.toLowerCase().endsWith('.csv'));
         } catch (e) {
-            console.error("Error fetching " + path, e);
+            console.error("Fetch failed for " + cleanPath, e);
             return [];
         }
     }
@@ -72,40 +77,36 @@
         const token = document.getElementById('ghToken').value;
         if (!token) return alert("Please enter your GitHub Token.");
         
-        status.textContent = "Scanning folders on GitHub...";
+        status.textContent = "Scanning... (Check console if this stays blank)";
         fileContainer.innerHTML = "";
         
-        try {
-            let allFiles = [];
-            for (const folder of routeFolders) {
-                const files = await fetchFolderFiles(folder, token);
-                allFiles = allFiles.concat(files);
-            }
-
-            if (allFiles.length === 0) {
-                status.textContent = "No CSV files found. Verify folder paths and token.";
-                return;
-            }
-
-            allFiles.forEach(file => {
-                const div = document.createElement('div');
-                div.style.padding = "4px 0";
-                div.innerHTML = `<label><input type="checkbox" checked data-path="${file.path}" data-name="${file.name}"> ${file.path}</label>`;
-                fileContainer.appendChild(div);
-            });
-
-            browser.style.display = "block";
-            status.textContent = `Found ${allFiles.length} routes. Select which to include.`;
-        } catch (e) {
-            alert("Connection error. Check your internet and token permissions.");
+        let allFiles = [];
+        for (const folder of routeFolders) {
+            const files = await fetchFolderFiles(folder, token);
+            allFiles = allFiles.concat(files);
         }
+
+        if (allFiles.length === 0) {
+            status.textContent = "No CSVs found. Tip: Check the F12 Console for errors.";
+            return;
+        }
+
+        allFiles.forEach(file => {
+            const div = document.createElement('div');
+            div.style.padding = "4px 0";
+            div.innerHTML = `<label><input type="checkbox" checked data-path="${file.path}" data-name="${file.name}"> ${file.path}</label>`;
+            fileContainer.appendChild(div);
+        });
+
+        browser.style.display = "block";
+        status.textContent = `Found ${allFiles.length} routes.`;
     });
 
     document.getElementById('btnGenerateManifest').addEventListener('click', function() {
         const checkboxes = fileContainer.querySelectorAll('input[type="checkbox"]:checked');
         const routes = Array.from(checkboxes).map(cb => {
             const path = cb.getAttribute('data-path');
-            const name = cb.getAttribute('data-name').replace(/\.[^/.]+$/, ""); // Removes .csv extension
+            const name = cb.getAttribute('data-name').replace(/\.csv$/i, "");
             return {
                 id: name.toLowerCase().replace(/\s+/g, '-'),
                 name: name,
@@ -114,7 +115,7 @@
         });
 
         jsonPreview.value = JSON.stringify({ routes: routes }, null, 4);
-        status.textContent = "Local manifest generated from selection.";
+        status.textContent = "Local manifest generated.";
     });
 
     document.getElementById('btnPushToGithub').addEventListener('click', async function() {
@@ -122,18 +123,16 @@
         const content = jsonPreview.value;
         if (!token || !content) return alert("Generate a manifest first.");
 
-        const confirmPush = confirm("Warning: This will overwrite the master JSON on GitHub. Technicians will see these changes immediately after they click 'Refresh'. Proceed?");
+        const confirmPush = confirm("Overwrite the master manifest on GitHub?");
         if (!confirmPush) return;
 
-        status.textContent = "Uploading master manifest to GitHub...";
-        
+        status.textContent = "Uploading...";
         const success = await uploadToGithub("ROUTES/routes-manifest.json", content, token);
         if (success) {
-            status.textContent = "SUCCESS: Master list updated!";
-            alert("Master Route Manifest has been updated on GitHub.");
+            alert("Master manifest updated!");
+            status.textContent = "SUCCESS";
         } else {
-            status.textContent = "Upload failed. Check token permissions.";
-            alert("Failed to update GitHub. Ensure your token has 'Write' access to contents.");
+            alert("Failed. Check token permissions.");
         }
     });
 
@@ -150,13 +149,10 @@
 
         const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
             method: 'PUT',
-            headers: { 
-                'Authorization': `token ${token}`, 
-                'Content-Type': 'application/json' 
-            },
+            headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                message: "Update route manifest via Manager Portal",
-                content: btoa(content),
+                message: "Update route manifest",
+                content: btoa(unescape(encodeURIComponent(content))),
                 sha: sha
             })
         });
