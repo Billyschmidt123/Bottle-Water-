@@ -81,7 +81,7 @@
             border: 1px solid #ccc;
         }
 
-        /* NEW ADDITIVE CODE: STYLES FOR THE POP-OUT MODAL */
+        /* NEW ADDITIVE CODE: CENTERED POP-OUT OVERLAY */
         .stop-popout-overlay { 
             display: none; 
             position: fixed; 
@@ -89,43 +89,44 @@
             left: 0; 
             width: 100%; 
             height: 100%; 
-            background: rgba(0,0,0,0.85); 
+            background: rgba(0,0,0,0.7); 
             z-index: 5000; 
             justify-content: center; 
             align-items: center; 
         }
         .stop-popout-content { 
-            background: white; 
-            width: 90%; 
-            max-width: 1200px; 
-            height: 85vh; 
-            border-radius: 12px; 
-            position: relative; 
-            overflow: hidden; 
+            background: #fff; 
+            width: 85%; 
+            max-width: 1000px; 
+            height: 80vh; 
+            border-radius: 10px; 
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
             display: flex; 
-            flex-direction: column; 
+            flex-direction: column;
+            overflow: hidden;
         }
         .popout-header { 
-            background: #333; 
-            color: white; 
-            padding: 15px; 
+            background: #2c3e50; 
+            color: #fff; 
+            padding: 15px 20px; 
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
         }
         .popout-body { 
-            flex-grow: 1; 
+            flex: 1; 
+            padding: 25px; 
             overflow-y: auto; 
-            padding: 20px; 
+            background: #f4f7f6;
         }
         .popout-close { 
-            background: #dc3545; 
-            color: white; 
+            background: #e74c3c; 
             border: none; 
-            padding: 8px 15px; 
-            border-radius: 4px; 
+            color: white; 
+            padding: 8px 16px; 
+            border-radius: 5px; 
             cursor: pointer; 
-            font-weight: bold; 
+            font-weight: bold;
         }
     </style>
 </head>
@@ -154,12 +155,12 @@
         <div id="infoPhone"><i class="fas fa-phone" style="color: #28a745;"></i> PHONE: <span>---</span></div>
     </div>
 
-    <!-- NEW ADDITIVE CODE: POP-OUT MODAL CONTAINER -->
+    <!-- NEW ADDITIVE CODE: POP-OUT MODAL STRUCTURE -->
     <div id="stopPopoutOverlay" class="stop-popout-overlay">
         <div class="stop-popout-content">
             <div class="popout-header">
-                <h3>Delivery Stop Details</h3>
-                <button class="popout-close" id="closePopoutBtn">CLOSE [X]</button>
+                <h2 id="popoutTitle">Stop Information</h2>
+                <button class="popout-close" id="closePopoutBtn">CLOSE</button>
             </div>
             <div id="popoutBodyContent" class="popout-body"></div>
         </div>
@@ -383,12 +384,13 @@
         
         document.getElementById('cancelCrudBtn').addEventListener('click', () => { document.getElementById('crudModal').style.display = 'none'; });
 
-        /* NEW ADDITIVE CODE: FUNCTIONS TO HANDLE THE POP-OUT MODAL */
-        function openStopPopout(content) {
-            document.getElementById('popoutBodyContent').innerHTML = content;
+        // NEW ADDITIVE CODE: POP-OUT TRIGGER AND DATA MAPPING
+        function openPopout(htmlContent) {
+            const body = document.getElementById('popoutBodyContent');
+            body.innerHTML = htmlContent;
             document.getElementById('stopPopoutOverlay').style.display = 'flex';
         }
-        
+
         document.getElementById('closePopoutBtn').addEventListener('click', () => {
             document.getElementById('stopPopoutOverlay').style.display = 'none';
         });
@@ -417,11 +419,11 @@
                         if (modalRes.ok) {
                             const modalHtml = await modalRes.text();
                             
-                            /* PRESERVED: KEEP ORIGINAL SIDEBAR BEHAVIOR */
+                            // PRESERVED: KEEP ORIGINAL SIDEBAR
                             sidebar.innerHTML = modalHtml;
                             
-                            /* ADDITIVE: ALSO OPEN IN POP-OUT MODAL */
-                            openStopPopout(modalHtml);
+                            // ADDITIVE: OPEN IN CENTERED POP-OUT
+                            openPopout(modalHtml);
                             
                             if (typeof window.processCSV === 'function') {
                                 window.processCSV(csvText);
