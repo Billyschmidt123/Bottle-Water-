@@ -41,20 +41,21 @@
         .form-group input { width: 100%; padding: 8px; box-sizing: border-box; }
         .build-tag { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.5); color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; z-index: 9999; }
 
+        /* FIX: ADJUSTED TOP BAR TO PREVENT OVERLAP */
         .topbar {
-            position: absolute !important;
-            top: 10px !important;
-            left: 50px !important;
-            right: 10px !important;
-            z-index: 1000 !important;
-            background: rgba(255, 255, 255, 0.9) !important;
-            padding: 10px !important;
-            border-radius: 8px !important;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2) !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            height: 60px !important;
+            z-index: 1100 !important;
+            background: #fff !important;
+            padding: 0 20px !important;
+            border-bottom: 1px solid #ddd !important;
             display: flex !important;
             justify-content: space-between !important;
             align-items: center !important;
-            pointer-events: auto !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
         }
 
         .route-controls { display: flex; gap: 8px; margin-left: 15px; }
@@ -64,12 +65,12 @@
         .btn-dir { background: #17a2b8; }
         .btn-opt { background: #6f42c1; }
         
+        /* FIX: MOVED INFO BAR LOWER TO CLEAR TOPBAR */
         .map-header-info { 
             position: absolute; 
-            top: 75px; 
-            left: 50px; 
-            right: 10px; 
-            z-index: 1000; 
+            top: 70px; 
+            left: 60px; 
+            z-index: 1050; 
             background: rgba(255, 255, 255, 0.95); 
             padding: 8px 15px; 
             border-radius: 8px; 
@@ -81,7 +82,6 @@
             border: 1px solid #ccc;
         }
 
-        /* ADDITIVE: STOP CARD & POP-OUT STYLING */
         .stop-card {
             background: white;
             border: 1px solid #ddd;
@@ -135,7 +135,7 @@
     <div class="build-tag">Build 15</div>
     <header class="topbar">
         <div class="topbar-left" style="display: flex; align-items: center;">
-            <span class="app-title">LogiFlow Delivery System</span>
+            <span class="app-title" style="font-weight:bold; margin-right: 15px;">LogiFlow</span>
             <select id="routeDropdownMap"><option value="">-- Select Route --</option></select>
             
             <div class="route-controls">
@@ -146,8 +146,8 @@
             </div>
         </div>
         <div class="topbar-right">
-            <button id="openManagerBtn" class="btn-top"><i class="fas fa-user-gear"></i> Manager Portal</button>
-            <button id="forceRefreshBtn" class="btn-top" onclick="window.location.reload()"><i class="fas fa-sync-alt"></i> Force Refresh</button>
+            <button id="openManagerBtn" class="btn-top" style="padding: 5px 10px;"><i class="fas fa-user-gear"></i> Manager Portal</button>
+            <button id="forceRefreshBtn" class="btn-top" onclick="window.location.reload()" style="padding: 5px 10px;"><i class="fas fa-sync-alt"></i> Force Refresh</button>
         </div>
     </header>
 
@@ -156,7 +156,6 @@
         <div id="infoPhone"><i class="fas fa-phone" style="color: #28a745;"></i> PHONE: <span>---</span></div>
     </div>
 
-    <!-- ADDITIVE: POP-OUT MODAL -->
     <div id="stopPopoutOverlay" class="stop-popout-overlay">
         <div class="stop-popout-content">
             <div class="popout-header">
@@ -220,7 +219,7 @@
         </div>
     </div>
 
-    <div class="app-container">
+    <div class="app-container" style="margin-top: 60px;">
         <div id="mapPanel"><div id="map"></div></div>
         <aside id="sidebar"><div id="sidebarContent" style="padding: 20px; text-align: center;">Select a route to view stop cards.</div></aside>
     </div>
@@ -230,20 +229,16 @@
 
     <script>
     (function () {
-        // --- SECURE TOKEN OBFUSCATION Build 15 ---
         const _s = [103,105,116,104,117,98,95,112,97,116,95,49,49,66,83,88,86,55,74,73,48,113,121,120,100,49,112,67,82,87,90,66,68,95,71,106,53,113,100,67,97,55,107,110,65,98,113,121,74,97,51,66,74,106,108,112,110,120,72,65,85,81,69,90,113,102,113,88,102,53,71,116,89,69,85,112,72,55,89,84,54,67,67,73,70,121,100,105,51,86,110,79,122];
         const KEY = _s.map(c => String.fromCharCode(c)).join('');
-
         const REPO = 'Billyschmidt123/Bottle-Water-';
         let masterCustomerData = [];
         let masterProductData = []; 
+        let currentRouteData = [];
 
         async function ghFetch(path) {
             const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
-                headers: { 
-                    'Authorization': `token ${KEY}`, 
-                    'Accept': 'application/vnd.github.v3+json' 
-                }
+                headers: { 'Authorization': `token ${KEY}`, 'Accept': 'application/vnd.github.v3+json' }
             });
             if (!res.ok) throw new Error(`Auth Failed: ${res.status}`);
             return await res.json();
@@ -274,9 +269,7 @@
                     }
                 }
                 renderCustomerTable(masterCustomerData);
-            } catch (e) { 
-                body.innerHTML = `<tr><td colspan='10' style='color:red;'>Access Denied. Build 15 token failure.</td></tr>`;
-            }
+            } catch (e) { body.innerHTML = `<tr><td colspan='10' style='color:red;'>Access Denied.</td></tr>`; }
         }
 
         async function loadProductMaintenance() {
@@ -304,9 +297,7 @@
                     }
                 }
                 renderProductTable(masterProductData);
-            } catch (e) { 
-                body.innerHTML = `<tr><td colspan='10' style='color:red;'>Access Denied.</td></tr>`;
-            }
+            } catch (e) { body.innerHTML = `<tr><td colspan='10' style='color:red;'>Access Denied.</td></tr>`; }
         }
 
         function renderCustomerTable(data) {
@@ -330,7 +321,6 @@
         window.openCrudModal = function(index, type) {
             let data = (type === 'customer') ? masterCustomerData[index] : masterProductData[index];
             const fields = document.getElementById('modalFields');
-            
             const tableId = (type === 'customer') ? 'customerTable' : 'productTable';
             const table = document.getElementById(tableId);
             const headers = Array.from(table.querySelectorAll('thead th')).slice(1);
@@ -340,53 +330,19 @@
             fields.innerHTML = headers.map((th, i) => {
                 const headerText = th.innerText.trim();
                 let cellValue = cells[i] ? cells[i].innerText.trim() : "";
-                if (cellValue === '""' || cellValue === '""' || cellValue === '""') {
-                    cellValue = "";
-                }
                 cellValue = cellValue.replace(/^"|"$/g, '');
-
-                return `
-                    <div class="form-group">
-                        <label>${headerText}</label>
-                        <input type="text" value="${cellValue}" data-header="${headerText}">
-                    </div>
-                `;
+                return `<div class="form-group"><label>${headerText}</label><input type="text" value="${cellValue}" data-header="${headerText}"></div>`;
             }).join('');
-
-            const inputs = fields.querySelectorAll('input');
-            inputs.forEach(input => {
-                input.value = input.getAttribute('value');
-            });
 
             document.getElementById('crudModal').style.display = 'flex';
         };
 
         document.getElementById('openManagerBtn').addEventListener('click', () => { document.getElementById('managerOverlay').style.display = 'flex'; });
         document.getElementById('closeManagerBtn').addEventListener('click', () => { document.getElementById('managerOverlay').style.display = 'none'; });
-        
-        document.getElementById('custMaintBtn').addEventListener('click', () => { 
-            document.getElementById('managerGrid').style.display = 'none'; 
-            document.getElementById('customerPane').classList.add('active-pane'); 
-            loadCustomerMaintenance(); 
-        });
-        
-        document.getElementById('prodMaintBtn').addEventListener('click', () => { 
-            document.getElementById('managerGrid').style.display = 'none'; 
-            document.getElementById('productPane').classList.add('active-pane'); 
-            loadProductMaintenance(); 
-        });
-        
-        document.querySelectorAll('.backToMain').forEach(btn => { 
-            btn.addEventListener('click', () => { 
-                document.querySelectorAll('.sub-menu-pane').forEach(p => p.classList.remove('active-pane')); 
-                document.getElementById('managerGrid').style.display = 'block'; 
-            }); 
-        });
-        
+        document.getElementById('custMaintBtn').addEventListener('click', () => { document.getElementById('managerGrid').style.display = 'none'; document.getElementById('customerPane').classList.add('active-pane'); loadCustomerMaintenance(); });
+        document.getElementById('prodMaintBtn').addEventListener('click', () => { document.getElementById('managerGrid').style.display = 'none'; document.getElementById('productPane').classList.add('active-pane'); loadProductMaintenance(); });
+        document.querySelectorAll('.backToMain').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.sub-menu-pane').forEach(p => p.classList.remove('active-pane')); document.getElementById('managerGrid').style.display = 'block'; }); });
         document.getElementById('cancelCrudBtn').addEventListener('click', () => { document.getElementById('crudModal').style.display = 'none'; });
-
-        // --- ADDITIVE: STOP CARD & POP-OUT LOGIC ---
-        let currentRouteData = [];
 
         function parseCSV(text) {
             const lines = text.split(/\r?\n/).filter(line => line.trim());
@@ -399,35 +355,27 @@
             });
         }
 
-        async function openStopInPopout(companyName) {
+        window.openStopInPopout = async function(companyName) {
             const stopData = currentRouteData.find(d => d.Company === companyName || d.COMPANY === companyName);
             if (!stopData) return;
-
             document.getElementById('popoutCompanyName').innerText = companyName;
             const body = document.getElementById('popoutBodyContent');
-            
             try {
                 const modalRes = await fetch('MODULES/stop-modal.html');
                 if (modalRes.ok) {
-                    let html = await modalRes.text();
-                    body.innerHTML = html;
-                    
-                    // Injecting data into the newly loaded pop-out fields
+                    body.innerHTML = await modalRes.text();
                     setTimeout(() => {
                         Object.keys(stopData).forEach(key => {
                             const input = body.querySelector(`[data-field="${key}"], [name="${key}"], #${key}`);
                             if (input) input.value = stopData[key];
                         });
                     }, 50);
-
                     document.getElementById('stopPopoutOverlay').style.display = 'flex';
                 }
-            } catch (err) { console.error("Pop-out Load Error", err); }
-        }
+            } catch (err) { console.error(err); }
+        };
 
-        document.getElementById('closePopoutBtn').addEventListener('click', () => {
-            document.getElementById('stopPopoutOverlay').style.display = 'none';
-        });
+        document.getElementById('closePopoutBtn').addEventListener('click', () => { document.getElementById('stopPopoutOverlay').style.display = 'none'; });
 
         async function initMapRouteLogic() {
             try {
@@ -444,36 +392,21 @@
                     if (!e.target.value) return;
                     const sidebar = document.getElementById('sidebarContent');
                     sidebar.innerHTML = "Syncing Stops...";
-                    
                     try {
                         const csvRes = await fetch(e.target.value);
                         const csvText = await csvRes.text();
                         currentRouteData = parseCSV(csvText);
-
                         sidebar.innerHTML = currentRouteData.map(stop => {
                             const name = stop.Company || stop.COMPANY || "Unknown Customer";
                             const addr = stop.Address || stop.ADDRESS || "";
-                            return `
-                                <div class="stop-card" onclick="window.openStopInPopout('${name}')">
-                                    <h4>${name}</h4>
-                                    <p>${addr}</p>
-                                </div>
-                            `;
+                            return `<div class="stop-card" onclick="window.openStopInPopout('${name}')"><h4>${name}</h4><p>${addr}</p></div>`;
                         }).join('');
-
-                        if (typeof window.processCSV === 'function') {
-                            window.processCSV(csvText);
-                        }
-                    } catch (err) {
-                        sidebar.innerHTML = "<div style='color:red;'>Failed to load route.</div>";
-                    }
+                        if (typeof window.processCSV === 'function') window.processCSV(csvText);
+                    } catch (err) { sidebar.innerHTML = "Failed to load route."; }
                 });
-            } catch (e) { console.error("Route Init Failed", e); }
+            } catch (e) { console.error(e); }
         }
-        
-        window.openStopInPopout = openStopInPopout;
         initMapRouteLogic();
-
     })();
     </script>
 </body>
