@@ -57,30 +57,30 @@
             pointer-events: auto !important;
         }
 
-        /* ADDITIVE FIX: TOP NAVIGATION BUTTONS AND CONTACT INFO */
-        .route-controls { display: flex; gap: 8px; margin-left: 15px; }
-        .btn-route { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; font-size: 12px; }
+        /* ADDITIVE FIX: UI COMPONENTS FOR ROUTE CONTROL AND CONTACT INFO */
+        .route-action-bar { display: flex; gap: 10px; margin-left: 20px; }
+        .action-btn { padding: 8px 16px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; color: white; font-size: 11px; text-transform: uppercase; }
         .btn-start { background: #28a745; }
         .btn-finish { background: #dc3545; }
-        .btn-dir { background: #17a2b8; }
-        .btn-opt { background: #6f42c1; }
-        
-        .contact-info-bar { 
-            position: absolute; 
-            top: 75px; 
-            left: 50px; 
-            right: 10px; 
-            z-index: 1000; 
-            background: rgba(255, 255, 255, 0.9); 
-            padding: 5px 15px; 
-            border-radius: 8px; 
-            box-shadow: 0 1px 5px rgba(0,0,0,0.1); 
-            display: flex; 
-            gap: 20px; 
-            font-size: 13px; 
-            font-weight: 500;
+        .btn-directions { background: #17a2b8; }
+        .btn-optimize { background: #6f42c1; }
+
+        .map-info-header {
+            position: absolute;
+            top: 75px;
+            left: 50px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            font-weight: 600;
+            border: 1px solid #ddd;
         }
-        .info-item i { color: #007bff; margin-right: 5px; }
     </style>
 </head>
 <body>
@@ -89,12 +89,13 @@
         <div class="topbar-left" style="display: flex; align-items: center;">
             <span class="app-title">LogiFlow Delivery System</span>
             <select id="routeDropdownMap"><option value="">-- Select Route --</option></select>
-            <!-- ADDITIVE FIX: ROUTE ACTION BUTTONS -->
-            <div class="route-controls">
-                <button class="btn-route btn-start" id="startRouteBtn">START ROUTE</button>
-                <button class="btn-route btn-finish" id="finishRouteBtn">FINISH ROUTE</button>
-                <button class="btn-route btn-dir" id="directionsBtn">DIRECTIONS</button>
-                <button class="btn-route btn-opt" id="optimizeBtn">OPTIMIZE ROUTE</button>
+            
+            <!-- ADDITIVE FIX: TOP NAVIGATION BUTTONS -->
+            <div class="route-action-bar">
+                <button class="action-btn btn-start">Start Route</button>
+                <button class="action-btn btn-finish">Finish Route</button>
+                <button class="action-btn btn-directions">Directions</button>
+                <button class="action-btn btn-optimize">Optimize Route</button>
             </div>
         </div>
         <div class="topbar-right">
@@ -103,10 +104,10 @@
         </div>
     </header>
 
-    <!-- ADDITIVE FIX: CONTACT INFO OVERLAY -->
-    <div class="contact-info-bar">
-        <div class="info-item"><i class="fas fa-map-marker-alt"></i> <span id="currentAddressDisplay">No Route Selected</span></div>
-        <div class="info-item"><i class="fas fa-phone"></i> <span id="currentPhoneDisplay">--</span></div>
+    <!-- ADDITIVE FIX: ADDRESS AND PHONE BAR ABOVE MAP -->
+    <div class="map-info-header">
+        <div id="displayAddress"><i class="fas fa-map-marker-alt"></i> Address: <span>Select a stop...</span></div>
+        <div id="displayPhone"><i class="fas fa-phone"></i> Phone: <span>--</span></div>
     </div>
 
     <div id="managerOverlay" class="manager-overlay">
@@ -327,7 +328,7 @@
         
         document.getElementById('cancelCrudBtn').addEventListener('click', () => { document.getElementById('crudModal').style.display = 'none'; });
 
-        // ADDITIVE FIX: ROUTE INITIALIZATION AND STOP MODAL INTEGRATION
+        // ADDITIVE FIX: CORRECT PATH TO MODULES FOLDER FOR 404 FIX
         async function initializeRoutes() {
             try {
                 const dropdown = document.getElementById('routeDropdownMap');
@@ -342,37 +343,28 @@
                 dropdown.addEventListener('change', async (e) => {
                     if (!e.target.value) return;
                     const sidebar = document.getElementById('sidebarContent');
-                    sidebar.innerHTML = "Processing Stop List...";
+                    sidebar.innerHTML = "Processing Route...";
                     
                     try {
                         const csvRes = await fetch(e.target.value);
                         const csvText = await csvRes.text();
                         
-                        // ADDITIVE FIX: LOAD STOP-MODAL.HTML AND INJECT CSV DATA
-                        const modalRes = await fetch('stop-modal.html');
+                        // FIX: Updated path to point into the MODULES folder
+                        const modalRes = await fetch('MODULES/stop-modal.html');
                         if (modalRes.ok) {
                             const modalHtml = await modalRes.text();
                             sidebar.innerHTML = modalHtml;
                             
-                            // Trigger the map logic to render points
+                            // Initialize map markers from JS/map.js
                             if (typeof window.processCSV === 'function') {
                                 window.processCSV(csvText);
                             }
-                            
-                            // Post-processing: Update address/phone bar if data exists
-                            const lines = csvText.split('\n');
-                            if (lines.length > 1) {
-                                const firstStop = lines[1].split(',');
-                                document.getElementById('currentAddressDisplay').textContent = firstStop[2] || "Grande Prairie, AB";
-                                document.getElementById('currentPhoneDisplay').textContent = firstStop[3] || "555-0100";
-                            }
                         } else {
-                            // Fallback if stop-modal.html isn't found
-                            if (typeof window.processCSV === 'function') window.processCSV(csvText);
+                            sidebar.innerHTML = "<div style='color:red;'>Error: MODULES/stop-modal.html not found.</div>";
                         }
                     } catch (err) {
-                        console.error("Route Loading Failed", err);
-                        sidebar.innerHTML = "Error loading route data.";
+                        console.error("Route Init Failed", err);
+                        sidebar.innerHTML = "Error loading route.";
                     }
                 });
             } catch (e) {
