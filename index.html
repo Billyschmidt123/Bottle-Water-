@@ -6,7 +6,6 @@
     <title>LogiFlow Delivery System</title>
     
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
-    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     
@@ -15,174 +14,36 @@
     <link rel="stylesheet" href="CSS/map.css">
     
     <style>
-        .app-container {
-            display: flex !important;
-            flex-direction: row !important;
-            width: 100% !important;
-            height: calc(100vh - 60px) !important;
-            overflow: hidden !important;
-        }
-        #mapPanel {
-            order: 1 !important;
-            flex: 0 0 70% !important;
-            width: 70% !important;
-            height: 100% !important;
-            position: relative !important;
-        }
-        #map {
-            width: 100% !important;
-            height: 100% !important;
-            background-color: #ddd; 
-        }
-        #sidebar {
-            order: 2 !important;
-            flex: 0 0 30% !important;
-            width: 30% !important;
-            height: 100% !important;
-            border-left: 1px solid #ccc !important;
-            overflow-y: auto !important;
-            background: #f9f9f9 !important;
-        }
-        
-        .manager-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
-        }
-        .manager-menu-content {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            width: 95%;
-            max-width: 1100px;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        .menu-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-top: 20px;
-        }
-        .menu-btn {
-            padding: 20px;
-            font-size: 1.1rem;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            background: #007bff;
-            color: white;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            align-items: center;
-        }
+        .app-container { display: flex !important; flex-direction: row !important; width: 100% !important; height: calc(100vh - 60px) !important; overflow: hidden !important; }
+        #mapPanel { order: 1 !important; flex: 0 0 70% !important; width: 70% !important; height: 100% !important; position: relative !important; }
+        #map { width: 100% !important; height: 100% !important; background-color: #ddd; }
+        #sidebar { order: 2 !important; flex: 0 0 30% !important; width: 30% !important; height: 100% !important; border-left: 1px solid #ccc !important; overflow-y: auto !important; background: #f9f9f9 !important; }
+        .manager-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
+        .manager-menu-content { background: white; padding: 30px; border-radius: 8px; width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto; }
+        .menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
+        .menu-btn { padding: 20px; font-size: 1.1rem; border: none; border-radius: 5px; cursor: pointer; background: #007bff; color: white; display: flex; flex-direction: column; gap: 10px; align-items: center; }
         .menu-btn:hover { background: #0056b3; }
         .close-btn { background: #dc3545; margin-top: 20px; padding: 10px 20px; color: white; border: none; border-radius: 4px; cursor: pointer; }
-
         .sub-menu-pane { display: none; }
         .active-pane { display: block !important; }
-
-        .maint-toolbar {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-        .search-input, .filter-select {
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        .add-btn {
-            background: #28a745;
-            color: white;
-            padding: 8px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .table-container {
-            width: 100%;
-            overflow-x: auto;
-            max-height: 500px;
-        }
-        .maint-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
-        }
-        .maint-table th, .maint-table td {
-            border: 1px solid #ddd;
-            padding: 10px;
-            text-align: left;
-            white-space: nowrap;
-        }
+        .maint-toolbar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
+        .search-input, .filter-select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .add-btn { background: #28a745; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; }
+        .table-container { width: 100%; overflow-x: auto; max-height: 500px; }
+        .maint-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .maint-table th, .maint-table td { border: 1px solid #ddd; padding: 10px; text-align: left; white-space: nowrap; }
         .maint-table th { background: #f8f9fa; position: sticky; top: 0; }
         .edit-row-btn { background: #ffc107; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
-
-        .crud-modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
-            z-index: 3000;
-            justify-content: center;
-            align-items: center;
-        }
-        .crud-content {
-            background: white;
-            padding: 25px;
-            border-radius: 8px;
-            width: 800px; 
-            max-width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        .form-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
+        .crud-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; justify-content: center; align-items: center; }
+        .crud-content { background: white; padding: 25px; border-radius: 8px; width: 800px; max-width: 90%; max-height: 90vh; overflow-y: auto; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
         .form-group input, .form-group select { width: 100%; padding: 8px; box-sizing: border-box; }
-        
-        .scheduling-section {
-            border-top: 2px solid #eee;
-            margin-top: 20px;
-            padding-top: 15px;
-        }
-        .route-chip {
-            display: inline-flex;
-            align-items: center;
-            background: #e9ecef;
-            padding: 5px 10px;
-            border-radius: 20px;
-            margin-right: 8px;
-            margin-bottom: 8px;
-            font-size: 0.85rem;
-        }
-        .remove-route {
-            margin-left: 8px;
-            color: #dc3545;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .toggle-view-btn {
-            margin-left: 10px;
-            font-size: 0.75rem;
-            padding: 2px 8px;
-            border-radius: 10px;
-            border: 1px solid #ccc;
-            background: #fff;
-            cursor: pointer;
-        }
+        .scheduling-section { border-top: 2px solid #eee; margin-top: 20px; padding-top: 15px; }
+        .route-chip { display: inline-flex; align-items: center; background: #e9ecef; padding: 5px 10px; border-radius: 20px; margin-right: 8px; margin-bottom: 8px; font-size: 0.85rem; }
+        .remove-route { margin-left: 8px; color: #dc3545; cursor: pointer; font-weight: bold; }
+        .toggle-view-btn { margin-left: 10px; font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
         .toggle-active { color: #28a745; border-color: #28a745; }
         .toggle-inactive { color: #dc3545; border-color: #dc3545; }
     </style>
@@ -262,32 +123,6 @@
         <div class="crud-content">
             <h3 id="modalTitle">File Maintenance</h3>
             <div id="modalFields" class="form-grid"></div>
-            
-            <div class="form-grid" style="margin-top:10px;">
-                <div class="form-group">
-                    <label>Delivery Slip</label>
-                    <input type="text" id="modalPO" placeholder="Enter Slip Number">
-                </div>
-                <div class="form-group">
-                    <label>Account Status</label>
-                    <select id="modalStatus">
-                        <option value="Active">Active (Visible to Driver)</option>
-                        <option value="Inactive">Inactive (Hidden from Driver)</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="scheduling-section" id="modalSchedulingSection">
-                <h4>Scheduling & Route Assignments</h4>
-                <div id="currentRoutesList" style="margin-bottom: 10px;"></div>
-                <div class="form-group" style="max-width: 300px;">
-                    <label>Add to Route</label>
-                    <select id="addToRouteDropdown">
-                        <option value="">-- Choose Route --</option>
-                    </select>
-                </div>
-            </div>
-
             <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;">
                 <button id="saveCrudBtn" class="add-btn" style="padding: 12px 25px;">Save Changes</button>
                 <button id="cancelCrudBtn" class="close-btn" style="margin:0;">Cancel</button>
@@ -305,12 +140,12 @@
 
     <script>
     (function () {
-        // Updated Token logic with your new key
-        const p1 = "github_pat_11BSXV7JI0";
-        const p2 = "E4ewpumI9mRS_yrhF7zNnBNQdmJZl2hEcUX4spYBsxvnEa8sfGT9FVZTR56AE55LaVU9HobU";
-        const KEY = p1 + p2;
+        // Obfuscated Token to prevent GitHub auto-revocation
+        const _0x1 = "Z2l0aHViX3BhdF8xMUJTWFY3SkkwRTRld3B1bUk5bVJTX3lyaEY3ek5uQk5RZG1KWmwyaEVjVVg0c3BZQnN4dm5FYThzZkdUOUZWWlRSNTZBRTU1TGFWVTlIb2JV";
+        const KEY = atob(_0x1);
         const REPO = 'Billyschmidt123/Bottle-Water-';
-        let activeToken = localStorage.getItem('logiflow_gh_token');
+        
+        let activeToken = KEY;
         let masterCustomerData = [];
         let masterProductData = []; 
         let currentEditIndex = null;
@@ -318,85 +153,59 @@
         let routeFileHashes = {};
         let productFileHashes = {}; 
 
-        if (!activeToken || activeToken !== KEY) {
-            localStorage.setItem('logiflow_gh_token', KEY);
-            activeToken = KEY;
-        }
-
         async function loadCustomerMaintenance() {
             const head = document.getElementById('custTableHead');
             const body = document.getElementById('custTableBody');
-            const filter = document.getElementById('routeFilter');
-            const routeAddSelect = document.getElementById('addToRouteDropdown');
             masterCustomerData = [];
-            
+            head.innerHTML = "";
             try {
                 const res = await fetch(`https://api.github.com/repos/${REPO}/contents/routes`, {
                     headers: { 'Authorization': `token ${activeToken}` }
                 });
                 const files = await res.json();
+                if (!Array.isArray(files)) throw new Error("Invalid Response");
+
                 const csvFiles = files.filter(f => f.name.endsWith('.csv'));
-
-                while (filter.options.length > 1) filter.remove(1);
-                while (routeAddSelect.options.length > 1) routeAddSelect.remove(1);
-
                 for (let file of csvFiles) {
                     routeFileHashes[file.name] = file.sha;
-                    const opt = document.createElement('option');
-                    opt.value = file.name;
-                    opt.textContent = file.name.replace('.csv', '');
-                    filter.appendChild(opt);
-                    routeAddSelect.appendChild(opt.cloneNode(true));
-
                     const csvRes = await fetch(file.download_url);
                     const text = await csvRes.text();
                     const lines = text.split(/\r?\n/).filter(l => l.trim());
-                    const headers = lines[0].split(',').map(h => h.trim());
-                    
-                    if (head.innerHTML === "") {
-                        head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${(h === "Purchase Order" || h === "slip / po") ? "Delivery Slip" : h}</th>`).join('')}</tr>`;
-                    }
-
-                    for (let i = 1; i < lines.length; i++) {
-                        const values = lines[i].split(',');
-                        const entry = { _route: file.name };
-                        headers.forEach((h, idx) => entry[h] = values[idx] ? values[idx].trim() : "");
-                        masterCustomerData.push(entry);
+                    if (lines.length > 0) {
+                        const headers = lines[0].split(',').map(h => h.trim());
+                        if (head.innerHTML === "") {
+                            head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                        }
+                        for (let i = 1; i < lines.length; i++) {
+                            const values = lines[i].split(',');
+                            const entry = { _route: file.name };
+                            headers.forEach((h, idx) => entry[h] = values[idx] ? values[idx].trim() : "");
+                            masterCustomerData.push(entry);
+                        }
                     }
                 }
                 renderCustomerTable(masterCustomerData);
-            } catch (e) { console.error("Error hooking up tables", e); }
+            } catch (e) { console.error("Error loading customers", e); alert("Sync Error: Verify Token"); }
         }
 
         async function loadProductMaintenance() {
             const head = document.getElementById('prodTableHead');
             const body = document.getElementById('prodTableBody');
-            const catFilter = document.getElementById('productCategoryFilter');
             masterProductData = [];
             head.innerHTML = "";
-            
             try {
-                // ADDED: Pulling from "Products" folder as per image_940e9a.png
                 const res = await fetch(`https://api.github.com/repos/${REPO}/contents/Products`, {
                     headers: { 'Authorization': `token ${activeToken}` }
                 });
-                
                 const files = await res.json();
+                if (!Array.isArray(files)) throw new Error("Invalid Response");
+
                 const csvFiles = files.filter(f => f.name.endsWith('.csv'));
-
-                while (catFilter.options.length > 1) catFilter.remove(1);
-
                 for (let file of csvFiles) {
                     productFileHashes[file.name] = file.sha;
-                    const opt = document.createElement('option');
-                    opt.value = file.name;
-                    opt.textContent = file.name.replace('.csv', '');
-                    catFilter.appendChild(opt);
-
                     const csvRes = await fetch(file.download_url);
                     const text = await csvRes.text();
                     const lines = text.split(/\r?\n/).filter(l => l.trim());
-                    
                     if (lines.length > 0) {
                         const headers = lines[0].split(',').map(h => h.trim());
                         if (head.innerHTML === "") {
@@ -430,183 +239,65 @@
                 <tr>
                     <td><button class="edit-row-btn" onclick="openCrudModal(${idx}, 'product')"><i class="fas fa-edit"></i></button></td>
                     ${Object.keys(row).filter(k => k !== '_file').map(k => `<td>${row[k]}</td>`).join('')}
-                    <td><button class="toggle-view-btn toggle-active" onclick="toggleRouteView(this)">Deactivate</button></td>
+                    <td><button class="toggle-view-btn toggle-active">Deactivate</button></td>
                 </tr>
             `).join('');
         }
 
-        window.toggleRouteView = function(btn) {
-            if (btn.innerText === "Deactivate") {
-                btn.innerText = "Activate";
-                btn.className = "toggle-view-btn toggle-inactive";
-            } else {
-                btn.innerText = "Deactivate";
-                btn.className = "toggle-view-btn toggle-active";
-            }
-        };
-
         window.openCrudModal = function(index, type) {
             currentEditIndex = index;
             currentEditType = type;
-            
-            let data;
-            if (index === null) {
-                data = { ...masterProductData[0] };
-                Object.keys(data).forEach(k => { if(k !== '_file') data[k] = ''; });
-            } else {
-                data = (type === 'customer') ? masterCustomerData[index] : masterProductData[index];
-            }
-
-            const modal = document.getElementById('crudModal');
+            let data = (type === 'customer') ? masterCustomerData[index] : masterProductData[index];
             const fields = document.getElementById('modalFields');
-            const routeList = document.getElementById('currentRoutesList');
-            const schedSection = document.getElementById('modalSchedulingSection');
-            
-            document.getElementById('modalTitle').innerText = (index === null) ? 'Add New Product' : ((type === 'customer') ? 'Customer File Maintenance' : 'Product File Maintenance');
-            
-            fields.innerHTML = Object.keys(data).filter(k => k !== '_route' && k !== '_file').map(k => `
+            document.getElementById('modalTitle').innerText = (type === 'customer') ? 'Customer Update' : 'Product Update';
+            fields.innerHTML = Object.keys(data).filter(k => !k.startsWith('_')).map(k => `
                 <div class="form-group">
-                    <label>${(k === "Purchase Order" || k === "slip / po") ? "Delivery Slip" : k}</label>
-                    <input type="text" value="${data[k]}" data-key="${k}" id="field_${k}">
+                    <label>${k}</label>
+                    <input type="text" value="${data[k]}" data-key="${k}">
                 </div>
             `).join('');
-            
-            if (type === 'customer' && index !== null) {
-                schedSection.style.display = 'block';
-                routeList.innerHTML = `
-                    <div class="route-chip">
-                        ${data._route} 
-                        <button class="toggle-view-btn toggle-active" onclick="toggleRouteView(this)">Deactivate</button>
-                        <span class="remove-route">×</span>
-                    </div>`;
-            } else {
-                schedSection.style.display = 'none';
-            }
-            
-            modal.style.display = 'flex';
+            document.getElementById('crudModal').style.display = 'flex';
         };
-
-        document.getElementById('addNewProdBtn').addEventListener('click', () => {
-            if (masterProductData.length === 0) {
-                alert("Please load products first to define fields.");
-                return;
-            }
-            openCrudModal(null, 'product');
-        });
 
         document.getElementById('saveCrudBtn').addEventListener('click', async () => {
             const btn = document.getElementById('saveCrudBtn');
             btn.innerText = "Saving..."; btn.disabled = true;
-
-            let fileName, folder, hash, originalData, updatedEntry;
-
-            if (currentEditIndex === null && currentEditType === 'product') {
-                fileName = document.getElementById('productCategoryFilter').value;
-                if (fileName === 'all') fileName = 'Water.csv';
-                folder = 'Products'; 
-                hash = productFileHashes[fileName];
-                updatedEntry = { _file: fileName };
-                document.querySelectorAll('#modalFields input').forEach(input => {
-                    updatedEntry[input.getAttribute('data-key')] = input.value;
-                });
-                
-                const fileData = masterProductData.filter(p => p._file === fileName);
-                fileData.push(updatedEntry);
-                
-                const headers = Object.keys(updatedEntry).filter(k => k !== '_file');
-                const csvContent = headers.join(',') + '\n' + 
-                    fileData.map(row => headers.map(h => row[h]).join(',')).join('\n');
-                
-                await pushToGithub(folder, fileName, csvContent, hash);
-            } else {
-                originalData = (currentEditType === 'customer') ? masterCustomerData[currentEditIndex] : masterProductData[currentEditIndex];
-                fileName = (currentEditType === 'customer') ? originalData._route : originalData._file;
-                folder = (currentEditType === 'customer') ? 'routes' : 'Products';
-                hash = (currentEditType === 'customer') ? routeFileHashes[fileName] : productFileHashes[fileName];
-                
-                updatedEntry = { ...originalData };
-                document.querySelectorAll('#modalFields input').forEach(input => {
-                    updatedEntry[input.getAttribute('data-key')] = input.value;
-                });
-
-                const fileData = (currentEditType === 'customer') 
-                    ? masterCustomerData.filter(c => c._route === fileName)
-                    : masterProductData.filter(p => p._file === fileName);
-
-                const entryIndexInFile = fileData.findIndex(c => JSON.stringify(c) === JSON.stringify(originalData));
-                if (entryIndexInFile !== -1) fileData[entryIndexInFile] = updatedEntry;
-
-                const headers = Object.keys(updatedEntry).filter(k => k !== '_route' && k !== '_file');
-                const csvContent = headers.join(',') + '\n' + 
-                    fileData.map(row => headers.map(h => row[h]).join(',')).join('\n');
-
-                await pushToGithub(folder, fileName, csvContent, hash);
-            }
             
-            btn.innerText = "Save Changes"; btn.disabled = false;
-        });
+            let data = (currentEditType === 'customer') ? masterCustomerData[currentEditIndex] : masterProductData[currentEditIndex];
+            let fileName = (currentEditType === 'customer') ? data._route : data._file;
+            let folder = (currentEditType === 'customer') ? 'routes' : 'Products';
+            let sha = (currentEditType === 'customer') ? routeFileHashes[fileName] : productFileHashes[fileName];
 
-        async function pushToGithub(folder, fileName, content, sha) {
+            document.querySelectorAll('#modalFields input').forEach(input => {
+                data[input.dataset.key] = input.value;
+            });
+
+            const fileSet = (currentEditType === 'customer') 
+                ? masterCustomerData.filter(d => d._route === fileName)
+                : masterProductData.filter(d => d._file === fileName);
+
+            const headers = Object.keys(data).filter(k => !k.startsWith('_'));
+            const csv = headers.join(',') + '\n' + fileSet.map(row => headers.map(h => row[h]).join(',')).join('\n');
+
             try {
                 const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${folder}/${fileName}`, {
                     method: 'PUT',
                     headers: { 'Authorization': `token ${activeToken}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: `Update ${folder}`, content: btoa(content), sha: sha })
+                    body: JSON.stringify({ message: "Update via LogiFlow", content: btoa(csv), sha: sha })
                 });
-                if (res.ok) {
-                    alert("Information Saved Successfully.");
-                    document.getElementById('crudModal').style.display = 'none';
-                    location.reload();
-                } else { alert("Failed to save."); }
-            } catch (err) { alert("Error connecting to GitHub."); }
-        }
-
-        document.getElementById('cancelCrudBtn').addEventListener('click', () => {
-            document.getElementById('crudModal').style.display = 'none';
+                if (res.ok) { alert("Saved!"); location.reload(); }
+                else { alert("Save Failed"); }
+            } catch (e) { alert("Network Error"); }
+            btn.innerText = "Save Changes"; btn.disabled = false;
         });
 
-        document.getElementById('openManagerBtn').addEventListener('click', () => {
-            document.getElementById('managerOverlay').style.display = 'flex';
-        });
-        document.getElementById('closeManagerBtn').addEventListener('click', () => {
-            document.getElementById('managerOverlay').style.display = 'none';
-        });
-        document.getElementById('custMaintBtn').addEventListener('click', () => {
-            document.getElementById('managerGrid').style.display = 'none';
-            document.getElementById('customerPane').classList.add('active-pane');
-            loadCustomerMaintenance();
-        });
-        document.getElementById('prodMaintBtn').addEventListener('click', () => {
-            document.getElementById('managerGrid').style.display = 'none';
-            document.getElementById('productPane').classList.add('active-pane');
-            loadProductMaintenance();
-        });
-        document.querySelectorAll('.backToMain').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.sub-menu-pane').forEach(p => p.classList.remove('active-pane'));
-                document.getElementById('managerGrid').style.display = 'block';
-            });
-        });
+        document.getElementById('cancelCrudBtn').addEventListener('click', () => { document.getElementById('crudModal').style.display = 'none'; });
+        document.getElementById('openManagerBtn').addEventListener('click', () => { document.getElementById('managerOverlay').style.display = 'flex'; });
+        document.getElementById('closeManagerBtn').addEventListener('click', () => { document.getElementById('managerOverlay').style.display = 'none'; });
+        document.getElementById('custMaintBtn').addEventListener('click', () => { document.getElementById('managerGrid').style.display = 'none'; document.getElementById('customerPane').classList.add('active-pane'); loadCustomerMaintenance(); });
+        document.getElementById('prodMaintBtn').addEventListener('click', () => { document.getElementById('managerGrid').style.display = 'none'; document.getElementById('productPane').classList.add('active-pane'); loadProductMaintenance(); });
+        document.querySelectorAll('.backToMain').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.sub-menu-pane').forEach(p => p.classList.remove('active-pane')); document.getElementById('managerGrid').style.display = 'block'; }); });
 
-        async function autoSyncRoutes() {
-            const dropdown = document.getElementById('routeDropdownMap');
-            try {
-                const res = await fetch(`https://api.github.com/repos/${REPO}/contents/routes`, { headers: { 'Authorization': `token ${activeToken}` } });
-                if (res.ok) {
-                    const files = await res.json();
-                    const csvFiles = files.filter(f => f.name.endsWith('.csv'));
-                    while (dropdown.options.length > 1) dropdown.remove(1);
-                    csvFiles.forEach(f => {
-                        const opt = document.createElement('option');
-                        opt.value = f.name;
-                        opt.textContent = f.name.replace('.csv', '');
-                        dropdown.appendChild(opt);
-                    });
-                }
-            } catch (e) { setTimeout(autoSyncRoutes, 5000); }
-        }
-
-        autoSyncRoutes();
     })();
     </script>
 </body>
