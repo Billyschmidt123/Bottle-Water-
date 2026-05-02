@@ -91,7 +91,10 @@
             transition: background 0.2s;
             text-align: left;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            display: block !important; /* Ensure visibility */
+            /* FIX: Forced visibility for Build 15 sidebar */
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
         }
         .stop-card:hover { background: #e9ecef; border-color: #007bff; }
         .stop-card h4 { margin: 0 0 5px 0; color: #333; font-size: 1rem; }
@@ -130,16 +133,16 @@
         .popout-body { flex: 1; padding: 20px; overflow-y: auto; }
         .popout-close { background: #e74c3c; border: none; color: white; padding: 8px 16px; border-radius: 5px; cursor: pointer; }
 
-        /* --- ADDITIVE FIX FOR OVERLAY ISSUE --- */
-        body { display: flex; flex-direction: column; }
-        .topbar-container { position: relative; height: 140px; width: 100%; z-index: 2000; }
-        .app-container { margin-top: 0 !important; }
-        /* -------------------------------------- */
+        /* --- ADDITIVE FIX FOR OVERLAY/FLOATING ISSUE --- */
+        body { display: flex; flex-direction: column; height: 100vh; margin: 0; padding: 0; }
+        .topbar-pusher { height: 130px; flex-shrink: 0; position: relative; width: 100%; }
+        .app-container { flex-grow: 1; margin-top: 0 !important; height: auto !important; }
+        /* ----------------------------------------------- */
     </style>
 </head>
 <body>
-    <!-- ADDITIVE WRAPPER TO PREVENT OVERLAP -->
-    <div class="topbar-container">
+    <!-- ADDED PUSHER TO PREVENT OVERLAYING VIEWS -->
+    <div class="topbar-pusher">
         <header class="topbar">
             <div class="topbar-left" style="display: flex; align-items: center;">
                 <span class="app-title">LogiFlow Delivery System</span>
@@ -163,7 +166,6 @@
             <div id="infoPhone"><i class="fas fa-phone" style="color: #28a745;"></i> PHONE: <span>---</span></div>
         </div>
     </div>
-    <!-- END ADDITIVE WRAPPER -->
 
     <div class="build-tag">Build 15</div>
 
