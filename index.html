@@ -305,10 +305,10 @@
 
     <script>
     (function () {
+        // Updated Token logic with your new key
         const p1 = "github_pat_11BSXV7JI0";
-        const p2 = "k1iv7Q6uVTCg_pJeYK0I";
-        const p3 = "Y2j421kGhDbAxI2ntoIPAbLV8sTPvJTqFBhE4XGNLLJ20GZKl8WC";
-        const KEY = p1 + p2 + p3;
+        const p2 = "E4ewpumI9mRS_yrhF7zNnBNQdmJZl2hEcUX4spYBsxvnEa8sfGT9FVZTR56AE55LaVU9HobU";
+        const KEY = p1 + p2;
         const REPO = 'Billyschmidt123/Bottle-Water-';
         let activeToken = localStorage.getItem('logiflow_gh_token');
         let masterCustomerData = [];
@@ -318,12 +318,9 @@
         let routeFileHashes = {};
         let productFileHashes = {}; 
 
-        if (!activeToken) {
-            const pass = prompt("LogiFlow Security: Enter Password:");
-            if (pass && pass.trim() === "2026!") {
-                localStorage.setItem('logiflow_gh_token', KEY);
-                activeToken = KEY;
-            } else { window.location.reload(); }
+        if (!activeToken || activeToken !== KEY) {
+            localStorage.setItem('logiflow_gh_token', KEY);
+            activeToken = KEY;
         }
 
         async function loadCustomerMaintenance() {
@@ -379,7 +376,7 @@
             head.innerHTML = "";
             
             try {
-                // ADDED: Pulling from "Products" folder as per your screenshot
+                // ADDED: Pulling from "Products" folder as per image_940e9a.png
                 const res = await fetch(`https://api.github.com/repos/${REPO}/contents/Products`, {
                     headers: { 'Authorization': `token ${activeToken}` }
                 });
@@ -452,10 +449,8 @@
             currentEditIndex = index;
             currentEditType = type;
             
-            // Logic for Add Product (index is null)
             let data;
             if (index === null) {
-                // Use headers from first product to build empty form
                 data = { ...masterProductData[0] };
                 Object.keys(data).forEach(k => { if(k !== '_file') data[k] = ''; });
             } else {
@@ -491,7 +486,6 @@
             modal.style.display = 'flex';
         };
 
-        // ADDED: Logic for the "Add New Product" button in the toolbar
         document.getElementById('addNewProdBtn').addEventListener('click', () => {
             if (masterProductData.length === 0) {
                 alert("Please load products first to define fields.");
@@ -507,9 +501,8 @@
             let fileName, folder, hash, originalData, updatedEntry;
 
             if (currentEditIndex === null && currentEditType === 'product') {
-                // New Product logic
                 fileName = document.getElementById('productCategoryFilter').value;
-                if (fileName === 'all') fileName = 'Water.csv'; // Default
+                if (fileName === 'all') fileName = 'Water.csv';
                 folder = 'Products'; 
                 hash = productFileHashes[fileName];
                 updatedEntry = { _file: fileName };
@@ -526,10 +519,9 @@
                 
                 await pushToGithub(folder, fileName, csvContent, hash);
             } else {
-                // Existing logic preserved
                 originalData = (currentEditType === 'customer') ? masterCustomerData[currentEditIndex] : masterProductData[currentEditIndex];
                 fileName = (currentEditType === 'customer') ? originalData._route : originalData._file;
-                folder = (currentEditType === 'customer') ? 'routes' : 'Products'; // Updated folder name
+                folder = (currentEditType === 'customer') ? 'routes' : 'Products';
                 hash = (currentEditType === 'customer') ? routeFileHashes[fileName] : productFileHashes[fileName];
                 
                 updatedEntry = { ...originalData };
