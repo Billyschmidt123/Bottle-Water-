@@ -94,21 +94,68 @@
         async function fetchProducts() {
             try {
                 const files = await ghFetch('Products');
-                const file = files.find(f => f.name.toLowerCase().endsWith('.csv'));
-                if (file) {
+                const csvFiles = files.filter(f => f.name.toLowerCase().endsWith('.csv'));
+                
+                // Combine data from all product CSVs (Water and Coffee)
+                for (const file of csvFiles) {
                     const res = await fetch(file.download_url);
                     const text = await res.text();
                     const lines = text.split('\n').filter(l => l.trim());
                     const headers = lines[0].split(',').map(h => h.trim());
-                    masterProductData = lines.slice(1).map(line => {
+                    
+                    const fileData = lines.slice(1).map(line => {
                         const vals = line.split(',');
                         let obj = {};
                         headers.forEach((h, i) => obj[h] = vals[i] ? vals[i].trim() : "");
                         return obj;
                     });
+                    masterProductData = masterProductData.concat(fileData);
                 }
             } catch (e) { console.error("Error loading products", e); }
         }
+
+        document.getElementById('addItemBtn').onclick = () => {
+            const container = document.getElementById('basketItems');
+            if (masterProductData.length === 0) return alert("Still loading products...");
+
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'basket-item';
+            
+            // Find the "Item" key safely regardless of case
+            const firstEntry = masterProductData[0];
+            const headers = Object.keys(firstEntry);
+            const itemKey = headers.find(h => h.toLowerCase() === "item") || headers[0];
+            
+            let options = masterProductData.map(p => {
+                const name = p[itemKey] || "Unknown";
+                return `<option value="${name}">${name}</option>`;
+            }).join('');
+            
+            itemDiv.innerHTML = `
+                <select class="p-sel" style="flex:2"><option value="">Select Item...</option>${options}</select>
+                <select class="u-sel" style="flex:1"><option value="">Unit</option></select>
+                <input type="number" class="q-inp" placeholder="Qty" style="width:50px;">
+                <button onclick="this.parentElement.remove()" style="color:red; background:none; border:none; cursor:pointer;"><i class="fas fa-trash"></i></button>
+            `;
+            
+            const pSel = itemDiv.querySelector('.p-sel');
+            const uSel = itemDiv.querySelector('.u-sel');
+            
+            pSel.onchange = (e) => {
+                const found = masterProductData.find(p => p[itemKey] === e.target.value);
+                uSel.innerHTML = '<option value="">Unit</option>';
+                
+                // Units based on images 86737f and 86733c
+                const unitTypes = ['Case', 'Box', 'Sleeve', 'bottle', 'Slieve'];
+                unitTypes.forEach(u => {
+                    const header = headers.find(h => h.toLowerCase() === u.toLowerCase());
+                    if (found && header && found[header] && found[header].trim() !== "" && found[header].trim().toLowerCase() !== "na") {
+                        uSel.innerHTML += `<option value="${header}">${header}</option>`;
+                    }
+                });
+            };
+            container.appendChild(itemDiv);
+        };
 
         function buildStopList(csvText) {
             const sidebar = document.getElementById('sidebarContent');
@@ -139,47 +186,6 @@
             });
         }
 
-        document.getElementById('addItemBtn').onclick = () => {
-            const container = document.getElementById('basketItems');
-            if (masterProductData.length === 0) return alert("Product list is still loading or empty.");
-
-            const itemDiv = document.createElement('div');
-            itemDiv.className = 'basket-item';
-            
-            // Find the header named exactly "Item" (case-insensitive)
-            const headers = Object.keys(masterProductData[0]);
-            const itemKey = headers.find(h => h.toLowerCase() === "item") || headers[1] || headers[0];
-            
-            let options = masterProductData.map(p => {
-                const name = p[itemKey] || "Unknown";
-                return `<option value="${name}">${name}</option>`;
-            }).join('');
-            
-            itemDiv.innerHTML = `
-                <select class="p-sel" style="flex:2"><option value="">Select Item...</option>${options}</select>
-                <select class="u-sel" style="flex:1"><option value="">Unit</option></select>
-                <input type="number" class="q-inp" placeholder="Qty" style="width:50px;">
-                <button onclick="this.parentElement.remove()" style="color:red; background:none; border:none; cursor:pointer;"><i class="fas fa-trash"></i></button>
-            `;
-            
-            const pSel = itemDiv.querySelector('.p-sel');
-            const uSel = itemDiv.querySelector('.u-sel');
-            
-            pSel.onchange = (e) => {
-                const found = masterProductData.find(p => p[itemKey] === e.target.value);
-                uSel.innerHTML = '<option value="">Unit</option>';
-                
-                // Units based on image_86737f.png and image_86733c.png
-                ['Case', 'Box', 'Sleeve', 'bottle', 'Slieve'].forEach(u => {
-                    const header = headers.find(h => h.toLowerCase() === u.toLowerCase());
-                    if (found && header && found[header] && found[header].trim() !== "" && found[header].trim().toLowerCase() !== "na") {
-                        uSel.innerHTML += `<option value="${header}">${header}</option>`;
-                    }
-                });
-            };
-            container.appendChild(itemDiv);
-        };
-
         async function start() {
             const dropdown = document.getElementById('routeDropdownMap');
             const files = await ghFetch('routes');
@@ -195,7 +201,7 @@
                 buildStopList(csv);
                 if (window.processCSV) window.processCSV(csv);
             };
-            fetchProducts();
+            await fetchProducts();
         }
         start();
     })();
