@@ -25,11 +25,6 @@
         .mgmt-table { width: 100%; border-collapse: collapse; min-width: 800px; }
         .mgmt-table th, .mgmt-table td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
         .mgmt-table th { background: #f8f9fa; position: sticky; top: 0; }
-        .status-pill { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
-        .mgmt-actions button { margin-right: 5px; padding: 5px 10px; cursor: pointer; border: none; border-radius: 4px; }
-        .btn-edit { background: #ffc107; color: #000; }
-        .btn-toggle { background: #17a2b8; color: #fff; }
-        .btn-delete { background: #dc3545; color: #fff; }
 
         #fullPageOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f7f6; z-index: 10000; overflow-y: auto; padding: 40px; }
         #productOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f7f6; z-index: 10000; overflow-y: auto; padding: 40px; }
@@ -51,14 +46,8 @@
         </div>
 
         <div class="topbar-right">
-            <input type="file" id="localFileImporter" multiple accept=".csv" style="display:none;">
-            
             <button id="refreshGitHubListBtn" class="btn-top github-refresh-btn">
-                <i class="fab fa-github"></i> Sync All Data
-            </button>
-
-            <button class="btn-top local-upload-btn" onclick="document.getElementById('localFileImporter').click()">
-                <i class="fas fa-file-import"></i> Local Import
+                <i class="fab fa-github"></i> Sync Route List
             </button>
 
             <button class="btn-top openManagerBtn">
@@ -66,16 +55,12 @@
             </button>
 
             <button id="refreshRoutesBtn" class="btn-top">
-                <i class="fas fa-sync"></i> Refresh
+                <i class="fas fa-sync"></i> Force Refresh
             </button>
         </div>
     </header>
 
     <div class="app-container">
-        <div id="uploadProgressContainer">
-            <div id="uploadProgressBar">0%</div>
-        </div>
-
         <div id="mapPanel">
             <div id="mapTopBar">
                 <div id="currentStopInfo">No stop selected</div>
@@ -113,6 +98,12 @@
             CUSTOMERS: 'logiflowCustomerMaster_v1'
         };
 
+        const GITHUB_CONFIG = {
+            TOKEN: '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',
+            REPO: 'Billyschmidt123/Bottle-Water-',
+            BASE_RAW: 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/'
+        };
+
         window.loadModule = function (moduleName) {
             const container = document.getElementById('sidebarContent');
             fetch('MODULES/' + moduleName + '.html?cb=' + Date.now())
@@ -126,19 +117,15 @@
         };
 
         async function initRouteSystem() {
-            console.log("System initialization started...");
-            
-            // 1. Load what we have in storage immediately so the UI isn't blank
+            // Load local backup first
             loadLocalRecoveryData();
-
-            // 2. Immediately try to fetch the newest data from GitHub (The "Source of Truth")
+            
+            // Auto-sync from online master
             try {
-                console.log("Checking for online updates...");
                 await window.refreshRoutesFromGitHub();
                 await window.loadProductsFromGitHub();
-                console.log("Update check complete. Using latest online versions.");
             } catch (e) {
-                console.warn("Online update failed (offline?). Using local backup data.");
+                console.warn("Startup sync failed. Using local storage.");
             }
         }
 
@@ -148,22 +135,15 @@
                 window.logiflowRouteCache = JSON.parse(cachedRoutes);
                 populateRouteDropdown(window.logiflowRouteCache.routes);
             }
-
-            const cachedProducts = localStorage.getItem(CACHE_KEYS.PRODUCTS);
-            if (cachedProducts) window._productData = JSON.parse(cachedProducts);
-
-            const cachedCustomers = localStorage.getItem(CACHE_KEYS.CUSTOMERS);
-            if (cachedCustomers) window._fullTableData = JSON.parse(cachedCustomers);
         }
 
         window.refreshRoutesFromGitHub = async function() {
-            const BASE = 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/';
-            const res = await fetch(BASE + 'routes/routes-manifest.json?cb=' + Date.now());
-            if (!res.ok) return;
+            const res = await fetch(GITHUB_CONFIG.BASE_RAW + 'routes/routes-manifest.json?cb=' + Date.now());
+            if (!res.ok) throw new Error("Manifest not found");
             
             const manifest = await res.json();
             const routePromises = manifest.routes.map(async r => {
-                const csvRes = await fetch(BASE + 'routes/' + r.file + '?cb=' + Date.now());
+                const csvRes = await fetch(GITHUB_CONFIG.BASE_RAW + 'routes/' + r.file + '?cb=' + Date.now());
                 const csvText = await csvRes.text();
                 return { ...r, stops: parseCSV(csvText) };
             });
@@ -171,23 +151,75 @@
             const updatedRoutes = await Promise.all(routePromises);
             const cache = { routes: updatedRoutes, updatedAt: new Date().toISOString() };
             
-            // Save to memory and local storage
             window.logiflowRouteCache = cache;
             localStorage.setItem(CACHE_KEYS.ROUTES, JSON.stringify(cache));
+            
+            // CRITICAL: Rebuild the master customer list from the new data
+            rebuildCustomerMaster(updatedRoutes);
+            
             populateRouteDropdown(updatedRoutes);
         };
 
-        window.loadProductsFromGitHub = async function() {
-            const BASE = 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/Products/';
-            const [coffee, water] = await Promise.all([
-                fetch(BASE + 'coffee.csv?cb=' + Date.now()).then(r => r.text()),
-                fetch(BASE + 'Water.csv?cb=' + Date.now()).then(r => r.text())
-            ]);
+        function rebuildCustomerMaster(routes) {
+            let allUniqueStops = {};
+            routes.forEach(route => {
+                route.stops.forEach(stop => {
+                    const key = stop.Address + (stop.Company || '');
+                    if (!allUniqueStops[key]) {
+                        allUniqueStops[key] = { ...stop, _routes: [] };
+                    }
+                    allUniqueStops[key]._routes.push({ id: route.id, name: route.name, status: stop.Status });
+                });
+            });
+            window._fullTableData = Object.values(allUniqueStops);
+            localStorage.setItem(CACHE_KEYS.CUSTOMERS, JSON.stringify(window._fullTableData));
+        }
 
-            const data = { coffee: parseCSV(coffee), water: parseCSV(water) };
-            window._productData = data;
-            localStorage.setItem(CACHE_KEYS.PRODUCTS, JSON.stringify(data));
+        window.syncRouteListFromGitHubDir = async function() {
+            const API_URL = `https://api.github.com/repos/${GITHUB_CONFIG.REPO}/contents/routes`;
+            try {
+                const res = await fetch(API_URL, {
+                    headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}` }
+                });
+                const files = await res.json();
+                const csvFiles = files.filter(f => f.name.endsWith('.csv')).map(f => ({
+                    id: f.name.replace('.csv', ''),
+                    name: f.name.replace('.csv', ''),
+                    file: f.name
+                }));
+
+                const manifest = { updatedAt: new Date().toISOString(), routes: csvFiles };
+                
+                // Push new manifest to GitHub
+                await pushManifestToGitHub(manifest);
+                
+                // REFRESH UI: This is the missing link. 
+                // We must now fetch the data inside those files we just found.
+                await window.refreshRoutesFromGitHub();
+                
+                alert(`Successfully synced ${csvFiles.length} files. Dropdown and tables updated.`);
+            } catch (e) {
+                alert("Sync Error: " + e.message);
+            }
         };
+
+        async function pushManifestToGitHub(manifest) {
+            const path = 'routes/routes-manifest.json';
+            const url = `https://api.github.com/repos/${GITHUB_CONFIG.REPO}/contents/${path}`;
+            
+            const getRes = await fetch(url, { headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}` } });
+            const sha = getRes.ok ? (await getRes.json()).sha : null;
+
+            await fetch(url, {
+                method: 'PUT',
+                headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: "Auto-sync route list",
+                    content: btoa(JSON.stringify(manifest, null, 2)),
+                    sha: sha
+                })
+            });
+        }
 
         function parseCSV(text) {
             const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -213,29 +245,9 @@
             });
         }
 
-        function injectMgmtButtons() {
-            const sidebar = document.getElementById('sidebarContent');
-            if (!sidebar) return;
-            
-            const html = `
-                <div style="margin-top:20px; border-top:1px solid #ddd; padding-top:10px;">
-                    <button class="btn-top" style="width:100%; margin-bottom:10px; background:#007bff; color:white;" onclick="window.openFullPageTable()">
-                        <i class="fas fa-users"></i> Customer Database
-                    </button>
-                    <button class="btn-top" style="width:100%; background:#28a745; color:white;" onclick="window.openProductTable()">
-                        <i class="fas fa-boxes"></i> Product Maintenance
-                    </button>
-                </div>
-            `;
-            sidebar.insertAdjacentHTML('beforeend', html);
-        }
+        document.getElementById('refreshGitHubListBtn').addEventListener('click', () => window.syncRouteListFromGitHubDir());
+        document.getElementById('refreshRoutesBtn').addEventListener('click', () => window.refreshRoutesFromGitHub());
 
-        document.getElementById('refreshGitHubListBtn').addEventListener('click', async () => {
-            await initRouteSystem();
-            alert("All data synchronized with the online master files.");
-        });
-
-        // Run system initialization on open
         initRouteSystem();
     })();
     </script>
