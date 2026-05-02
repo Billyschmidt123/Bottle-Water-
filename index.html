@@ -1,207 +1,42 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogiFlow Delivery System</title>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="CSS/main.css">
-    
-    <style>
-        .app-container { display: flex; flex-direction: row; width: 100%; height: calc(100vh - 60px); overflow: hidden; }
-        #mapPanel { flex: 0 0 70%; height: 100%; position: relative; }
-        #map { width: 100%; height: 100%; }
-        #sidebar { flex: 0 0 30%; height: 100%; border-left: 1px solid #ccc; overflow-y: auto; background: #f9f9f9; }
+// map.js
+let map;
+let markers = [];
+
+function initMap() {
+    // Defaulting to Grande Prairie area
+    map = L.map('map').setView([55.1707, -118.7947], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+}
+
+window.processCSV = function(csvText) {
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+
+    const lines = csvText.split('\n').filter(l => l.trim());
+    if (lines.length === 0) return;
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+
+    lines.slice(1).forEach(line => {
+        const vals = line.split(',');
+        let data = {};
+        headers.forEach((h, i) => data[h] = vals[i] ? vals[i].trim() : "");
         
-        .order-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; justify-content: center; align-items: center; background: rgba(0,0,0,0.7); }
-        .order-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 900px; max-height: 90vh; overflow-y: auto; }
+        // Supports latitude/longitude regardless of column capitalization
+        const lat = parseFloat(data.latitude || data.lat);
+        const lng = parseFloat(data.longitude || data.lng || data.long);
 
-        .topbar { background: #fff; padding: 10px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center; height: 60px; }
-        .btn-top { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
-        
-        .stop-card { background: white; margin: 10px; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; border-left: 5px solid #007bff; }
-        .basket-item { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #dee2e6; }
-        
-        .product-section { margin-top: 15px; padding: 10px; border: 1px solid #eee; border-radius: 8px; }
-        .water-header { color: #007bff; font-weight: bold; }
-        .coffee-header { color: #6f42c1; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <header class="topbar">
-        <div>
-            <b style="font-size: 1.2rem; margin-right: 20px;">LogiFlow</b>
-            <select id="routeDropdownMap"><option value="">-- Select Route --</option></select>
-        </div>
-        <div>
-            <button class="btn-top" style="background:#6c757d" onclick="window.location.reload()">REFRESH</button>
-        </div>
-    </header>
-
-    <div id="orderModal" class="order-modal">
-        <div class="order-content">
-            <h2 id="orderCompanyName">Stop Details</h2>
-            <hr>
-            
-            <!-- Water Section -->
-            <div class="product-section">
-                <div class="water-header"><i class="fas fa-tint"></i> Water Products</div>
-                <div id="waterBasketItems"></div>
-                <button id="addWaterBtn" style="background: #007bff; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; margin-top: 5px;">+ Add Water</button>
-            </div>
-
-            <!-- Coffee Section -->
-            <div class="product-section">
-                <div class="coffee-header"><i class="fas fa-coffee"></i> Coffee Products</div>
-                <div id="coffeeBasketItems"></div>
-                <button id="addCoffeeBtn" style="background: #6f42c1; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; margin-top: 5px;">+ Add Coffee</button>
-            </div>
-
-            <div style="text-align: right; margin-top: 20px;">
-                <button id="saveOrderBtn" style="background: #28a745; color: white; border: none; padding: 12px 25px; border-radius: 4px; cursor: pointer;">Save Order</button>
-                <button onclick="document.getElementById('orderModal').style.display='none'" style="background:#dc3545; color:white; border:none; padding:12px 25px; border-radius:4px; cursor:pointer;">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="app-container">
-        <div id="mapPanel"><div id="map"></div></div>
-        <aside id="sidebar"><div id="sidebarContent" style="padding: 15px;">Please select a route.</div></aside>
-    </div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="JS/map.js"></script>
-    <script>
-    (function () {
-        const _s = [103,105,116,104,117,98,95,112,97,116,95,49,49,66,83,88,86,55,74,73,48,113,121,120,100,49,112,67,82,87,90,66,68,95,71,106,53,113,100,67,97,55,107,110,65,98,113,121,74,97,51,66,74,106,108,112,110,120,72,65,85,81,69,90,113,102,113,88,102,53,71,116,89,69,85,112,72,55,89,84,54,67,67,73,70,121,100,105,51,86,110,79,122];
-        const KEY = _s.map(c => String.fromCharCode(c)).join('');
-        const REPO = 'Billyschmidt123/Bottle-Water-';
-        
-        let waterProducts = [];
-        let coffeeProducts = [];
-
-        async function ghFetch(path) {
-            const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
-                headers: { 'Authorization': `token ${KEY}` }
-            });
-            return await res.json();
+        if (!isNaN(lat) && !isNaN(lng)) {
+            const m = L.marker([lat, lng]).addTo(map).bindPopup(data.company || "Delivery Stop");
+            markers.push(m);
         }
+    });
 
-        async function loadProductData() {
-            try {
-                const files = await ghFetch('Products');
-                for (const file of files) {
-                    if (!file.name.endsWith('.csv')) continue;
-                    const res = await fetch(file.download_url);
-                    const text = await res.text();
-                    const data = parseCSV(text);
-                    
-                    if (file.name.toLowerCase().includes('water')) {
-                        waterProducts = data;
-                    } else if (file.name.toLowerCase().includes('coffee')) {
-                        coffeeProducts = data;
-                    }
-                }
-            } catch (e) { console.error("Error loading CSVs", e); }
-        }
+    if (markers.length > 0) {
+        map.fitBounds(L.featureGroup(markers).getBounds());
+    }
+};
 
-        function parseCSV(text) {
-            const lines = text.split('\n').filter(l => l.trim());
-            if (lines.length < 2) return [];
-            const headers = lines[0].split(',').map(h => h.trim());
-            return lines.slice(1).map(line => {
-                const vals = line.split(',');
-                let obj = {};
-                headers.forEach((h, i) => obj[h] = vals[i] ? vals[i].trim() : "");
-                return obj;
-            });
-        }
-
-        function createItemRow(containerId, productList, unitTypes) {
-            const container = document.getElementById(containerId);
-            const itemDiv = document.createElement('div');
-            itemDiv.className = 'basket-item';
-            
-            // "Item" is the standard column name from your files
-            let options = productList.map(p => `<option value="${p.Item}">${p.Item}</option>`).join('');
-            
-            itemDiv.innerHTML = `
-                <select class="p-sel" style="flex:2"><option value="">Select Product...</option>${options}</select>
-                <select class="u-sel" style="flex:1"><option value="">Unit</option></select>
-                <input type="number" class="q-inp" placeholder="Qty" style="width:50px;">
-                <button onclick="this.parentElement.remove()" style="color:red; background:none; border:none; cursor:pointer;"><i class="fas fa-trash"></i></button>
-            `;
-            
-            const pSel = itemDiv.querySelector('.p-sel');
-            const uSel = itemDiv.querySelector('.u-sel');
-            
-            pSel.onchange = (e) => {
-                const found = productList.find(p => p.Item === e.target.value);
-                uSel.innerHTML = '<option value="">Unit</option>';
-                if (!found) return;
-
-                unitTypes.forEach(u => {
-                    const header = Object.keys(found).find(h => h.toLowerCase() === u.toLowerCase());
-                    if (header && found[header] && found[header].toLowerCase() !== "na" && found[header] !== "") {
-                        uSel.innerHTML += `<option value="${header}">${header}</option>`;
-                    }
-                });
-            };
-            container.appendChild(itemDiv);
-        }
-
-        document.getElementById('addWaterBtn').onclick = () => 
-            createItemRow('waterBasketItems', waterProducts, ['bottle', 'Case', 'Sleive']);
-
-        document.getElementById('addCoffeeBtn').onclick = () => 
-            createItemRow('coffeeBasketItems', coffeeProducts, ['Box', 'Case']);
-
-        function buildStopList(csvText) {
-            const sidebar = document.getElementById('sidebarContent');
-            sidebar.innerHTML = "";
-            const lines = csvText.split('\n').filter(l => l.trim());
-            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-            
-            lines.slice(1).forEach(line => {
-                const vals = line.split(',');
-                let data = {};
-                headers.forEach((h, i) => data[h] = vals[i] ? vals[i].trim() : "");
-
-                const card = document.createElement('div');
-                card.className = 'stop-card';
-                card.innerHTML = `<b>${data.company || 'Customer'}</b><br>${data.address || ''}`;
-                card.onclick = () => {
-                    document.getElementById('orderCompanyName').innerText = data.company || "Details";
-                    document.getElementById('waterBasketItems').innerHTML = "";
-                    document.getElementById('coffeeBasketItems').innerHTML = "";
-                    document.getElementById('orderModal').style.display = 'flex';
-                };
-                sidebar.appendChild(card);
-            });
-        }
-
-        async function start() {
-            const dropdown = document.getElementById('routeDropdownMap');
-            const files = await ghFetch('routes');
-            files.forEach(file => {
-                if (!file.name.endsWith('.csv')) return;
-                const opt = document.createElement('option');
-                opt.value = file.download_url;
-                opt.textContent = file.name.replace('.csv', '');
-                dropdown.appendChild(opt);
-            });
-            dropdown.onchange = async (e) => {
-                const res = await fetch(e.target.value);
-                const csv = await res.text();
-                buildStopList(csv);
-                if (window.processCSV) window.processCSV(csv);
-            };
-            await loadProductData();
-        }
-        start();
-    })();
-    </script>
-</body>
-</html>
+document.addEventListener('DOMContentLoaded', initMap);
