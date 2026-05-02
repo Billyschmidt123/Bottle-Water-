@@ -3,14 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>LogiFlow Delivery System</title>
-
     <meta name="theme-color" content="#007bff">
 
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <link rel="shortcut icon" href="favicon.ico">
-
     <link rel="stylesheet" href="ASSETS/LEAFLET/leaflet.css?v=1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
@@ -26,16 +22,15 @@
     <header class="topbar">
         <div class="topbar-left">
             <span class="app-title">LogiFlow Delivery System</span>
+            <!-- Route selector for the main map screen -->
+            <select id="routeDropdownMap" style="margin-left:15px; padding:6px; border-radius:4px; border:1px solid #ccc;">
+                <option value="">-- Select Route --</option>
+            </select>
         </div>
-<button id="openManagerBtn" class="btn-primary">Manager Portal</button>
-
-<!-- ADDED: Map-screen route dropdown -->
-<select id="routeDropdownMap" style="margin-left:8px; padding:4px 6px;">
-    <option value="">-- Select route --</option>
-</select>
 
         <div class="topbar-right">
-            <button id="openManagerBtn" class="btn-top">
+            <!-- Changed ID to class to support multiple buttons -->
+            <button class="btn-top openManagerBtn">
                 <i class="fas fa-user-gear"></i> Manager Portal
             </button>
 
@@ -47,261 +42,172 @@
 
     <div class="app-container">
         <div id="mapPanel">
-
-<!-- === ADDED: Map top bar with current stop + controls === -->
             <div id="mapTopBar">
-                <div id="currentStopInfo">
-                    No stop selected
-                </div>
+                <div id="currentStopInfo">No stop selected</div>
                 <div id="mapControlButtons">
-                    <button id="btnPrevStop" class="btn-top btn-small">
-                        <i class="fas fa-arrow-left"></i> Back
-                    </button>
-                    <button id="btnNextStop" class="btn-top btn-small">
-                        Forward <i class="fas fa-arrow-right"></i>
-                    </button>
-                    <button id="btnStartRoute" class="btn-top btn-small btn-success">
-                        <i class="fas fa-play"></i> Start
-                    </button>
-                    <button id="btnFinishRoute" class="btn-top btn-small btn-warning">
-                        <i class="fas fa-flag-checkered"></i> Finish
-                    </button>
-                    <button id="btnDirections" class="btn-top btn-small">
-                        <i class="fas fa-route"></i> Directions
-                    </button>
+                    <button id="btnPrevStop" class="btn-top btn-small"><i class="fas fa-arrow-left"></i> Back</button>
+                    <button id="btnNextStop" class="btn-top btn-small">Forward <i class="fas fa-arrow-right"></i></button>
+                    <button id="btnStartRoute" class="btn-top btn-small btn-success"><i class="fas fa-play"></i> Start</button>
+                    <button id="btnFinishRoute" class="btn-top btn-small btn-warning"><i class="fas fa-flag-checkered"></i> Finish</button>
+                    <button id="btnDirections" class="btn-top btn-small"><i class="fas fa-route"></i> Directions</button>
                 </div>
             </div>
-            <!-- === END ADDED: Map top bar with current stop + controls === -->
-
             <div id="map"></div>
         </div>
 
         <aside id="sidebar">
-            <div id="sidebarContent"></div>
+            <div id="sidebarContent">
+                <div style="padding: 20px; text-align: center; color: #666;">
+                    Select a route to view delivery details.
+                </div>
+            </div>
         </aside>
     </div>
 
     <div id="modalContainer"></div>
 
+    <!-- External Libraries -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <!-- === ADDED: jsPDF for delivery receipt generation === -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- === END ADDED: jsPDF for delivery receipt generation === -->
-
     <script src="JS/loader.js?v=1"></script>
 
-    <!-- FIX ADDED: Manager button wiring + module loader + route JSON cache system (additive-only) -->
     <script>
     (function () {
-        // ---- Additive module loader for MODULES/*.html ----
-        if (typeof window.loadModule !== 'function') {
-            window.loadModule = function (moduleName) {
-                var container = document.getElementById('sidebarContent');
-                if (!container || !moduleName) return;
+        const ROUTE_CACHE_KEY = 'logiflowRouteCache_v1';
 
-                var url = 'MODULES/' + moduleName + '.html';
-                fetch(url + '?cacheBust=' + Date.now(), { cache: 'no-store' })
-                    .then(function (res) {
-                        if (!res.ok) {
-                            throw new Error('Failed to load module: ' + url + ' (' + res.status + ')');
-                        }
-                        return res.text();
-                    })
-                    .then(function (html) {
-                        container.innerHTML = html;
+        // --- Core Module Loader ---
+        window.loadModule = function (moduleName) {
+            const container = document.getElementById('sidebarContent');
+            if (!container) return;
 
-                        // Execute any <script> tags inside the loaded module HTML
-                        var temp = document.createElement('div');
-                        temp.innerHTML = html;
-                        var scripts = temp.querySelectorAll('script');
-                        scripts.forEach(function (oldScript) {
-                            var newScript = document.createElement('script');
-                            if (oldScript.src) {
-                                newScript.src = oldScript.src;
-                            } else {
-                                newScript.textContent = oldScript.textContent;
-                            }
-                            document.body.appendChild(newScript);
-                        });
-                    })
-                    .catch(function (err) {
-                        console.error(err);
+            const url = 'MODULES/' + moduleName + '.html';
+            fetch(url + '?cb=' + Date.now())
+                .then(res => {
+                    if (!res.ok) throw new Error('Module load failed');
+                    return res.text();
+                })
+                .then(html => {
+                    container.innerHTML = html;
+                    // Execute scripts inside the module
+                    const temp = document.createElement('div');
+                    temp.innerHTML = html;
+                    temp.querySelectorAll('script').forEach(oldScript => {
+                        const newScript = document.createElement('script');
+                        if (oldScript.src) newScript.src = oldScript.src;
+                        else newScript.textContent = oldScript.textContent;
+                        document.body.appendChild(newScript);
                     });
-            };
-        }
+                    
+                    // Immediately try to populate dropdowns in the new module
+                    if (window.logiflowRouteCache) {
+                        populateRouteDropdown(window.logiflowRouteCache.routes);
+                    }
+                })
+                .catch(err => console.error(err));
+        };
 
-        // ---- Manager button wiring (handles duplicate IDs) ----
+        // --- Manager Portal Wiring ---
         function initManagerButtons() {
-            var buttons = document.querySelectorAll('#openManagerBtn');
-            if (!buttons || !buttons.length) return;
-
-            function onManagerClick(event) {
-                if (event && event.preventDefault) {
-                    event.preventDefault();
-                }
-                if (typeof window.loadModule === 'function') {
-                    // Use the confirmed module name: manager-portal.html
-                    window.loadModule('manager-portal');
-                }
-            }
-
-            buttons.forEach(function (btn) {
-                if (btn && !btn.__logiflowManagerBound) {
-                    btn.addEventListener('click', onManagerClick);
-                    btn.__logiflowManagerBound = true;
+            document.querySelectorAll('.openManagerBtn').forEach(btn => {
+                if (!btn.__bound) {
+                    btn.addEventListener('click', () => window.loadModule('manager-portal'));
+                    btn.__bound = true;
                 }
             });
         }
 
-        // ---- Route JSON cache system (GitHub-based, additive-only) ----
-        var ROUTE_CACHE_KEY = 'logiflowRouteCache_v1';
-
-        // Simple CSV parser (no quoted fields support; good enough for basic route CSVs)
+        // --- Route Data Logic ---
         function parseCSV(text) {
             if (!text) return [];
-            var lines = text.split(/\r?\n/).filter(function (l) { return l.trim().length > 0; });
+            const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
             if (lines.length === 0) return [];
-            var headers = lines[0].split(',').map(function (h) { return h.trim(); });
-            var rows = [];
-            for (var i = 1; i < lines.length; i++) {
-                var parts = lines[i].split(',');
-                if (parts.length === 1 && parts[0].trim() === '') continue;
-                var obj = {};
-                for (var j = 0; j < headers.length; j++) {
-                    obj[headers[j]] = (parts[j] || '').trim();
-                }
-                rows.push(obj);
-            }
-            return rows;
-        }
-
-        function saveRouteCache(cache) {
-            try {
-                localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
-            } catch (e) {
-                // ignore storage errors
-            }
-        }
-
-        function loadRouteCache() {
-            try {
-                var raw = localStorage.getItem(ROUTE_CACHE_KEY);
-                if (!raw) return null;
-                return JSON.parse(raw);
-            } catch (e) {
-                return null;
-            }
+            const headers = lines[0].split(',').map(h => h.trim());
+            return lines.slice(1).map(line => {
+                const parts = line.split(',');
+                const obj = {};
+                headers.forEach((h, i) => obj[h] = (parts[i] || '').trim());
+                return obj;
+            });
         }
 
         function populateRouteDropdown(routes) {
-            var dropdown = document.getElementById('routeDropdownMap');
-            if (!dropdown) return;
+            // Update BOTH the map header dropdown and the portal dropdown
+            const selectors = ['#routeDropdownMap', '#routeDropdown'];
+            selectors.forEach(selector => {
+                const dropdown = document.querySelector(selector);
+                if (!dropdown) return;
 
-            // Clear existing options except the first placeholder
-            while (dropdown.options.length > 1) {
-                dropdown.remove(1);
-            }
+                while (dropdown.options.length > 1) dropdown.remove(1);
 
-            if (!routes || !routes.length) return;
-
-            routes.forEach(function (route) {
-                var opt = document.createElement('option');
-                opt.value = route.id || route.name || '';
-                opt.textContent = route.name || route.id || 'Unnamed route';
-                dropdown.appendChild(opt);
+                routes.forEach(route => {
+                    const opt = document.createElement('option');
+                    opt.value = route.id || route.name;
+                    opt.textContent = route.name || route.id;
+                    dropdown.appendChild(opt);
+                });
             });
         }
 
-        function fetchRouteManifest() {
-            var url = 'ROUTES/routes-manifest.json?cacheBust=' + Date.now();
-            return fetch(url, { cache: 'no-store' }).then(function (res) {
-                if (!res.ok) {
-                    throw new Error('Failed to load route manifest: ' + res.status);
-                }
-                return res.json();
-            });
-        }
-
-        function fetchRouteCSV(routeDef) {
-            var url = routeDef.file + (routeDef.file.indexOf('?') === -1 ? '?cacheBust=' + Date.now() : '&cacheBust=' + Date.now());
-            return fetch(url, { cache: 'no-store' })
-                .then(function (res) {
-                    if (!res.ok) {
-                        throw new Error('Failed to load route CSV: ' + routeDef.file);
-                    }
-                    return res.text();
-                })
-                .then(function (text) {
-                    var stops = parseCSV(text);
-                    return {
-                        id: routeDef.id || routeDef.name || '',
-                        name: routeDef.name || routeDef.id || '',
-                        file: routeDef.file,
-                        stops: stops
-                    };
-                });
-        }
-
-        function refreshRoutesFromGitHub() {
-            return fetchRouteManifest()
-                .then(function (manifest) {
-                    if (!manifest || !manifest.routes || !manifest.routes.length) {
-                        return { routes: [] };
-                    }
-                    var promises = manifest.routes.map(function (routeDef) {
-                        return fetchRouteCSV(routeDef).catch(function () {
-                            return null;
-                        });
+        window.refreshRoutesFromGitHub = function() {
+            console.log("Syncing with GitHub...");
+            const manifestUrl = 'ROUTES/routes-manifest.json?cb=' + Date.now();
+            
+            return fetch(manifestUrl)
+                .then(res => res.json())
+                .then(manifest => {
+                    const promises = manifest.routes.map(r => {
+                        return fetch(r.file + '?cb=' + Date.now())
+                            .then(res => res.text())
+                            .then(csv => ({ ...r, stops: parseCSV(csv) }))
+                            .catch(() => null);
                     });
-                    return Promise.all(promises).then(function (results) {
-                        var routes = results.filter(function (r) { return !!r; });
-                        var cache = { routes: routes, refreshedAt: new Date().toISOString() };
-                        saveRouteCache(cache);
-                        populateRouteDropdown(routes);
-                        window.logiflowRouteCache = cache;
-                        return cache;
-                    });
+
+                    return Promise.all(promises);
                 })
-                .catch(function () {
-                    var existing = loadRouteCache();
-                    if (existing) {
-                        populateRouteDropdown(existing.routes);
-                        window.logiflowRouteCache = existing;
-                        return existing;
-                    }
-                    return { routes: [] };
+                .then(results => {
+                    const routes = results.filter(r => r !== null);
+                    const cache = { routes: routes, updatedAt: new Date().toISOString() };
+                    localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
+                    window.logiflowRouteCache = cache;
+                    populateRouteDropdown(routes);
+                    return cache;
                 });
+        };
+
+        function loadRouteCache() {
+            try {
+                const raw = localStorage.getItem(ROUTE_CACHE_KEY);
+                return raw ? JSON.parse(raw) : null;
+            } catch (e) { return null; }
         }
 
         function initRouteSystem() {
-            var cached = loadRouteCache();
-            if (cached && cached.routes && cached.routes.length) {
-                populateRouteDropdown(cached.routes);
+            const cached = loadRouteCache();
+            if (cached) {
                 window.logiflowRouteCache = cached;
+                populateRouteDropdown(cached.routes);
             }
+            
+            // Try background update
+            window.refreshRoutesFromGitHub().catch(e => console.warn("Offline mode active."));
 
-            refreshRoutesFromGitHub();
-
-            var refreshBtn = document.getElementById('refreshRoutesBtn');
-            if (refreshBtn && !refreshBtn.__logiflowRoutesBound) {
-                refreshBtn.addEventListener('click', function (event) {
-                    if (event && event.preventDefault) {
-                        event.preventDefault();
-                    }
-                    refreshRoutesFromGitHub();
-                });
-                refreshBtn.__logiflowRoutesBound = true;
-            }
+            document.getElementById('refreshRoutesBtn').addEventListener('click', (e) => {
+                e.preventDefault();
+                window.refreshRoutesFromGitHub().then(() => alert("Routes Updated"));
+            });
         }
 
-        document.addEventListener('DOMContentLoaded', function () {
+        // Global Close function for modules
+        window.closeModal = function() {
+            document.getElementById('sidebarContent').innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Select a route to begin.</div>';
+        };
+
+        // --- Start Everything ---
+        document.addEventListener('DOMContentLoaded', () => {
             initManagerButtons();
-            // initRouteSystem();
+            initRouteSystem();
         });
     })();
     </script>
-    <!-- END FIX ADDED: Manager button wiring + module loader + route JSON cache system -->
-
 </body>
 </html>
