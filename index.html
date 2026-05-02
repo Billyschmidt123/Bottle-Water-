@@ -20,6 +20,19 @@
         #uploadProgressBar { width: 0%; height: 20px; background: #28a745; border-radius: 5px; text-align: center; color: white; line-height: 20px; font-size: 12px; transition: width 0.3s; }
         .local-upload-btn { background: #28a745 !important; color: white !important; }
         .github-refresh-btn { background: #6f42c1 !important; color: white !important; }
+        
+        /* NEW CUSTOMER MANAGEMENT STYLES */
+        .mgmt-table-container { width: 100%; overflow-x: auto; margin-top: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .mgmt-table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        .mgmt-table th, .mgmt-table td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+        .mgmt-table th { background: #f8f9fa; position: sticky; top: 0; }
+        .status-pill { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+        .status-active { background: #d4edda; color: #155724; }
+        .status-inactive { background: #f8d7da; color: #721c24; }
+        .mgmt-actions button { margin-right: 5px; padding: 5px 10px; cursor: pointer; border: none; border-radius: 4px; }
+        .btn-edit { background: #ffc107; color: #000; }
+        .btn-toggle { background: #17a2b8; color: #fff; }
+        .btn-delete { background: #dc3545; color: #fff; }
     </style>
 </head>
 
@@ -193,7 +206,6 @@
                     return Promise.all(promises);
                 })
                 .then(results => {
-                    // FIX: Ensure results is an array before filtering
                     const safeResults = Array.isArray(results) ? results : [];
                     const routes = safeResults.filter(r => r !== null);
                     if (routes.length > 0) {
@@ -286,7 +298,6 @@
                         
                         progressContainer.style.display = 'none';
 
-                        // Confirmation workflow
                         const confirmSync = confirm(`Loaded ${files.length} routes. Generate Route List JSON and sync to GitHub?`);
                         if (confirmSync) {
                             const routelist = { updatedAt: new Date().toISOString(), routes: routes.map(r => ({ id: r.id, name: r.name, file: r.file })) };
@@ -299,6 +310,171 @@
                 reader.readAsText(file);
             });
         });
+
+        // --- NEW ADDITIONS START HERE: CUSTOMER MANAGEMENT FUNCTIONALITY ---
+
+        window.openCustomerManagement = function() {
+            const container = document.getElementById('sidebarContent');
+            if (!container) return;
+
+            if (!window.logiflowRouteCache || !window.logiflowRouteCache.routes) {
+                alert("No route data found. Please import routes first.");
+                return;
+            }
+
+            let allStops = [];
+            let headers = [];
+
+            // Extract all stops and find headers from the first valid stop
+            window.logiflowRouteCache.routes.forEach(route => {
+                if (route.stops && Array.isArray(route.stops)) {
+                    route.stops.forEach((stop, index) => {
+                        if (headers.length === 0) headers = Object.keys(stop);
+                        // Store route info so we know where to save changes
+                        allStops.push({ ...stop, _routeId: route.id, _localIndex: index });
+                    });
+                }
+            });
+
+            let html = `
+                <div style="padding:15px;">
+                    <h2>Customer Management</h2>
+                    <button class="btn-top" onclick="window.loadModule('manager-portal')">Back to Manager</button>
+                    <button class="btn-top btn-success" onclick="window.customerCRUD('create')">Add New Customer</button>
+                    
+                    <div class="mgmt-table-container">
+                        <table class="mgmt-table">
+                            <thead>
+                                <tr>
+                                    ${headers.map(h => `<th>${h}</th>`).join('')}
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${allStops.map((stop, globalIndex) => {
+                                    const isActive = stop.Status !== 'Inactive';
+                                    return `
+                                        <tr>
+                                            ${headers.map(h => `<td>${stop[h] || ''}</td>`).join('')}
+                                            <td>
+                                                <span class="status-pill ${isActive ? 'status-active' : 'status-inactive'}">
+                                                    ${isActive ? 'Active' : 'Inactive'}
+                                                </span>
+                                            </td>
+                                            <td class="mgmt-actions">
+                                                <button class="btn-edit" onclick="window.customerCRUD('update', ${globalIndex})"><i class="fas fa-edit"></i></button>
+                                                <button class="btn-toggle" onclick="window.customerCRUD('toggle', ${globalIndex})"><i class="fas fa-power-off"></i></button>
+                                                <button class="btn-delete" onclick="window.customerCRUD('delete', ${globalIndex})"><i class="fas fa-trash"></i></button>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            container.innerHTML = html;
+            window._allStopsReference = allStops; // Temporary reference for CRUD
+            window._headersReference = headers;
+        };
+
+        window.customerCRUD = function(action, index) {
+            const stops = window._allStopsReference;
+            const headers = window._headersReference;
+            const stop = index !== undefined ? stops[index] : null;
+
+            if (action === 'delete') {
+                if (!confirm("Are you sure you want to delete this customer?")) return;
+                const rId = stop._routeId;
+                const route = window.logiflowRouteCache.routes.find(r => r.id === rId);
+                route.stops.splice(stop._localIndex, 1);
+                saveAndRefreshMgmt();
+            } 
+            else if (action === 'toggle') {
+                const rId = stop._routeId;
+                const route = window.logiflowRouteCache.routes.find(r => r.id === rId);
+                const target = route.stops[stop._localIndex];
+                target.Status = (target.Status === 'Inactive') ? 'Active' : 'Inactive';
+                saveAndRefreshMgmt();
+            }
+            else if (action === 'create' || action === 'update') {
+                let formHtml = `<div style="padding:20px;"><h3>${action === 'create' ? 'Add' : 'Edit'} Customer</h3><form id="mgmtForm">`;
+                headers.forEach(h => {
+                    if (h.startsWith('_')) return;
+                    formHtml += `
+                        <div style="margin-bottom:10px;">
+                            <label style="display:block;font-size:12px;color:#666;">${h}</label>
+                            <input type="text" name="${h}" value="${stop ? (stop[h] || '') : ''}" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                        </div>
+                    `;
+                });
+                
+                if (action === 'create') {
+                    formHtml += `<div style="margin-bottom:10px;"><label>Select Route</label><select name="_targetRoute" style="width:100%;padding:8px;">`;
+                    window.logiflowRouteCache.routes.forEach(r => {
+                        formHtml += `<option value="${r.id}">${r.name}</option>`;
+                    });
+                    formHtml += `</select></div>`;
+                }
+
+                formHtml += `
+                    <div style="margin-top:20px;">
+                        <button type="button" class="btn-top btn-success" onclick="window.saveMgmtForm('${action}', ${index})">Save Changes</button>
+                        <button type="button" class="btn-top" onclick="window.openCustomerManagement()">Cancel</button>
+                    </div>
+                </form></div>`;
+                document.getElementById('sidebarContent').innerHTML = formHtml;
+            }
+        };
+
+        window.saveMgmtForm = function(action, index) {
+            const formData = new FormData(document.getElementById('mgmtForm'));
+            const data = {};
+            formData.forEach((value, key) => { data[key] = value; });
+
+            if (action === 'update') {
+                const stopRef = window._allStopsReference[index];
+                const route = window.logiflowRouteCache.routes.find(r => r.id === stopRef._routeId);
+                Object.assign(route.stops[stopRef._localIndex], data);
+            } else {
+                const route = window.logiflowRouteCache.routes.find(r => r.id === data._targetRoute);
+                delete data._targetRoute;
+                route.stops.push(data);
+            }
+            saveAndRefreshMgmt();
+        };
+
+        function saveAndRefreshMgmt() {
+            localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(window.logiflowRouteCache));
+            window.openCustomerManagement();
+            alert("Changes saved to local memory.");
+        }
+
+        // Intercept module loading to inject the button into the Manager Portal UI dynamically
+        const originalLoadModule = window.loadModule;
+        window.loadModule = function(moduleName) {
+            originalLoadModule(moduleName);
+            if (moduleName === 'manager-portal') {
+                setTimeout(() => {
+                    const container = document.getElementById('sidebarContent');
+                    if (container && !container.querySelector('.customer-mgmt-trigger')) {
+                        const btn = document.createElement('button');
+                        btn.className = 'btn-top customer-mgmt-trigger';
+                        btn.style.width = '100%';
+                        btn.style.marginTop = '10px';
+                        btn.style.background = '#007bff';
+                        btn.style.color = '#fff';
+                        btn.innerHTML = '<i class="fas fa-users-gear"></i> Customer Management';
+                        btn.onclick = window.openCustomerManagement;
+                        container.appendChild(btn);
+                    }
+                }, 300);
+            }
+        };
+
+        // --- NEW ADDITIONS END ---
 
         document.addEventListener('DOMContentLoaded', () => {
             initManagerButtons();
