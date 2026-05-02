@@ -40,7 +40,7 @@
     <div class="app-container">
         <aside id="sidebar">
             <div id="sidebarContent">
-                <div style="padding: 20px; text-align: center; color: #666;">Waiting for route selection...</div>
+                <div style="padding: 20px; text-align: center; color: #666;">Ready for Route Selection</div>
             </div>
         </aside>
         <div id="mapPanel">
@@ -53,39 +53,37 @@
 
     <script>
     (function () {
-        // --- SECURE STORAGE KEY ---
         const STORAGE_KEY = 'logiflow_gh_token';
         
-        // This is your actual GitHub token, but split up to prevent simple web scraping
-        const part1 = "github_pat_11BSXV7JI0";
-        const part2 = "k1iv7Q6uVTCg_pJeYK0I";
-        const part3 = "Y2j421kGhDbAxI2ntoIPAbLV8sTPvJTqFBhE4XGNLLJ20GZKl8WC";
-        const FULL_KEY = part1 + part2 + part3;
+        // Split key to prevent simple scraping while maintaining stability
+        const p1 = "github_pat_11BSXV7JI0";
+        const p2 = "k1iv7Q6uVTCg_pJeYK0I";
+        const p3 = "Y2j421kGhDbAxI2ntoIPAbLV8sTPvJTqFBhE4XGNLLJ20GZKl8WC";
+        const FINAL_KEY = p1 + p2 + p3;
 
-        let activeToken = localStorage.getItem(STORAGE_KEY);
+        let token = localStorage.getItem(STORAGE_KEY);
 
-        // Security Prompt for Field Technicians
-        if (!activeToken || activeToken === "null") {
-            const entry = prompt("LogiFlow Security: Enter Access Password:");
+        // Security check for technicians
+        if (!token || token === "null" || token === "undefined") {
+            const pass = prompt("LogiFlow Security: Enter Access Password:");
             
-            if (entry && entry.trim() === "2026!") {
-                // If they have the password, we grant them the key
-                localStorage.setItem(STORAGE_KEY, FULL_KEY);
-                activeToken = FULL_KEY;
-                console.log("System Unlocked.");
-            } else if (entry !== null) {
-                alert("Incorrect Password.");
+            if (pass && pass.trim() === "2026!") {
+                localStorage.setItem(STORAGE_KEY, FINAL_KEY);
+                token = FINAL_KEY;
+                console.log("LogiFlow Unlocked.");
+            } else if (pass !== null) {
+                alert("Access Denied: Incorrect Password.");
                 window.location.reload();
             }
         }
 
         const GITHUB = {
-            TOKEN: activeToken,
+            TOKEN: token,
             REPO: 'Billyschmidt123/Bottle-Water-',
             BASE: 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/'
         };
 
-        async function apiReq(url, opts = {}) {
+        async function apiCall(url, opts = {}) {
             if (!GITHUB.TOKEN) return null;
             try {
                 return await fetch(url, {
@@ -95,9 +93,9 @@
             } catch (e) { return null; }
         }
 
-        // --- STOP CARD LOADING ---
+        // --- STOP CARD HANDLER ---
         window.refreshRoutesFromGitHub = async function() {
-            const res = await apiReq(GITHUB.BASE + 'routes/routes-manifest.json?cb=' + Date.now());
+            const res = await apiCall(GITHUB.BASE + 'routes/routes-manifest.json?cb=' + Date.now());
             if (res && res.ok) {
                 const manifest = await res.json();
                 const dropdown = document.querySelector('#routeDropdownMap');
@@ -115,34 +113,34 @@
             const file = e.target.value;
             if (!file) return;
             const sidebar = document.getElementById('sidebarContent');
-            sidebar.innerHTML = '<div style="padding: 20px;">Loading Stop Cards...</div>';
+            sidebar.innerHTML = '<div style="padding: 20px;">Fetching Stop Cards...</div>';
 
-            const res = await apiReq(GITHUB.BASE + 'routes/' + file + '?cb=' + Date.now());
+            const res = await apiCall(GITHUB.BASE + 'routes/' + file + '?cb=' + Date.now());
             if (res && res.ok) {
                 const text = await res.text();
-                const lines = text.split(/\r?\n/).filter(l => l.trim());
-                sidebar.innerHTML = `<div style="padding: 20px;">Loaded ${lines.length - 1} stop cards.</div>`;
+                const count = text.split(/\r?\n/).filter(l => l.trim()).length - 1;
+                sidebar.innerHTML = `<div style="padding: 20px;">Loaded ${count} stop cards for delivery.</div>`;
             }
         });
 
         document.getElementById('refreshGitHubListBtn').addEventListener('click', async () => {
-            const res = await apiReq(`https://api.github.com/repos/${GITHUB.REPO}/contents/routes`);
+            const res = await apiCall(`https://api.github.com/repos/${GITHUB.REPO}/contents/routes`);
             if (res && res.ok) {
                 const files = (await res.json()).filter(f => f.name.endsWith('.csv')).map(f => ({
                     id: f.name.replace('.csv', ''), name: f.name.replace('.csv', ''), file: f.name
                 }));
                 const manifest = { updatedAt: new Date().toISOString(), routes: files };
                 const manifestUrl = `https://api.github.com/repos/${GITHUB.REPO}/contents/routes/routes-manifest.json`;
-                const getRes = await apiReq(manifestUrl);
+                const getRes = await apiCall(manifestUrl);
                 const sha = getRes && getRes.ok ? (await getRes.json()).sha : null;
 
                 await fetch(manifestUrl, {
                     method: 'PUT',
                     headers: { 'Authorization': `token ${GITHUB.TOKEN}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: "Sync Manifest", content: btoa(JSON.stringify(manifest, null, 2)), sha })
+                    body: JSON.stringify({ message: "Update Route Manifest", content: btoa(JSON.stringify(manifest, null, 2)), sha })
                 });
                 await window.refreshRoutesFromGitHub();
-                alert("Success: Route list updated.");
+                alert("Route list synced successfully.");
             }
         });
 
