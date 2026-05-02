@@ -1,30 +1,34 @@
 <div class="modal">
     <div class="modal-header">
-        <h2>Bulk Route Importer & GitHub Sync</h2>
+        <h2>GitHub Route Browser & Sync</h2>
     </div>
 
     <div class="modal-body">
-        <p style="color: #d9534f; font-weight: bold;">⚠️ WARNING: Uploading will overwrite existing files on GitHub. Ensure you have a backup of your local CSVs first.</p>
-        
         <label>GitHub Personal Access Token:</label>
         <input type="password" id="ghToken" placeholder="paste token here" style="width:100%; margin-bottom:10px;">
         
+        <button id="btnFetchFromGithub" class="btn-secondary" style="width: 100%; margin-bottom: 15px;">
+            <i class="fas fa-search"></i> Browse GitHub for CSVs
+        </button>
+
+        <div id="githubFileBrowser" style="display:none; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fdfdfd;">
+            <p style="font-size: 0.85em; margin-bottom: 5px;"><strong>Found in your 5 folders:</strong></p>
+            <div id="fileListContainer" style="max-height: 200px; overflow-y: auto; font-size: 0.9em;">
+                <!-- Files will appear here with checkboxes -->
+            </div>
+            <button id="btnGenerateManifest" class="btn-success" style="width: 100%; margin-top: 15px;">Add Selected to Manifest</button>
+        </div>
+
         <hr>
-
-        <label>Select CSV Route Files:</label>
-        <input type="file" id="bulkCsvInput" multiple accept=".csv" style="margin-bottom: 20px; width: 100%;">
         
-        <div id="importStatus" style="margin-bottom: 15px; font-size: 0.9em;"></div>
-
-        <div id="fileCheckList" style="margin-bottom:15px; max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 5px; display:none;">
-            <strong>Files to be processed:</strong>
-            <ul id="pendingFilesList" style="font-size: 0.85em; padding-left: 20px;"></ul>
-        </div>
+        <div id="importStatus" style="margin-bottom: 10px; font-weight: bold; color: #007bff;"></div>
         
-        <div style="margin-top: 15px;">
-            <button id="btnSyncToGithub" class="btn-primary" style="width: 100%; margin-bottom: 10px;">Sync to GitHub (Master List)</button>
-            <button id="btnSaveLocal" class="btn-secondary" style="width: 100%;">Save Local Only (Testing)</button>
-        </div>
+        <label>Manifest Preview:</label>
+        <textarea id="jsonPreview" style="width:100%; height:120px; font-family: monospace; font-size: 11px;"></textarea>
+
+        <button id="btnPushToGithub" class="btn-primary" style="width: 100%; margin-top: 15px;">
+            <i class="fas fa-cloud-upload-alt"></i> Overwrite Master Manifest on GitHub
+        </button>
     </div>
 
     <div class="modal-footer">
@@ -34,115 +38,112 @@
 
 <script>
 (function() {
-    const csvInput = document.getElementById('bulkCsvInput');
-    const status = document.getElementById('importStatus');
-    const list = document.getElementById('pendingFilesList');
-    const listDiv = document.getElementById('fileCheckList');
-    
-    // Repository Config (Adjust these to match your repo)
     const owner = "Billyschmidt123";
     const repo = "Bottle-Water-";
-    const branch = "main";
+    const status = document.getElementById('importStatus');
+    const browser = document.getElementById('githubFileBrowser');
+    const fileContainer = document.getElementById('fileListContainer');
+    const jsonPreview = document.getElementById('jsonPreview');
 
-    let filesToUpload = [];
+    // Folders to scan (Modify these to your 5 folder names)
+    const routeFolders = ["routes/north", "routes/south", "routes/east", "routes/west", "routes/central"];
 
-    csvInput.addEventListener('change', function(e) {
-        filesToUpload = Array.from(e.target.files);
-        list.innerHTML = "";
-        if(filesToUpload.length > 0) {
-            listDiv.style.display = "block";
-            filesToUpload.forEach(f => {
-                const li = document.createElement('li');
-                li.textContent = f.name;
-                list.appendChild(li);
+    async function fetchFolderFiles(path, token) {
+        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+            headers: { 'Authorization': `token ${token}` }
+        });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return data.filter(item => item.name.endsWith('.csv'));
+    }
+
+    document.getElementById('btnFetchFromGithub').addEventListener('click', async function() {
+        const token = document.getElementById('ghToken').value;
+        if (!token) return alert("Please enter your GitHub Token.");
+        
+        status.textContent = "Scanning GitHub folders...";
+        fileContainer.innerHTML = "";
+        
+        try {
+            let allFiles = [];
+            for (const folder of routeFolders) {
+                const files = await fetchFolderFiles(folder, token);
+                allFiles = allFiles.concat(files);
+            }
+
+            if (allFiles.length === 0) {
+                status.textContent = "No CSV files found in specified folders.";
+                return;
+            }
+
+            allFiles.forEach(file => {
+                const div = document.createElement('div');
+                div.innerHTML = `<label><input type="checkbox" checked data-path="${file.path}" data-name="${file.name}"> ${file.path}</label>`;
+                fileContainer.appendChild(div);
             });
-            status.textContent = filesToUpload.length + " files selected.";
+
+            browser.style.display = "block";
+            status.textContent = `Found ${allFiles.length} CSV files across folders.`;
+        } catch (e) {
+            alert("Connection error. Check token and folder paths.");
         }
     });
 
-    async function getSha(path, token) {
-        try {
-            const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-                headers: { 'Authorization': `token ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                return data.sha;
-            }
-            return null;
-        } catch (e) { return null; }
-    }
+    document.getElementById('btnGenerateManifest').addEventListener('click', function() {
+        const checkboxes = fileContainer.querySelectorAll('input[type="checkbox"]:checked');
+        const routes = Array.from(checkboxes).map(cb => {
+            const path = cb.getAttribute('data-path');
+            const name = cb.getAttribute('data-name').replace('.csv', '');
+            return {
+                id: name.toLowerCase().replace(/\s+/g, '-'),
+                name: name,
+                file: path
+            };
+        });
 
-    async function uploadFile(path, content, token, isBinary = false) {
-        const sha = await getSha(path, token);
-        const body = {
-            message: `Update ${path} via LogiFlow Manager`,
-            content: isBinary ? content : btoa(content),
-            branch: branch
-        };
-        if (sha) body.sha = sha;
+        jsonPreview.value = JSON.stringify({ routes: routes }, null, 4);
+        status.textContent = "Manifest generated locally.";
+    });
+
+    document.getElementById('btnPushToGithub').addEventListener('click', async function() {
+        const token = document.getElementById('ghToken').value;
+        const content = jsonPreview.value;
+        if (!token || !content) return alert("Missing data or token.");
+
+        const confirmPush = confirm("This will update the MASTER JSON on GitHub. Technicians will see these changes on their next refresh. Continue?");
+        if (!confirmPush) return;
+
+        // Reuse the updateManifestManually logic (already in index.html) 
+        // to push the ROUTES/routes-manifest.json to GitHub.
+        status.textContent = "Uploading to GitHub...";
+        
+        // This helper would be defined in index.html or here:
+        const success = await uploadToGithub("ROUTES/routes-manifest.json", content, token);
+        if (success) {
+            alert("Master Manifest Updated!");
+        }
+    });
+
+    async function uploadToGithub(path, content, token) {
+        const shaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+            headers: { 'Authorization': `token ${token}` }
+        });
+        let sha = null;
+        if (shaRes.ok) {
+            const data = await shaRes.json();
+            sha = data.sha;
+        }
 
         const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
             method: 'PUT',
-            headers: { 
-                'Authorization': `token ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(body)
+            headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: "Update route manifest",
+                content: btoa(content),
+                sha: sha
+            })
         });
         return res.ok;
     }
-
-    document.getElementById('btnSyncToGithub').addEventListener('click', async function() {
-        const token = document.getElementById('ghToken').value;
-        if (!token) return alert("Please enter your GitHub Token.");
-        if (filesToUpload.length === 0) return alert("Select files first.");
-
-        const confirmSync = confirm("This will overwrite existing routes on GitHub. Are you sure you want to proceed?");
-        if (!confirmSync) return;
-
-        status.textContent = "Checking GitHub for existing files...";
-        
-        let manifestRoutes = [];
-
-        for (let file of filesToUpload) {
-            const path = "routes/" + file.name;
-            const routeName = file.name.replace(".csv", "");
-            
-            status.textContent = "Uploading: " + file.name + "...";
-            const reader = new FileReader();
-            
-            const content = await new Promise((resolve) => {
-                reader.onload = (e) => resolve(e.target.result);
-                reader.readAsText(file);
-            });
-
-            const success = await uploadFile(path, content, token);
-            if (success) {
-                manifestRoutes.push({
-                    id: routeName.toLowerCase().replace(/\s+/g, '-'),
-                    name: routeName,
-                    file: path
-                });
-            }
-        }
-
-        // Final Manifest Update
-        status.textContent = "Updating Master Manifest...";
-        const manifestJson = JSON.stringify({ routes: manifestRoutes }, null, 4);
-        const manifestSuccess = await uploadFile("ROUTES/routes-manifest.json", manifestJson, token);
-
-        if (manifestSuccess) {
-            status.textContent = "SUCCESS: GitHub Master List updated!";
-            alert("All files uploaded. Your team can now use 'Refresh' to see the changes.");
-        } else {
-            alert("Files uploaded, but failed to update Master Manifest.");
-        }
-    });
-
-    document.getElementById('btnSaveLocal').addEventListener('click', function() {
-        // Preserves existing local-only logic
-        alert("Local Save functionality remains as fallback.");
-    });
 })();
 </script>
