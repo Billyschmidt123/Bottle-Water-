@@ -141,53 +141,50 @@
 
         window.refreshRoutesFromGitHub = function() {
             console.log("Syncing with GitHub...");
-            // MODIFICATION: Try manifest in ROUTES first
-            const manifestUrl = 'ROUTES/routes-manifest.json?cb=' + Date.now();
             
-            return fetch(manifestUrl)
-                .then(res => {
-                    if (!res.ok) return fetch('routes/routes-manifest.json?cb=' + Date.now());
-                    return res;
-                })
-                .then(res => {
-                    if (!res.ok) throw new Error('Manifest not found in ROUTES or routes');
-                    return res.json();
-                })
+            // FIX ADDED HERE: Attempting to find the manifest in updated locations
+            const manifestOptions = [
+                'routes/routes-manifest.json',
+                'routes-manifest.json',
+                'ROUTES/routes-manifest.json'
+            ];
+
+            const fetchManifest = (index) => {
+                if (index >= manifestOptions.length) return Promise.reject('Manifest not found');
+                return fetch(manifestOptions[index] + '?cb=' + Date.now())
+                    .then(res => {
+                        if (!res.ok) return fetchManifest(index + 1);
+                        return res.json();
+                    });
+            };
+
+            return fetchManifest(0)
                 .then(manifest => {
                     const promises = manifest.routes.map(r => {
-                        // --- FIX ADDED HERE: Robust Case-Insensitive Multi-Path Searching ---
-                        let baseFile = r.file;
+                        // FIX ADDED HERE: Robust path resolution after directory deletion
+                        let targetPath = r.file;
                         
-                        // Handle the specific nesting from image_052f76.png
-                        if (baseFile.includes('Others/')) {
-                            const fileName = baseFile.split('/').pop();
-                            baseFile = 'Others-20260423T171847Z-3-001/Others/' + fileName;
-                        }
-
-                        // Define both potential parent folders from the tree
+                        // Check if file is in an 'Others' folder or root
                         const tryPaths = [
-                            'routes/' + baseFile,
-                            'ROUTES/' + baseFile
+                            targetPath,
+                            'routes/' + targetPath,
+                            'ROUTES/' + targetPath
                         ];
 
-                        // Attempt to fetch from both locations
-                        const attemptFetch = (index) => {
-                            if (index >= tryPaths.length) return Promise.reject('Not found in any folder');
-                            const currentPath = tryPaths[index];
+                        const attemptFetch = (pathIndex) => {
+                            if (pathIndex >= tryPaths.length) return Promise.reject('File not found');
+                            const encodedPath = encodeURI(tryPaths[pathIndex]);
                             
-                            return fetch(currentPath + '?cb=' + Date.now())
+                            return fetch(encodedPath + '?cb=' + Date.now())
                                 .then(res => {
-                                    if (!res.ok) return attemptFetch(index + 1);
+                                    if (!res.ok) return attemptFetch(pathIndex + 1);
                                     return res.text();
                                 });
                         };
 
                         return attemptFetch(0)
                             .then(csv => ({ ...r, stops: parseCSV(csv) }))
-                            .catch((err) => {
-                                console.warn(`Route ${r.id} skip: ${err}`);
-                                return null;
-                            });
+                            .catch(() => null);
                     });
 
                     return Promise.all(promises);
@@ -227,11 +224,11 @@
                 populateRouteDropdown(cached.routes);
             }
             
-            window.refreshRoutesFromGitHub().catch(e => console.warn("Offline mode active."));
+            window.refreshRoutesFromGitHub().catch(e => console.warn("Sync failed: " + e));
 
             document.getElementById('refreshRoutesBtn').addEventListener('click', (e) => {
                 e.preventDefault();
-                window.refreshRoutesFromGitHub().then(() => alert("Routes Updated"));
+                window.refreshRoutesFromGitHub().then(() => alert("Routes Updated")).catch(err => alert("Update failed: " + err));
             });
         }
 
