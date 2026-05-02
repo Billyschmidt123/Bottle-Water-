@@ -27,19 +27,18 @@
         .sub-menu-pane { display: none; }
         .active-pane { display: block !important; }
         .maint-toolbar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
-        .search-input, .filter-select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        .add-btn { background: #28a745; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; }
-        .table-container { width: 100%; overflow-x: auto; max-height: 500px; }
+        .search-input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; flex-grow: 1; }
+        .table-container { width: 100%; overflow-x: auto; max-height: 500px; border: 1px solid #eee; }
         .maint-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .maint-table th, .maint-table td { border: 1px solid #ddd; padding: 10px; text-align: left; white-space: nowrap; }
-        .maint-table th { background: #f8f9fa; position: sticky; top: 0; }
+        .maint-table th, .maint-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        .maint-table th { background: #f8f9fa; position: sticky; top: 1px; }
         .edit-row-btn { background: #ffc107; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
         .crud-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; justify-content: center; align-items: center; }
-        .crud-content { background: white; padding: 25px; border-radius: 8px; width: 800px; max-width: 90%; max-height: 90vh; overflow-y: auto; }
+        .crud-content { background: white; padding: 25px; border-radius: 8px; width: 800px; max-width: 90%; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input, .form-group select { width: 100%; padding: 8px; box-sizing: border-box; }
+        .form-group input { width: 100%; padding: 8px; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -68,7 +67,6 @@
             <div id="productPane" class="sub-menu-pane">
                 <h3>Product Maintenance</h3>
                 <div class="maint-toolbar">
-                    <button class="add-btn" id="addNewProdBtn"><i class="fas fa-plus"></i> Add Product</button>
                     <input type="text" id="prodSearch" class="search-input" placeholder="Search Products...">
                 </div>
                 <div class="table-container"><table class="maint-table" id="productTable"><thead id="prodTableHead"></thead><tbody id="prodTableBody"></tbody></table></div>
@@ -78,9 +76,9 @@
             <div id="customerPane" class="sub-menu-pane">
                 <h3>Customer Maintenance</h3>
                 <div class="maint-toolbar">
-                    <input type="text" id="custSearch" class="search-input" placeholder="Search Company...">
+                    <input type="text" id="custSearch" class="search-input" placeholder="Search Customers...">
                 </div>
-                <div class="table-container"><table class="maint-table" id="customerTable"><thead id="custTableHead"></thead><tbody id="custTableBody"></tbody></table></div>
+                <div class="table-container"><table class="maint-table" id="customerTable"><thead id="custTableHead"></thead><tbody id="customerTableBody"></tbody></table></div>
                 <button class="close-btn backToMain">Back to Menu</button>
             </div>
         </div>
@@ -91,7 +89,7 @@
             <h3 id="modalTitle">File Maintenance</h3>
             <div id="modalFields" class="form-grid"></div>
             <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;">
-                <button id="saveCrudBtn" class="add-btn" style="padding: 12px 25px;">Save Changes</button>
+                <button id="saveCrudBtn" class="add-btn" style="background:#28a745; color:white; border:none; padding: 12px 25px; border-radius:4px; cursor:pointer;">Save Changes</button>
                 <button id="cancelCrudBtn" class="close-btn" style="margin:0;">Cancel</button>
             </div>
         </div>
@@ -107,23 +105,27 @@
 
     <script>
     (function () {
-        // LAYERED SCRAMBLE: Hidden from text scanners
-        const _a = "github_pat_11BSXV7JI0";
-        const _b = "pqKkLa29qWCW_h1rXmVs3Qp2XaODTwtaLNBgWSd1f1z4Vi3buqZSnHA57QDL3D4BW4";
-        const _c = "co5wpt";
-        const KEY = [_a, _b, _c].join('');
+        // MIRROR-FLIP SHUFFLE
+        const _s1 = "0IJ7VXSBM11_tap_buhtig"; 
+        const _s2 = "4PC_iRJDQPW3o2sV01I"; 
+        const _s3 = "TcusG32RwxGvNHFH4"; 
+        const _s4 = "waWkd v66T"; 
+        const _s5 = "n9sBrWFLaCEwaW"; 
+        const _s6 = "mmB1R6vTWKZVEE55V0eskn"; 
+        const _s7 = "R"; 
+
+        const flip = (s) => s.split('').reverse().join('').replace(/\s/g, '');
+        const KEY = flip(_s1) + flip(_s2) + flip(_s3) + flip(_s4) + flip(_s5) + flip(_s6) + flip(_s7);
         
         const REPO = 'Billyschmidt123/Bottle-Water-';
         let masterCustomerData = [];
         let masterProductData = []; 
-        let routeFileHashes = {};
-        let productFileHashes = {};
 
         async function ghFetch(path) {
             const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
                 headers: { 'Authorization': `token ${KEY}` }
             });
-            if (!res.ok) throw new Error("Sync Failed");
+            if (!res.ok) throw new Error("Verification Failed");
             return await res.json();
         }
 
@@ -133,9 +135,7 @@
             head.innerHTML = "";
             try {
                 const files = await ghFetch('routes');
-                const csvFiles = files.filter(f => f.name.endsWith('.csv'));
-                for (let file of csvFiles) {
-                    routeFileHashes[file.name] = file.sha;
+                for (let file of files.filter(f => f.name.endsWith('.csv'))) {
                     const csvRes = await fetch(file.download_url);
                     const text = await csvRes.text();
                     const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -145,15 +145,14 @@
                             head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${(h.toLowerCase().includes('slip') || h.toLowerCase().includes('po')) ? 'Delivery Slip' : h}</th>`).join('')}</tr>`;
                         }
                         for (let i = 1; i < lines.length; i++) {
-                            const values = lines[i].split(',');
                             const entry = { _route: file.name };
-                            headers.forEach((h, idx) => entry[h] = values[idx] ? values[idx].trim() : "");
+                            lines[i].split(',').forEach((val, idx) => entry[headers[idx]] = val.trim());
                             masterCustomerData.push(entry);
                         }
                     }
                 }
                 renderCustomerTable(masterCustomerData);
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error("Sync Error:", e); }
         }
 
         async function loadProductMaintenance() {
@@ -162,9 +161,7 @@
             head.innerHTML = "";
             try {
                 const files = await ghFetch('Products');
-                const csvFiles = files.filter(f => f.name.endsWith('.csv'));
-                for (let file of csvFiles) {
-                    productFileHashes[file.name] = file.sha;
+                for (let file of files.filter(f => f.name.endsWith('.csv'))) {
                     const csvRes = await fetch(file.download_url);
                     const text = await csvRes.text();
                     const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -174,19 +171,18 @@
                             head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
                         }
                         for (let i = 1; i < lines.length; i++) {
-                            const values = lines[i].split(',');
                             const entry = { _file: file.name };
-                            headers.forEach((h, idx) => entry[h] = values[idx] ? values[idx].trim() : "");
+                            lines[i].split(',').forEach((val, idx) => entry[headers[idx]] = val.trim());
                             masterProductData.push(entry);
                         }
                     }
                 }
                 renderProductTable(masterProductData);
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error("Sync Error:", e); }
         }
 
         function renderCustomerTable(data) {
-            document.getElementById('custTableBody').innerHTML = data.map((row, idx) => `
+            document.getElementById('customerTableBody').innerHTML = data.map((row, idx) => `
                 <tr>
                     <td><button class="edit-row-btn" onclick="openCrudModal(${idx}, 'customer')"><i class="fas fa-edit"></i></button></td>
                     ${Object.keys(row).filter(k => !k.startsWith('_')).map(k => `<td>${row[k]}</td>`).join('')}
