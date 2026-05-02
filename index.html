@@ -143,6 +143,7 @@
         }
 
         function populateRouteDropdown(routes) {
+            if (!Array.isArray(routes)) return;
             const selectors = ['#routeDropdownMap', '#routeDropdown'];
             const dayOrder = { "monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4, "friday": 5, "saturday": 6, "sunday": 7 };
             
@@ -181,7 +182,7 @@
                     return res.json();
                 })
                 .then(manifest => {
-                    if (!manifest.routes || manifest.routes.length === 0) return;
+                    if (!manifest.routes || manifest.routes.length === 0) return [];
                     const promises = manifest.routes.map(r => {
                         const targetPath = 'routes/' + r.file;
                         return fetch(GITHUB_RAW_BASE + targetPath + '?cb=' + Date.now())
@@ -192,12 +193,16 @@
                     return Promise.all(promises);
                 })
                 .then(results => {
-                    if (!results) return;
-                    const routes = results.filter(r => r !== null);
-                    const cache = { routes: routes, updatedAt: new Date().toISOString() };
-                    localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
-                    window.logiflowRouteCache = cache;
-                    populateRouteDropdown(routes);
+                    // FIX: Ensure results is an array before filtering
+                    const safeResults = Array.isArray(results) ? results : [];
+                    const routes = safeResults.filter(r => r !== null);
+                    if (routes.length > 0) {
+                        const cache = { routes: routes, updatedAt: new Date().toISOString() };
+                        localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
+                        window.logiflowRouteCache = cache;
+                        populateRouteDropdown(routes);
+                    }
+                    return safeResults;
                 });
         };
 
@@ -215,9 +220,11 @@
                     file: f.name
                 }));
                 if (csvFiles.length === 0) return alert("No CSVs found.");
-                await window.pushRouteListToGitHub({ updatedAt: new Date().toISOString(), routes: csvFiles });
+                
+                const routelist = { updatedAt: new Date().toISOString(), routes: csvFiles };
+                await window.pushRouteListToGitHub(routelist);
                 await window.refreshRoutesFromGitHub();
-                alert(`Synced ${csvFiles.length} routes.`);
+                alert(`Synced ${csvFiles.length} routes from GitHub directory.`);
             } catch (e) { alert("Sync Error: " + e.message); }
         };
 
@@ -272,7 +279,6 @@
                     progressBar.style.width = Math.round((processedCount / files.length) * 100) + '%';
 
                     if (processedCount === files.length) {
-                        // 1. Load routes into local cache first
                         const cache = { routes: routes, updatedAt: new Date().toISOString() };
                         localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
                         window.logiflowRouteCache = cache;
@@ -280,13 +286,12 @@
                         
                         progressContainer.style.display = 'none';
 
-                        // 2. Ask if user wants to create the JSON route list
-                        const confirmSync = confirm(`Successfully loaded ${files.length} routes locally. \n\nWould you like to generate and sync the Route List (JSON) to GitHub now?`);
-                        
+                        // Confirmation workflow
+                        const confirmSync = confirm(`Loaded ${files.length} routes. Generate Route List JSON and sync to GitHub?`);
                         if (confirmSync) {
                             const routelist = { updatedAt: new Date().toISOString(), routes: routes.map(r => ({ id: r.id, name: r.name, file: r.file })) };
                             window.pushRouteListToGitHub(routelist).then(() => {
-                                alert("Route List created and pushed to GitHub.");
+                                alert("Success: Route List created and synced.");
                             });
                         }
                     }
