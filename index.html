@@ -141,6 +141,7 @@
 
         window.refreshRoutesFromGitHub = function() {
             console.log("Syncing with GitHub...");
+            // Use ROUTES/ for manifest but we'll check paths carefully for stops
             const manifestUrl = 'ROUTES/routes-manifest.json?cb=' + Date.now();
             
             return fetch(manifestUrl)
@@ -150,24 +151,29 @@
                 })
                 .then(manifest => {
                     const promises = manifest.routes.map(r => {
-                        // --- FIX ADDED HERE: Robust path handling for timestamped folders ---
+                        // --- FIX ADDED HERE: Match the specific nested tree structure ---
                         let targetPath = r.file;
                         
-                        // Check if it's an "Others" route that needs the full folder name from your repo
-                        if (targetPath.includes('Others/') && !targetPath.includes('Others-20260423T171847Z')) {
-                             targetPath = targetPath.replace('Others/', 'Others-20260423T171847Z-3-001/');
-                        }
-
-                        // Ensure ROUTES/ prefix
-                        if (targetPath && !targetPath.startsWith('ROUTES/')) {
-                            targetPath = 'ROUTES/' + targetPath;
+                        // Handle the 'Others' path specifically based on the screenshot tree
+                        if (targetPath.includes('Others/')) {
+                            // Map to: routes/Others-20260423T171847Z-3-001/Others/
+                            targetPath = targetPath.replace('Others/', 'routes/Others-20260423T171847Z-3-001/Others/');
+                        } else if (!targetPath.startsWith('routes/') && !targetPath.startsWith('ROUTES/')) {
+                            // Default to lowercase 'routes/' to match tree
+                            targetPath = 'routes/' + targetPath;
                         }
                         // --- END FIX ---
 
                         return fetch(targetPath + '?cb=' + Date.now())
-                            .then(res => res.text())
+                            .then(res => {
+                                if(!res.ok) throw new Error('File not found at ' + targetPath);
+                                return res.text();
+                            })
                             .then(csv => ({ ...r, stops: parseCSV(csv) }))
-                            .catch(() => null);
+                            .catch((err) => {
+                                console.warn(err.message);
+                                return null;
+                            });
                     });
 
                     return Promise.all(promises);
