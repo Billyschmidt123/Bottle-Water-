@@ -111,13 +111,11 @@
             width: 100%;
             overflow-x: auto;
             max-height: 500px;
-            border: 1px solid #ddd;
         }
         .maint-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.85rem;
-            background: white;
         }
         .maint-table th, .maint-table td {
             border: 1px solid #ddd;
@@ -125,7 +123,7 @@
             text-align: left;
             white-space: nowrap;
         }
-        .maint-table th { background: #f8f9fa; position: sticky; top: 0; z-index: 10; }
+        .maint-table th { background: #f8f9fa; position: sticky; top: 0; }
         .edit-row-btn { background: #ffc107; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
 
         .crud-modal {
@@ -154,6 +152,39 @@
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
         .form-group input, .form-group select { width: 100%; padding: 8px; box-sizing: border-box; }
+        
+        .scheduling-section {
+            border-top: 2px solid #eee;
+            margin-top: 20px;
+            padding-top: 15px;
+        }
+        .route-chip {
+            display: inline-flex;
+            align-items: center;
+            background: #e9ecef;
+            padding: 5px 10px;
+            border-radius: 20px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+        }
+        .remove-route {
+            margin-left: 8px;
+            color: #dc3545;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .toggle-view-btn {
+            margin-left: 10px;
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: 1px solid #ccc;
+            background: #fff;
+            cursor: pointer;
+        }
+        .toggle-active { color: #28a745; border-color: #28a745; }
+        .toggle-inactive { color: #dc3545; border-color: #dc3545; }
     </style>
 </head>
 <body>
@@ -174,6 +205,7 @@
             <button id="forceRefreshBtn" class="btn-top" onclick="window.location.reload()">
                 <i class="fas fa-sync-alt"></i> Force Refresh
             </button>
+            <button id="refreshRoutesBtn" class="btn-top"><i class="fas fa-sync"></i> Refresh List</button>
         </div>
     </header>
 
@@ -220,7 +252,7 @@
                 <div class="table-container">
                     <table class="maint-table" id="customerTable">
                         <thead id="custTableHead"></thead>
-                        <tbody id="customerTableBody"></tbody>
+                        <tbody id="custTableBody"></tbody>
                     </table>
                 </div>
                 <button class="close-btn backToMain">Back to Menu</button>
@@ -233,6 +265,31 @@
             <h3 id="modalTitle">File Maintenance</h3>
             <div id="modalFields" class="form-grid"></div>
             
+            <div class="form-grid" style="margin-top:10px;">
+                <div class="form-group">
+                    <label>Purchase Order (PO)</label>
+                    <input type="text" id="modalPO" placeholder="Enter PO Number">
+                </div>
+                <div class="form-group">
+                    <label>Account Status</label>
+                    <select id="modalStatus">
+                        <option value="Active">Active (Visible to Driver)</option>
+                        <option value="Inactive">Inactive (Hidden from Driver)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="scheduling-section" id="modalSchedulingSection">
+                <h4>Scheduling & Route Assignments</h4>
+                <div id="currentRoutesList" style="margin-bottom: 10px;"></div>
+                <div class="form-group" style="max-width: 300px;">
+                    <label>Add to Route</label>
+                    <select id="addToRouteDropdown">
+                        <option value="">-- Choose Route --</option>
+                    </select>
+                </div>
+            </div>
+
             <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;">
                 <button id="saveCrudBtn" class="add-btn" style="padding: 12px 25px;">Save Changes</button>
                 <button id="cancelCrudBtn" class="close-btn" style="margin:0;">Cancel</button>
@@ -246,6 +303,7 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="JS/map.js"></script>
 
     <script>
     (function () {
@@ -272,10 +330,10 @@
 
         async function loadCustomerMaintenance() {
             const head = document.getElementById('custTableHead');
-            const body = document.getElementById('customerTableBody');
+            const body = document.getElementById('custTableBody');
+            const filter = document.getElementById('routeFilter');
+            const routeAddSelect = document.getElementById('addToRouteDropdown');
             masterCustomerData = [];
-            head.innerHTML = "";
-            body.innerHTML = "<tr><td colspan='100%'>Loading Customers...</td></tr>";
             
             try {
                 const res = await fetch(`https://api.github.com/repos/${REPO}/contents/routes`, {
@@ -284,28 +342,35 @@
                 const files = await res.json();
                 const csvFiles = files.filter(f => f.name.endsWith('.csv'));
 
+                while (filter.options.length > 1) filter.remove(1);
+                while (routeAddSelect.options.length > 1) routeAddSelect.remove(1);
+
                 for (let file of csvFiles) {
                     routeFileHashes[file.name] = file.sha;
+                    const opt = document.createElement('option');
+                    opt.value = file.name;
+                    opt.textContent = file.name.replace('.csv', '');
+                    filter.appendChild(opt);
+                    routeAddSelect.appendChild(opt.cloneNode(true));
+
                     const csvRes = await fetch(file.download_url);
                     const text = await csvRes.text();
                     const lines = text.split(/\r?\n/).filter(l => l.trim());
+                    const headers = lines[0].split(',');
                     
-                    if (lines.length > 0) {
-                        const headers = lines[0].split(',').map(h => h.trim());
-                        if (head.innerHTML === "") {
-                            head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${(h === "Purchase Order" || h === "slip / po") ? "Delivery Slip" : h}</th>`).join('')}</tr>`;
-                        }
+                    if (head.innerHTML === "") {
+                        head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                    }
 
-                        for (let i = 1; i < lines.length; i++) {
-                            const values = lines[i].split(',');
-                            const entry = { _route: file.name };
-                            headers.forEach((h, idx) => entry[h] = values[idx] ? values[idx].trim() : "");
-                            masterCustomerData.push(entry);
-                        }
+                    for (let i = 1; i < lines.length; i++) {
+                        const values = lines[i].split(',');
+                        const entry = { _route: file.name };
+                        headers.forEach((h, idx) => entry[h] = values[idx] || "");
+                        masterCustomerData.push(entry);
                     }
                 }
                 renderCustomerTable(masterCustomerData);
-            } catch (e) { body.innerHTML = "<tr><td colspan='100%'>Error loading customers.</td></tr>"; }
+            } catch (e) { console.error("Error hooking up tables", e); }
         }
 
         async function loadProductMaintenance() {
@@ -313,57 +378,47 @@
             const body = document.getElementById('prodTableBody');
             masterProductData = [];
             head.innerHTML = "";
-            body.innerHTML = "<tr><td colspan='100%'>Loading Products...</td></tr>";
             
-            const possibleFolders = ['prodfiles', 'Prodfiles', '']; 
+            // FOLDER FIX: Changed from 'Products' to 'Prodfiles' based on image_94f437.png
             const productFiles = ['Coffee.csv', 'Water.csv'];
             
             try {
                 for (let fileName of productFiles) {
-                    let fileFound = false;
-                    for (let folder of possibleFolders) {
-                        const path = folder ? `${folder}/${fileName}` : fileName;
-                        const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
-                            headers: { 'Authorization': `token ${activeToken}` }
-                        });
-                        
-                        if (res.ok) {
-                            const file = await res.json();
-                            productFileHashes[fileName] = file.sha;
-                            const csvRes = await fetch(file.download_url);
-                            let text = await csvRes.text();
-                            text = text.replace(/^\uFEFF/, '');
-                            
-                            const lines = text.split(/\r?\n/).filter(l => l.trim());
-                            if (lines.length > 0) {
-                                const headers = lines[0].split(',').map(h => h.trim());
-                                const filteredHeaders = headers.filter(h => h !== "Purchase Order" && h !== "Delivery Slip" && h !== "slip / po");
-                                
-                                if (head.innerHTML === "") {
-                                    head.innerHTML = `<tr><th>Edit</th>${filteredHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
-                                }
-                                for (let i = 1; i < lines.length; i++) {
-                                    const values = lines[i].split(',');
-                                    const entry = { _file: fileName, _path: path };
-                                    headers.forEach((h, idx) => {
-                                        if (h !== "Purchase Order" && h !== "Delivery Slip" && h !== "slip / po") {
-                                            entry[h] = values[idx] ? values[idx].trim() : "";
-                                        }
-                                    });
-                                    masterProductData.push(entry);
-                                }
-                            }
-                            fileFound = true;
-                            break;
+                    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/Prodfiles/${fileName}`, {
+                        headers: { 'Authorization': `token ${activeToken}` }
+                    });
+                    
+                    if (!res.ok) continue;
+
+                    const file = await res.json();
+                    productFileHashes[fileName] = file.sha;
+
+                    const csvRes = await fetch(file.download_url);
+                    const text = await csvRes.text();
+                    
+                    // SAFETY: Don't load if it looks like HTML (indicates a 404 page)
+                    if (text.trim().startsWith('<')) continue;
+
+                    const lines = text.split(/\r?\n/).filter(l => l.trim());
+                    if (lines.length > 0) {
+                        const headers = lines[0].split(',');
+                        if (head.innerHTML === "") {
+                            head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                        }
+                        for (let i = 1; i < lines.length; i++) {
+                            const values = lines[i].split(',');
+                            const entry = { _file: fileName };
+                            headers.forEach((h, idx) => entry[h] = values[idx] || "");
+                            masterProductData.push(entry);
                         }
                     }
                 }
                 renderProductTable(masterProductData);
-            } catch (e) { body.innerHTML = "<tr><td colspan='100%'>Error loading products.</td></tr>"; }
+            } catch (e) { console.error("Error loading products", e); }
         }
 
         function renderCustomerTable(data) {
-            const body = document.getElementById('customerTableBody');
+            const body = document.getElementById('custTableBody');
             body.innerHTML = data.map((row, idx) => `
                 <tr>
                     <td><button class="edit-row-btn" onclick="openCrudModal(${idx}, 'customer')"><i class="fas fa-edit"></i></button></td>
@@ -377,10 +432,20 @@
             body.innerHTML = data.map((row, idx) => `
                 <tr>
                     <td><button class="edit-row-btn" onclick="openCrudModal(${idx}, 'product')"><i class="fas fa-edit"></i></button></td>
-                    ${Object.keys(row).filter(k => k !== '_file' && k !== '_path').map(k => `<td>${row[k]}</td>`).join('')}
+                    ${Object.keys(row).filter(k => k !== '_file').map(k => `<td>${row[k]}</td>`).join('')}
                 </tr>
             `).join('');
         }
+
+        window.toggleRouteView = function(btn) {
+            if (btn.innerText === "Deactivate") {
+                btn.innerText = "Activate";
+                btn.className = "toggle-view-btn toggle-inactive";
+            } else {
+                btn.innerText = "Deactivate";
+                btn.className = "toggle-view-btn toggle-active";
+            }
+        };
 
         window.openCrudModal = function(index, type) {
             currentEditIndex = index;
@@ -388,28 +453,43 @@
             const data = (type === 'customer') ? masterCustomerData[index] : masterProductData[index];
             const modal = document.getElementById('crudModal');
             const fields = document.getElementById('modalFields');
+            const routeList = document.getElementById('currentRoutesList');
+            const schedSection = document.getElementById('modalSchedulingSection');
             
             document.getElementById('modalTitle').innerText = (type === 'customer') ? 'Customer File Maintenance' : 'Product File Maintenance';
             
-            fields.innerHTML = Object.keys(data)
-                .filter(k => k !== '_route' && k !== '_file' && k !== '_path')
-                .filter(k => type === 'customer' || (k !== "Purchase Order" && k !== "Delivery Slip" && k !== "slip / po"))
-                .map(k => `
+            fields.innerHTML = Object.keys(data).filter(k => k !== '_route' && k !== '_file').map(k => `
                 <div class="form-group">
-                    <label>${(k === "Purchase Order" || k === "slip / po") ? "Delivery Slip" : k}</label>
-                    <input type="text" value="${data[k]}" data-key="${k}">
+                    <label>${k}</label>
+                    <input type="text" value="${data[k]}" data-key="${k}" id="field_${k}">
                 </div>
             `).join('');
+            
+            if (type === 'customer') {
+                schedSection.style.display = 'block';
+                routeList.innerHTML = `
+                    <div class="route-chip">
+                        ${data._route} 
+                        <button class="toggle-view-btn toggle-active" onclick="toggleRouteView(this)">Deactivate</button>
+                        <span class="remove-route" onclick="removeRouteFromCust('${data._route}')">×</span>
+                    </div>`;
+            } else {
+                schedSection.style.display = 'none';
+            }
+            
             modal.style.display = 'flex';
         };
 
         document.getElementById('saveCrudBtn').addEventListener('click', async () => {
+            if (currentEditIndex === null) return;
             const btn = document.getElementById('saveCrudBtn');
-            btn.innerText = "Saving..."; btn.disabled = true;
+            btn.innerText = "Saving...";
+            btn.disabled = true;
 
             const originalData = (currentEditType === 'customer') ? masterCustomerData[currentEditIndex] : masterProductData[currentEditIndex];
             const fileName = (currentEditType === 'customer') ? originalData._route : originalData._file;
-            const folderPath = (currentEditType === 'customer') ? `routes/${fileName}` : originalData._path;
+            // FOLDER FIX: Changed from 'Products' to 'Prodfiles' based on image_94f437.png
+            const folder = (currentEditType === 'customer') ? 'routes' : 'Prodfiles';
             const hash = (currentEditType === 'customer') ? routeFileHashes[fileName] : productFileHashes[fileName];
             
             const updatedEntry = { ...originalData };
@@ -421,26 +501,76 @@
                 ? masterCustomerData.filter(c => c._route === fileName)
                 : masterProductData.filter(p => p._file === fileName);
 
-            const entryIndex = fileData.findIndex(c => JSON.stringify(c) === JSON.stringify(originalData));
-            if (entryIndex !== -1) fileData[entryIndex] = updatedEntry;
+            const entryIndexInFile = fileData.findIndex(c => JSON.stringify(c) === JSON.stringify(originalData));
+            if (entryIndexInFile !== -1) fileData[entryIndexInFile] = updatedEntry;
 
-            const headers = Object.keys(updatedEntry).filter(k => k !== '_route' && k !== '_file' && k !== '_path');
-            const csvContent = headers.join(',') + '\n' + fileData.map(row => headers.map(h => row[h]).join(',')).join('\n');
+            const headers = Object.keys(updatedEntry).filter(k => k !== '_route' && k !== '_file');
+            const csvContent = headers.join(',') + '\n' + 
+                fileData.map(row => headers.map(h => row[h]).join(',')).join('\n');
 
             try {
-                const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${folderPath}`, {
+                const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${folder}/${fileName}`, {
                     method: 'PUT',
-                    headers: { 'Authorization': `token ${activeToken}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: `Update ${currentEditType}`, content: btoa(csvContent), sha: hash })
+                    headers: { 
+                        'Authorization': `token ${activeToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: `Update ${currentEditType} in ${fileName}`,
+                        content: btoa(csvContent),
+                        sha: hash
+                    })
                 });
-                if (res.ok) { alert("Saved."); document.getElementById('crudModal').style.display = 'none'; location.reload(); }
-            } catch (err) { alert("Save failed."); }
-            btn.innerText = "Save Changes"; btn.disabled = false;
+
+                if (res.ok) {
+                    alert("Information Saved Successfully.");
+                    document.getElementById('crudModal').style.display = 'none';
+                    if (currentEditType === 'customer') loadCustomerMaintenance(); else loadProductMaintenance();
+                } else { alert("Failed to save. Check permissions."); }
+            } catch (err) { alert("Error connecting to GitHub."); }
+            
+            btn.innerText = "Save Changes";
+            btn.disabled = false;
         });
 
-        document.getElementById('cancelCrudBtn').addEventListener('click', () => { document.getElementById('crudModal').style.display = 'none'; });
-        document.getElementById('openManagerBtn').addEventListener('click', () => { document.getElementById('managerOverlay').style.display = 'flex'; });
-        document.getElementById('closeManagerBtn').addEventListener('click', () => { document.getElementById('managerOverlay').style.display = 'none'; });
+        document.getElementById('custSearch').addEventListener('input', (e) => {
+            const val = e.target.value.toLowerCase();
+            const filtered = masterCustomerData.filter(c => 
+                Object.values(c).some(v => v.toLowerCase().includes(val))
+            );
+            renderCustomerTable(filtered);
+        });
+
+        document.getElementById('prodSearch').addEventListener('input', (e) => {
+            const val = e.target.value.toLowerCase();
+            const filtered = masterProductData.filter(p => 
+                Object.values(p).some(v => v.toLowerCase().includes(val))
+            );
+            renderProductTable(filtered);
+        });
+
+        document.getElementById('routeFilter').addEventListener('change', (e) => {
+            const val = e.target.value;
+            const filtered = val === 'all' ? masterCustomerData : masterCustomerData.filter(c => c._route === val);
+            renderCustomerTable(filtered);
+        });
+
+        document.getElementById('productCategoryFilter').addEventListener('change', (e) => {
+            const val = e.target.value;
+            const filtered = val === 'all' ? masterProductData : masterProductData.filter(p => p._file === val);
+            renderProductTable(filtered);
+        });
+
+        document.getElementById('cancelCrudBtn').addEventListener('click', () => {
+            document.getElementById('crudModal').style.display = 'none';
+        });
+
+        document.getElementById('openManagerBtn').addEventListener('click', () => {
+            document.getElementById('managerOverlay').style.display = 'flex';
+        });
+        document.getElementById('closeManagerBtn').addEventListener('click', () => {
+            document.getElementById('managerOverlay').style.display = 'none';
+        });
         document.getElementById('custMaintBtn').addEventListener('click', () => {
             document.getElementById('managerGrid').style.display = 'none';
             document.getElementById('customerPane').classList.add('active-pane');
@@ -457,6 +587,38 @@
                 document.getElementById('managerGrid').style.display = 'block';
             });
         });
+
+        async function autoSyncRoutes() {
+            const dropdown = document.getElementById('routeDropdownMap');
+            const url = `https://api.github.com/repos/${REPO}/contents/routes`;
+            try {
+                const res = await fetch(url, { headers: { 'Authorization': `token ${activeToken}` } });
+                if (res.ok) {
+                    const files = await res.json();
+                    const csvFiles = files.filter(f => f.name.endsWith('.csv'));
+                    while (dropdown.options.length > 1) dropdown.remove(1);
+                    csvFiles.forEach(f => {
+                        const opt = document.createElement('option');
+                        opt.value = f.name;
+                        opt.textContent = f.name.replace('.csv', '');
+                        dropdown.appendChild(opt);
+                    });
+                }
+            } catch (e) { setTimeout(autoSyncRoutes, 5000); }
+        }
+
+        let refreshAttempts = 0;
+        function tryMapRefresh() {
+            if (window.map && typeof window.map.invalidateSize === 'function') {
+                window.map.invalidateSize();
+            } else if (refreshAttempts < 10) {
+                refreshAttempts++;
+                setTimeout(tryMapRefresh, 500);
+            }
+        }
+
+        autoSyncRoutes().catch(() => {});
+        window.addEventListener('load', tryMapRefresh);
     })();
     </script>
 </body>
