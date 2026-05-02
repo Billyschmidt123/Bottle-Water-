@@ -144,15 +144,11 @@
             const itemDiv = document.createElement('div');
             itemDiv.className = 'basket-item';
             
-            const allHeaders = masterProductData.length > 0 ? Object.keys(masterProductData[0]) : [];
-            const nameHeader = allHeaders.find(h => h.toLowerCase() === 'item') || 
-                               allHeaders.find(h => h.toLowerCase() === 'product') || 
-                               allHeaders[0] || 'Item';
-            
-            let options = masterProductData.map(p => `<option value="${p[nameHeader]}">${p[nameHeader]}</option>`).join('');
+            // Strictly pull from "Item" column as per CSV structure
+            let options = masterProductData.map(p => `<option value="${p['Item']}">${p['Item']}</option>`).join('');
             
             itemDiv.innerHTML = `
-                <select class="p-sel" style="flex:2"><option value="">Select ${nameHeader}...</option>${options}</select>
+                <select class="p-sel" style="flex:2"><option value="">Select Item...</option>${options}</select>
                 <select class="u-sel" style="flex:1"><option value="">Unit</option></select>
                 <input type="number" class="q-inp" placeholder="Qty" style="width:50px;">
                 <button onclick="this.parentElement.remove()" style="color:red; background:none; border:none; cursor:pointer;">X</button>
@@ -162,10 +158,13 @@
             const uSel = itemDiv.querySelector('.u-sel');
             
             pSel.onchange = (e) => {
-                const found = masterProductData.find(p => p[nameHeader] === e.target.value);
+                const found = masterProductData.find(p => p['Item'] === e.target.value);
                 uSel.innerHTML = '<option value="">Unit</option>';
-                ['Box', 'Case', 'Slieve', 'Bottle', 'BOX', 'CASE', 'SLIEVE', 'BOTTLE'].forEach(u => {
-                    if (found && found[u] && found[u].trim() !== "") uSel.innerHTML += `<option value="${u}">${u}</option>`;
+                // Check all possible unit and price columns from your CSV
+                ['Case', 'Box', 'Sleeve', 'bottle', 'Slieve'].forEach(u => {
+                    if (found && found[u] && found[u].trim() !== "" && found[u].trim().toLowerCase() !== "na") {
+                        uSel.innerHTML += `<option value="${u}">${u}</option>`;
+                    }
                 });
             };
             container.appendChild(itemDiv);
