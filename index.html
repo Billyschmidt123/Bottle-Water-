@@ -219,7 +219,7 @@
             let data = (type === 'customer') ? masterCustomerData[index] : masterProductData[index];
             const fields = document.getElementById('modalFields');
             
-            // Build the HTML for the fields
+            // Build HTML
             fields.innerHTML = Object.keys(data).filter(k => !k.startsWith('_')).map(k => `
                 <div class="form-group">
                     <label>${(k.toLowerCase().includes('slip') || k.toLowerCase().includes('po')) ? 'Delivery Slip' : k}</label>
@@ -227,14 +227,21 @@
                 </div>
             `).join('');
 
-            // ADDITIVE FIX START: Explicitly set values after HTML generation to ensure display
+            // ADDITIVE FIX START: Handle Undefined by stripping whitespace/quotes and checking live DOM
             const inputs = fields.querySelectorAll('input');
             inputs.forEach(input => {
                 const key = input.getAttribute('data-key');
-                if (data[key] !== undefined) {
-                    input.setAttribute('value', data[key]); // Sets the attribute
-                    input.value = data[key];               // Sets the live DOM property
+                let val = data[key];
+                
+                // If the direct key is undefined, search for a matching key regardless of formatting
+                if (val === undefined || val === "undefined") {
+                    const cleanKey = key.replace(/["\s]/g, '').toLowerCase();
+                    const realKey = Object.keys(data).find(k => k.replace(/["\s]/g, '').toLowerCase() === cleanKey);
+                    val = realKey ? data[realKey] : "";
                 }
+
+                input.setAttribute('value', val); 
+                input.value = val;               
             });
             // ADDITIVE FIX END
 
