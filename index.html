@@ -265,11 +265,7 @@
             <h3 id="modalTitle">File Maintenance</h3>
             <div id="modalFields" class="form-grid"></div>
             
-            <div class="form-grid" style="margin-top:10px;">
-                <div class="form-group">
-                    <label>Purchase Order (PO)</label>
-                    <input type="text" id="modalPO" placeholder="Enter PO Number">
-                </div>
+            <div class="form-grid" id="statusGroup" style="margin-top:10px;">
                 <div class="form-group">
                     <label>Account Status</label>
                     <select id="modalStatus">
@@ -359,7 +355,7 @@
                     const headers = lines[0].split(',');
                     
                     if (head.innerHTML === "") {
-                        head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                        head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${h === "Purchase Order" ? "Delivery Slip" : h}</th>`).join('')}</tr>`;
                     }
 
                     for (let i = 1; i < lines.length; i++) {
@@ -379,7 +375,6 @@
             masterProductData = [];
             head.innerHTML = "";
             
-            // FOLDER FIX: Changed from 'Products' to 'Prodfiles' based on image_94f437.png
             const productFiles = ['Coffee.csv', 'Water.csv'];
             
             try {
@@ -396,19 +391,24 @@
                     const csvRes = await fetch(file.download_url);
                     const text = await csvRes.text();
                     
-                    // SAFETY: Don't load if it looks like HTML (indicates a 404 page)
                     if (text.trim().startsWith('<')) continue;
 
                     const lines = text.split(/\r?\n/).filter(l => l.trim());
                     if (lines.length > 0) {
                         const headers = lines[0].split(',');
                         if (head.innerHTML === "") {
-                            head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                            // Filter out PO/Slip from product maintenance table headers
+                            const filteredHeaders = headers.filter(h => h !== "Purchase Order" && h !== "Delivery Slip");
+                            head.innerHTML = `<tr><th>Edit</th>${filteredHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
                         }
                         for (let i = 1; i < lines.length; i++) {
                             const values = lines[i].split(',');
                             const entry = { _file: fileName };
-                            headers.forEach((h, idx) => entry[h] = values[idx] || "");
+                            headers.forEach((h, idx) => {
+                                if (h !== "Purchase Order" && h !== "Delivery Slip") {
+                                    entry[h] = values[idx] || "";
+                                }
+                            });
                             masterProductData.push(entry);
                         }
                     }
@@ -458,9 +458,12 @@
             
             document.getElementById('modalTitle').innerText = (type === 'customer') ? 'Customer File Maintenance' : 'Product File Maintenance';
             
-            fields.innerHTML = Object.keys(data).filter(k => k !== '_route' && k !== '_file').map(k => `
+            fields.innerHTML = Object.keys(data)
+                .filter(k => k !== '_route' && k !== '_file')
+                .filter(k => type === 'customer' || (k !== "Purchase Order" && k !== "Delivery Slip")) // Hide PO/Slip in Product Modal
+                .map(k => `
                 <div class="form-group">
-                    <label>${k}</label>
+                    <label>${k === "Purchase Order" ? "Delivery Slip" : k}</label>
                     <input type="text" value="${data[k]}" data-key="${k}" id="field_${k}">
                 </div>
             `).join('');
@@ -477,6 +480,9 @@
                 schedSection.style.display = 'none';
             }
             
+            const statusSelect = document.getElementById('modalStatus');
+            if (statusSelect) statusSelect.value = data['Status'] || data['Account Status'] || "Active";
+
             modal.style.display = 'flex';
         };
 
@@ -488,7 +494,6 @@
 
             const originalData = (currentEditType === 'customer') ? masterCustomerData[currentEditIndex] : masterProductData[currentEditIndex];
             const fileName = (currentEditType === 'customer') ? originalData._route : originalData._file;
-            // FOLDER FIX: Changed from 'Products' to 'Prodfiles' based on image_94f437.png
             const folder = (currentEditType === 'customer') ? 'routes' : 'Prodfiles';
             const hash = (currentEditType === 'customer') ? routeFileHashes[fileName] : productFileHashes[fileName];
             
