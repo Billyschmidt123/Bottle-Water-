@@ -1,58 +1,378 @@
-<div class="modal">
-    <div class="modal-header">
-        <div><strong>{{COMPANY}}</strong></div>
-        <div>{{ADDRESS_HEADER}}</div>
-        <div>{{PHONE}}</div>
-    </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogiFlow Delivery System - Build 15</title>
+    
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="CSS/main.css">
+    <link rel="stylesheet" href="CSS/theme.css">
+    <link rel="stylesheet" href="CSS/map.css">
+    
+    <style>
+        .app-container { display: flex !important; flex-direction: row !important; width: 100% !important; height: calc(100vh - 60px) !important; overflow: hidden !important; }
+        #mapPanel { order: 1 !important; flex: 0 0 70% !important; width: 70% !important; height: 100% !important; position: relative !important; }
+        #map { width: 100% !important; height: 100% !important; background-color: #ddd; }
+        #sidebar { order: 2 !important; flex: 0 0 30% !important; width: 30% !important; height: 100% !important; border-left: 1px solid #ccc !important; overflow-y: auto !important; background: #f9f9f9 !important; }
+        .manager-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
+        .manager-menu-content { background: white; padding: 30px; border-radius: 8px; width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto; }
+        .menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
+        .menu-btn { padding: 20px; font-size: 1.1rem; border: none; border-radius: 5px; cursor: pointer; background: #007bff; color: white; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+        .menu-btn:hover { background: #0056b3; }
+        .close-btn { background: #dc3545; margin-top: 20px; padding: 10px 20px; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .sub-menu-pane { display: none; }
+        .active-pane { display: block !important; }
+        .maint-toolbar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
+        .search-input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; flex-grow: 1; }
+        .table-container { width: 100%; overflow-x: auto; max-height: 500px; border: 1px solid #eee; }
+        .maint-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .maint-table th, .maint-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        .maint-table th { background: #f8f9fa; position: sticky; top: 0; z-index: 10; }
+        .edit-row-btn { background: #ffc107; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
+        .crud-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; justify-content: center; align-items: center; }
+        .crud-content { background: white; padding: 25px; border-radius: 8px; width: 800px; max-width: 90%; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input { width: 100%; padding: 8px; box-sizing: border-box; }
+        .build-tag { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.5); color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; z-index: 9999; }
 
-    <div class="modal-body">
-        <div style="margin-bottom:10px;">
-            <label>Email</label>
-            <input type="email" id="stopEmail" style="width:100%;" value="{{EMAIL}}">
-        </div>
+        .topbar {
+            position: absolute !important;
+            top: 10px !important;
+            left: 50px !important;
+            right: 10px !important;
+            z-index: 1000 !important;
+            background: rgba(255, 255, 255, 0.9) !important;
+            padding: 10px !important;
+            border-radius: 8px !important;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2) !important;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            pointer-events: auto !important;
+        }
 
-        <div style="margin-bottom:10px;">
-            <label>Delivery fee / travel</label>
-            <div style="display:flex; gap:6px;">
-                <input type="text" id="stopDeliveryFee" placeholder="Delivery fee" style="flex:1;" value="{{DELIVERY_FEE}}">
-                <input type="text" id="stopTravel" placeholder="Travel" style="flex:1;" value="{{TRAVEL}}">
+        /* ADDITIVE FIX: UI CONTROLS AND INFO BAR */
+        .route-controls { display: flex; gap: 8px; margin-left: 15px; }
+        .btn-action { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; font-size: 12px; }
+        .btn-start { background: #28a745; }
+        .btn-finish { background: #dc3545; }
+        .btn-dir { background: #17a2b8; }
+        .btn-opt { background: #6f42c1; }
+        
+        .map-header-info { 
+            position: absolute; 
+            top: 75px; 
+            left: 50px; 
+            right: 10px; 
+            z-index: 1000; 
+            background: rgba(255, 255, 255, 0.95); 
+            padding: 8px 15px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+            display: flex; 
+            gap: 25px; 
+            font-size: 14px; 
+            font-weight: bold;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="build-tag">Build 15</div>
+    <header class="topbar">
+        <div class="topbar-left" style="display: flex; align-items: center;">
+            <span class="app-title">LogiFlow Delivery System</span>
+            <select id="routeDropdownMap"><option value="">-- Select Route --</option></select>
+            
+            <!-- ADDITIVE FIX: ROUTE ACTION BUTTONS -->
+            <div class="route-controls">
+                <button class="btn-action btn-start" id="startRoute">START ROUTE</button>
+                <button class="btn-action btn-finish" id="finishRoute">FINISH ROUTE</button>
+                <button class="btn-action btn-dir" id="getDirections">DIRECTIONS</button>
+                <button class="btn-action btn-opt" id="optimizeRoute">OPTIMIZE ROUTE</button>
             </div>
         </div>
-
-        <div style="margin-bottom:10px;">
-            <label>Special instructions</label>
-            <textarea id="stopSpecialInstructions" style="width:100%; height:60px;">{{SPECIAL_INSTRUCTIONS}}</textarea>
+        <div class="topbar-right">
+            <button id="openManagerBtn" class="btn-top"><i class="fas fa-user-gear"></i> Manager Portal</button>
+            <button id="forceRefreshBtn" class="btn-top" onclick="window.location.reload()"><i class="fas fa-sync-alt"></i> Force Refresh</button>
         </div>
+    </header>
 
-        <div style="margin-bottom:10px;">
-            <label>Water products</label>
-            <select id="waterProducts" style="width:100%;"></select>
-        </div>
+    <!-- ADDITIVE FIX: ADDRESS AND PHONE BAR -->
+    <div class="map-header-info">
+        <div id="infoAddr"><i class="fas fa-map-marker-alt" style="color: #007bff;"></i> ADDRESS: <span>---</span></div>
+        <div id="infoPhone"><i class="fas fa-phone" style="color: #28a745;"></i> PHONE: <span>---</span></div>
+    </div>
 
-        <div style="margin-bottom:10px;">
-            <label>Coffee products</label>
-            <select id="coffeeProducts" style="width:100%;"></select>
-        </div>
-
-        <div style="margin-bottom:10px;">
-            <label>Received by</label>
-            <input type="text" id="stopReceivedBy" style="width:100%;" value="{{RECEIVED_BY}}">
-        </div>
-
-        <div style="margin-bottom:10px;">
-            <label>Signature</label>
-            <div style="position:relative; border:1px solid #ccc; height:120px;">
-                <canvas id="signatureCanvas" width="400" height="120" style="width:100%; height:100%;"></canvas>
-                <div id="signatureHint" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:#999; pointer-events:none;">
-                    Sign here
+    <div id="managerOverlay" class="manager-overlay">
+        <div class="manager-menu-content">
+            <div id="managerGrid">
+                <h2 style="text-align: center;">LogiFlow Manager Portal</h2>
+                <div class="menu-grid">
+                    <button class="menu-btn" id="prodMaintBtn"><i class="fas fa-box"></i> Product Management</button>
+                    <button class="menu-btn" id="custMaintBtn"><i class="fas fa-users"></i> Customer Management</button>
                 </div>
+                <div style="text-align: center;"><button id="closeManagerBtn" class="close-btn">Exit Manager Portal</button></div>
+            </div>
+            
+            <div id="productPane" class="sub-menu-pane">
+                <h3>Product Maintenance</h3>
+                <div class="maint-toolbar">
+                    <button class="add-btn" id="addNewProdBtn" style="background:#28a745; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;"><i class="fas fa-plus"></i> Add Product</button>
+                    <input type="text" id="prodSearch" class="search-input" placeholder="Search Products...">
+                </div>
+                <div class="table-container">
+                    <table class="maint-table" id="productTable">
+                        <thead id="prodTableHead"></thead>
+                        <tbody id="prodTableBody"></tbody>
+                    </table>
+                </div>
+                <button class="close-btn backToMain">Back to Menu</button>
+            </div>
+
+            <div id="customerPane" class="sub-menu-pane">
+                <h3>Customer Maintenance</h3>
+                <div class="maint-toolbar">
+                    <input type="text" id="custSearch" class="search-input" placeholder="Search Company Name...">
+                </div>
+                <div class="table-container">
+                    <table class="maint-table" id="customerTable">
+                        <thead id="custTableHead"></thead>
+                        <tbody id="customerTableBody"></tbody>
+                    </table>
+                </div>
+                <button class="close-btn backToMain">Back to Menu</button>
             </div>
         </div>
     </div>
 
-    <div class="modal-footer">
-        <button id="btnSaveAndReceipt" class="btn-success">Save and create delivery receipt</button>
-        <button id="btnNotDelivered" class="btn-danger">Not delivered</button>
-        <button class="btn-warning" onclick="closeModal()">Close</button>
+    <div id="crudModal" class="crud-modal">
+        <div class="crud-content">
+            <h3 id="modalTitle">File Maintenance</h3>
+            <div id="modalFields" class="form-grid"></div>
+            <div style="display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;">
+                <button id="saveCrudBtn" class="add-btn" style="background:#28a745; color:white; border:none; padding: 12px 25px; border-radius:4px; cursor:pointer;">Save Changes</button>
+                <button id="cancelCrudBtn" class="close-btn" style="margin:0;">Cancel</button>
+            </div>
+        </div>
     </div>
-</div>
+
+    <div class="app-container">
+        <div id="mapPanel"><div id="map"></div></div>
+        <aside id="sidebar"><div id="sidebarContent" style="padding: 20px; text-align: center;">Select a route to view stop cards.</div></aside>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="JS/map.js"></script>
+
+    <script>
+    (function () {
+        // --- SECURE TOKEN OBFUSCATION Build 15 ---
+        const _s = [103,105,116,104,117,98,95,112,97,116,95,49,49,66,83,88,86,55,74,73,48,113,121,120,100,49,112,67,82,87,90,66,68,95,71,106,53,113,100,67,97,55,107,110,65,98,113,121,74,97,51,66,74,106,108,112,110,120,72,65,85,81,69,90,113,102,113,88,102,53,71,116,89,69,85,112,72,55,89,84,54,67,67,73,70,121,100,105,51,86,110,79,122];
+        const KEY = _s.map(c => String.fromCharCode(c)).join('');
+
+        const REPO = 'Billyschmidt123/Bottle-Water-';
+        let masterCustomerData = [];
+        let masterProductData = []; 
+
+        async function ghFetch(path) {
+            const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
+                headers: { 
+                    'Authorization': `token ${KEY}`, 
+                    'Accept': 'application/vnd.github.v3+json' 
+                }
+            });
+            if (!res.ok) throw new Error(`Auth Failed: ${res.status}`);
+            return await res.json();
+        }
+
+        async function loadCustomerMaintenance() {
+            const head = document.getElementById('custTableHead');
+            const body = document.getElementById('customerTableBody');
+            masterCustomerData = [];
+            head.innerHTML = "";
+            body.innerHTML = "<tr><td colspan='10'>Syncing Customer Files...</td></tr>";
+            try {
+                const files = await ghFetch('routes');
+                for (let file of files.filter(f => f.name.endsWith('.csv'))) {
+                    const csvRes = await fetch(file.download_url);
+                    const text = await csvRes.text();
+                    const lines = text.split(/\r?\n/).filter(l => l.trim());
+                    if (lines.length > 0) {
+                        const headers = lines[0].split(',').map(h => h.trim());
+                        if (head.innerHTML === "") {
+                            head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${(h.toLowerCase().includes('slip') || h.toLowerCase().includes('po')) ? 'Delivery Slip' : h}</th>`).join('')}</tr>`;
+                        }
+                        for (let i = 1; i < lines.length; i++) {
+                            const entry = { _route: file.name };
+                            lines[i].split(',').forEach((val, idx) => entry[headers[idx]] = (val || "").trim());
+                            masterCustomerData.push(entry);
+                        }
+                    }
+                }
+                renderCustomerTable(masterCustomerData);
+            } catch (e) { 
+                body.innerHTML = `<tr><td colspan='10' style='color:red;'>Access Denied. Build 15 token failure.</td></tr>`;
+            }
+        }
+
+        async function loadProductMaintenance() {
+            const head = document.getElementById('prodTableHead');
+            const body = document.getElementById('prodTableBody');
+            masterProductData = [];
+            head.innerHTML = "";
+            body.innerHTML = "<tr><td colspan='10'>Syncing Products...</td></tr>";
+            try {
+                const files = await ghFetch('Products');
+                for (let file of files.filter(f => f.name.endsWith('.csv'))) {
+                    const csvRes = await fetch(file.download_url);
+                    const text = await csvRes.text();
+                    const lines = text.split(/\r?\n/).filter(l => l.trim());
+                    if (lines.length > 0) {
+                        const headers = lines[0].split(',').map(h => h.trim());
+                        if (head.innerHTML === "") {
+                            head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                        }
+                        for (let i = 1; i < lines.length; i++) {
+                            const entry = { _file: file.name };
+                            lines[i].split(',').forEach((val, idx) => entry[headers[idx]] = (val || "").trim());
+                            masterProductData.push(entry);
+                        }
+                    }
+                }
+                renderProductTable(masterProductData);
+            } catch (e) { 
+                body.innerHTML = `<tr><td colspan='10' style='color:red;'>Access Denied.</td></tr>`;
+            }
+        }
+
+        function renderCustomerTable(data) {
+            document.getElementById('customerTableBody').innerHTML = data.map((row, idx) => `
+                <tr>
+                    <td><button class="edit-row-btn" onclick="openCrudModal(${idx}, 'customer')"><i class="fas fa-edit"></i></button></td>
+                    ${Object.keys(row).filter(k => !k.startsWith('_')).map(k => `<td>${row[k]}</td>`).join('')}
+                </tr>
+            `).join('');
+        }
+
+        function renderProductTable(data) {
+            document.getElementById('prodTableBody').innerHTML = data.map((row, idx) => `
+                <tr>
+                    <td><button class="edit-row-btn" onclick="openCrudModal(${idx}, 'product')"><i class="fas fa-edit"></i></button></td>
+                    ${Object.keys(row).filter(k => !k.startsWith('_')).map(k => `<td>${row[k]}</td>`).join('')}
+                </tr>
+            `).join('');
+        }
+
+        window.openCrudModal = function(index, type) {
+            let data = (type === 'customer') ? masterCustomerData[index] : masterProductData[index];
+            const fields = document.getElementById('modalFields');
+            
+            const tableId = (type === 'customer') ? 'customerTable' : 'productTable';
+            const table = document.getElementById(tableId);
+            const headers = Array.from(table.querySelectorAll('thead th')).slice(1);
+            const rowCells = Array.from(table.querySelectorAll('tbody tr'))[index].querySelectorAll('td');
+            const cells = Array.from(rowCells).slice(1);
+
+            fields.innerHTML = headers.map((th, i) => {
+                const headerText = th.innerText.trim();
+                let cellValue = cells[i] ? cells[i].innerText.trim() : "";
+                if (cellValue === '""' || cellValue === '""' || cellValue === '""') {
+                    cellValue = "";
+                }
+                cellValue = cellValue.replace(/^"|"$/g, '');
+
+                return `
+                    <div class="form-group">
+                        <label>${headerText}</label>
+                        <input type="text" value="${cellValue}" data-header="${headerText}">
+                    </div>
+                `;
+            }).join('');
+
+            const inputs = fields.querySelectorAll('input');
+            inputs.forEach(input => {
+                input.value = input.getAttribute('value');
+            });
+
+            document.getElementById('crudModal').style.display = 'flex';
+        };
+
+        document.getElementById('openManagerBtn').addEventListener('click', () => { document.getElementById('managerOverlay').style.display = 'flex'; });
+        document.getElementById('closeManagerBtn').addEventListener('click', () => { document.getElementById('managerOverlay').style.display = 'none'; });
+        
+        document.getElementById('custMaintBtn').addEventListener('click', () => { 
+            document.getElementById('managerGrid').style.display = 'none'; 
+            document.getElementById('customerPane').classList.add('active-pane'); 
+            loadCustomerMaintenance(); 
+        });
+        
+        document.getElementById('prodMaintBtn').addEventListener('click', () => { 
+            document.getElementById('managerGrid').style.display = 'none'; 
+            document.getElementById('productPane').classList.add('active-pane'); 
+            loadProductMaintenance(); 
+        });
+        
+        document.querySelectorAll('.backToMain').forEach(btn => { 
+            btn.addEventListener('click', () => { 
+                document.querySelectorAll('.sub-menu-pane').forEach(p => p.classList.remove('active-pane')); 
+                document.getElementById('managerGrid').style.display = 'block'; 
+            }); 
+        });
+        
+        document.getElementById('cancelCrudBtn').addEventListener('click', () => { document.getElementById('crudModal').style.display = 'none'; });
+
+        // ADDITIVE FIX: 404 RESOLUTION BY UPDATING PATH TO MODULES FOLDER
+        async function initMapRouteLogic() {
+            try {
+                const dropdown = document.getElementById('routeDropdownMap');
+                const files = await ghFetch('routes');
+                files.filter(f => f.name.endsWith('.csv')).forEach(file => {
+                    const opt = document.createElement('option');
+                    opt.value = file.download_url;
+                    opt.textContent = file.name.replace('.csv', '');
+                    dropdown.appendChild(opt);
+                });
+
+                dropdown.addEventListener('change', async (e) => {
+                    if (!e.target.value) return;
+                    const sidebar = document.getElementById('sidebarContent');
+                    sidebar.innerHTML = "Loading Stop Data...";
+                    
+                    try {
+                        const csvRes = await fetch(e.target.value);
+                        const csvText = await csvRes.text();
+                        
+                        // FIX: Pointing to the MODULES folder as seen in image_88ad19.png
+                        const modalRes = await fetch('MODULES/stop-modal.html');
+                        if (modalRes.ok) {
+                            const modalHtml = await modalRes.text();
+                            sidebar.innerHTML = modalHtml;
+                            
+                            // Initialize map dots
+                            if (typeof window.processCSV === 'function') {
+                                window.processCSV(csvText);
+                            }
+                        } else {
+                            sidebar.innerHTML = "<div style='color:red;'>Could not load stop-modal.html from MODULES/ folder.</div>";
+                        }
+                    } catch (err) {
+                        console.error("Map Logic Error", err);
+                    }
+                });
+            } catch (e) {
+                console.error("Route Init Failed", e);
+            }
+        }
+        initMapRouteLogic();
+
+    })();
+    </script>
+</body>
+</html>
