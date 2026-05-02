@@ -41,7 +41,6 @@
         .form-group input { width: 100%; padding: 8px; box-sizing: border-box; }
         .build-tag { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.5); color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; z-index: 9999; }
 
-        /* ADDITIVE FIX: RESTORE BUTTONS TO TOP OF MAP */
         .topbar {
             position: absolute !important;
             top: 10px !important;
@@ -236,21 +235,19 @@
             let data = (type === 'customer') ? masterCustomerData[index] : masterProductData[index];
             const fields = document.getElementById('modalFields');
             
-            // FIX START: Map table headers directly to cell data to ensure 1:1 match
             const tableId = (type === 'customer') ? 'customerTable' : 'productTable';
             const table = document.getElementById(tableId);
-            const headers = Array.from(table.querySelectorAll('thead th')).slice(1); // Skip 'Edit'
+            const headers = Array.from(table.querySelectorAll('thead th')).slice(1);
             const rowCells = Array.from(table.querySelectorAll('tbody tr'))[index].querySelectorAll('td');
-            const cells = Array.from(rowCells).slice(1); // Skip Edit button cell
+            const cells = Array.from(rowCells).slice(1);
 
             fields.innerHTML = headers.map((th, i) => {
                 const headerText = th.innerText.trim();
-                // CLEANUP ADDITION: Strip literal quotes and ensure empty strings aren't shown as placeholders
                 let cellValue = cells[i] ? cells[i].innerText.trim() : "";
                 if (cellValue === '""' || cellValue === '""' || cellValue === '""') {
                     cellValue = "";
                 }
-                cellValue = cellValue.replace(/^"|"$/g, ''); // Removes leading/trailing quotes
+                cellValue = cellValue.replace(/^"|"$/g, '');
 
                 return `
                     <div class="form-group">
@@ -260,17 +257,14 @@
                 `;
             }).join('');
 
-            // Force DOM values to update
             const inputs = fields.querySelectorAll('input');
             inputs.forEach(input => {
                 input.value = input.getAttribute('value');
             });
-            // FIX END
 
             document.getElementById('crudModal').style.display = 'flex';
         };
 
-        // UI Event Listeners
         document.getElementById('openManagerBtn').addEventListener('click', () => { document.getElementById('managerOverlay').style.display = 'flex'; });
         document.getElementById('closeManagerBtn').addEventListener('click', () => { document.getElementById('managerOverlay').style.display = 'none'; });
         
@@ -295,7 +289,7 @@
         
         document.getElementById('cancelCrudBtn').addEventListener('click', () => { document.getElementById('crudModal').style.display = 'none'; });
 
-        /* ADDITIVE FIX: RESTORE AUTOMATIC ROUTE LOADING */
+        // ADDITIVE FIX: FULL RESTORATION OF ROUTE LOADING HANDLER
         async function initializeRoutes() {
             try {
                 const dropdown = document.getElementById('routeDropdownMap');
@@ -305,6 +299,25 @@
                     opt.value = file.download_url;
                     opt.textContent = file.name.replace('.csv', '');
                     dropdown.appendChild(opt);
+                });
+
+                // RESTORED: Listener for when a route is actually selected
+                dropdown.addEventListener('change', async (e) => {
+                    if (!e.target.value) return;
+                    document.getElementById('sidebarContent').innerHTML = "Loading stops...";
+                    try {
+                        const csvRes = await fetch(e.target.value);
+                        const csvText = await csvRes.text();
+                        // This uses your existing map.js logic to parse and show stops
+                        if (typeof window.processCSV === 'function') {
+                            window.processCSV(csvText);
+                        } else {
+                            console.warn("processCSV not found in map.js");
+                        }
+                    } catch (err) {
+                        console.error("CSV Fetch Error", err);
+                        document.getElementById('sidebarContent').innerHTML = "Error loading route.";
+                    }
                 });
             } catch (e) {
                 console.error("Route Init Failed", e);
