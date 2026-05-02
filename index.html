@@ -6,7 +6,7 @@
     <title>LogiFlow Delivery System</title>
     <meta name="theme-color" content="#007bff">
 
-    <!-- Corrected Favicon Path -->
+    <!-- Absolute path to fix favicon 404 -->
     <link rel="icon" type="image/x-icon" href="./favicon.ico">
     
     <link rel="stylesheet" href="ASSETS/LEAFLET/leaflet.css?v=1">
@@ -23,7 +23,6 @@
         #uploadProgressBar { width: 0%; height: 20px; background: #28a745; border-radius: 5px; text-align: center; color: white; line-height: 20px; font-size: 12px; transition: width 0.3s; }
         .github-refresh-btn { background: #6f42c1 !important; color: white !important; }
         #routeDropdownMap { margin-left:15px; padding:6px; border-radius:4px; border:1px solid #ccc; width: 200px; }
-        .topbar-right .btn-top { margin-left: 5px; }
     </style>
 </head>
 
@@ -41,11 +40,9 @@
             <button id="refreshGitHubListBtn" class="btn-top github-refresh-btn">
                 <i class="fab fa-github"></i> Sync Route List
             </button>
-
             <button class="btn-top openManagerBtn">
                 <i class="fas fa-user-gear"></i> Manager Portal
             </button>
-
             <button id="refreshRoutesBtn" class="btn-top">
                 <i class="fas fa-sync"></i> Force Refresh
             </button>
@@ -73,7 +70,7 @@
         <aside id="sidebar">
             <div id="sidebarContent">
                 <div style="padding: 20px; text-align: center; color: #666;">
-                    Checking for updates...
+                    System Initializing...
                 </div>
             </div>
         </aside>
@@ -84,22 +81,22 @@
     <div id="mgmtModal"><div class="modal-content" id="modalBody"></div></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Core logic loaders -->
     <script src="JS/loader.js?v=1"></script>
 
     <script>
     (function () {
-        // Encoded key to bypass GitHub security scanning
-       const _sc = 'Z2l0aHViX3BhdF8xMUJTWFY3SkkwY0wzU2VPeUtHSElZXzZ6SGpVaHhNVExNY0RiNFJGanRwVUNMZlZVSEM1RWQzQ3hFbkUwbUFUNk9CQ0dBTFdITmtkYTFYaXZu';
-
         const GITHUB_CONFIG = {
-            TOKEN: atob(_sc), 
+            // Pro Move: Retrieve token from browser storage
+            TOKEN: localStorage.getItem('logiflow_gh_token'), 
             REPO: 'Billyschmidt123/Bottle-Water-',
             BASE_RAW: 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/'
         };
 
-        // Robust fetch to prevent "Message Channel" errors
         async function safeFetch(url, options = {}) {
+            if (!GITHUB_CONFIG.TOKEN) {
+                console.error("No GitHub Token found in local storage.");
+                return null;
+            }
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 15000);
             try {
@@ -120,7 +117,7 @@
                 const values = line.split(',');
                 const obj = {};
                 headers.forEach((h, i) => {
-                    // Applied naming correction: slip/po -> delivery slip
+                    // Applied correction: slip/po -> delivery slip
                     let key = (h.toLowerCase().includes('slip')) ? 'delivery slip' : h;
                     obj[key] = (values[i] || '').trim();
                 });
@@ -131,27 +128,22 @@
         window.refreshRoutesFromGitHub = async function() {
             try {
                 const res = await safeFetch(GITHUB_CONFIG.BASE_RAW + 'routes/routes-manifest.json?cb=' + Date.now());
-                
-                if (res.status === 404) {
-                    return await window.syncRouteListFromGitHubDir();
-                }
+                if (!res || res.status === 404) return await window.syncRouteListFromGitHubDir();
 
                 const manifest = await res.json();
                 const routePromises = manifest.routes.map(async r => {
-                    try {
-                        const csvRes = await safeFetch(GITHUB_CONFIG.BASE_RAW + 'routes/' + r.file + '?cb=' + Date.now());
-                        const csvText = await csvRes.text();
-                        return { ...r, stops: parseCSV(csvText) };
-                    } catch (err) { return null; }
+                    const csvRes = await safeFetch(GITHUB_CONFIG.BASE_RAW + 'routes/' + r.file + '?cb=' + Date.now());
+                    if (!csvRes) return null;
+                    const csvText = await csvRes.text();
+                    return { ...r, stops: parseCSV(csvText) };
                 });
 
                 const updatedRoutes = (await Promise.all(routePromises)).filter(r => r !== null);
                 window.logiflowRouteCache = { routes: updatedRoutes, updatedAt: new Date().toISOString() };
                 localStorage.setItem('logiflowRouteCache_v1', JSON.stringify(window.logiflowRouteCache));
-                
                 populateRouteDropdown(updatedRoutes);
             } catch (e) {
-                console.warn("Connection quieted. System running on local cache.");
+                console.warn("Offline or Token Issue. Using cached data.");
             }
         };
 
@@ -161,10 +153,9 @@
                 const res = await safeFetch(API_URL, {
                     headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}` }
                 });
+                if (!res || !res.ok) throw new Error("Check your Local Storage Token.");
 
                 const data = await res.json();
-                if (!Array.isArray(data)) throw new Error("Folder access denied.");
-
                 const csvFiles = data.filter(f => f.name.endsWith('.csv')).map(f => ({
                     id: f.name.replace('.csv', ''),
                     name: f.name.replace('.csv', ''),
@@ -174,31 +165,29 @@
                 const manifest = { updatedAt: new Date().toISOString(), routes: csvFiles };
                 await pushManifestToGitHub(manifest);
                 await window.refreshRoutesFromGitHub();
-                
-                alert(`Sync Successful: ${csvFiles.length} routes found.`);
+                alert(`Sync Complete: Found ${csvFiles.length} routes.`);
             } catch (e) {
-                alert("Network issue: " + e.message);
+                alert("GitHub Sync Error: " + e.message);
             }
         };
 
         async function pushManifestToGitHub(manifest) {
             const path = 'routes/routes-manifest.json';
             const url = `https://api.github.com/repos/${GITHUB_CONFIG.REPO}/contents/${path}`;
-            
             try {
                 const getRes = await safeFetch(url, { headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}` } });
-                const sha = getRes.ok ? (await getRes.json()).sha : null;
+                const sha = getRes && getRes.ok ? (await getRes.json()).sha : null;
 
                 await safeFetch(url, {
                     method: 'PUT',
                     headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        message: "Auto-Sync Route Manifest",
+                        message: "Logiflow Auto-Manifest Update",
                         content: btoa(JSON.stringify(manifest, null, 2)),
                         sha: sha
                     })
                 });
-            } catch (e) { console.error("Manifest Push Interrupted:", e); }
+            } catch (e) { console.error("Manifest update failed:", e); }
         }
 
         function populateRouteDropdown(routes) {
@@ -213,7 +202,6 @@
             });
         }
 
-        // Event Listeners
         document.getElementById('refreshGitHubListBtn').addEventListener('click', (e) => {
             e.preventDefault();
             window.syncRouteListFromGitHubDir();
@@ -224,7 +212,6 @@
             window.refreshRoutesFromGitHub();
         });
 
-        // Initialize
         window.refreshRoutesFromGitHub();
     })();
     </script>
