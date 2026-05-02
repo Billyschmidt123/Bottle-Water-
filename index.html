@@ -224,7 +224,6 @@
             
             <div id="productPane" class="sub-menu-pane">
                 <h3>Product Maintenance</h3>
-                <!-- FIX ADDITION: PRODUCT TOOLBAR AND TABLE -->
                 <div class="maint-toolbar">
                     <button class="add-btn" id="addNewProdBtn"><i class="fas fa-plus"></i> Add New Product</button>
                     <select id="productCategoryFilter" class="filter-select">
@@ -315,11 +314,11 @@
         const REPO = 'Billyschmidt123/Bottle-Water-';
         let activeToken = localStorage.getItem('logiflow_gh_token');
         let masterCustomerData = [];
-        let masterProductData = []; // FIX ADDITION
+        let masterProductData = []; 
         let currentEditIndex = null;
-        let currentEditType = 'customer'; // FIX ADDITION
+        let currentEditType = 'customer'; 
         let routeFileHashes = {};
-        let productFileHashes = {}; // FIX ADDITION
+        let productFileHashes = {}; 
 
         if (!activeToken) {
             const pass = prompt("LogiFlow Security: Enter Password:");
@@ -374,7 +373,6 @@
             } catch (e) { console.error("Error hooking up tables", e); }
         }
 
-        // FIX ADDITION: PRODUCT MAINTENANCE LOGIC
         async function loadProductMaintenance() {
             const head = document.getElementById('prodTableHead');
             const body = document.getElementById('prodTableBody');
@@ -393,18 +391,20 @@
 
                     const csvRes = await fetch(file.download_url);
                     const text = await csvRes.text();
-                    const lines = text.split(/\r?\n/).filter(l => l.trim());
-                    const headers = lines[0].split(',');
                     
-                    if (head.innerHTML === "") {
-                        head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
-                    }
-
-                    for (let i = 1; i < lines.length; i++) {
-                        const values = lines[i].split(',');
-                        const entry = { _file: fileName };
-                        headers.forEach((h, idx) => entry[h] = values[idx] || "");
-                        masterProductData.push(entry);
+                    // FIX ADDITION: DATA FETCHING FOR PRODUCTS
+                    const lines = text.split(/\r?\n/).filter(l => l.trim());
+                    if (lines.length > 0) {
+                        const headers = lines[0].split(',');
+                        if (head.innerHTML === "") {
+                            head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                        }
+                        for (let i = 1; i < lines.length; i++) {
+                            const values = lines[i].split(',');
+                            const entry = { _file: fileName };
+                            headers.forEach((h, idx) => entry[h] = values[idx] || "");
+                            masterProductData.push(entry);
+                        }
                     }
                 }
                 renderProductTable(masterProductData);
@@ -421,7 +421,6 @@
             `).join('');
         }
 
-        // FIX ADDITION: RENDER PRODUCT TABLE
         function renderProductTable(data) {
             const body = document.getElementById('prodTableBody');
             body.innerHTML = data.map((row, idx) => `
@@ -535,7 +534,6 @@
             renderCustomerTable(filtered);
         });
 
-        // FIX ADDITION: PRODUCT SEARCH
         document.getElementById('prodSearch').addEventListener('input', (e) => {
             const val = e.target.value.toLowerCase();
             const filtered = masterProductData.filter(p => 
@@ -550,7 +548,6 @@
             renderCustomerTable(filtered);
         });
 
-        // FIX ADDITION: PRODUCT CATEGORY FILTER
         document.getElementById('productCategoryFilter').addEventListener('change', (e) => {
             const val = e.target.value;
             const filtered = val === 'all' ? masterProductData : masterProductData.filter(p => p._file === val);
@@ -572,7 +569,6 @@
             document.getElementById('customerPane').classList.add('active-pane');
             loadCustomerMaintenance();
         });
-        // FIX ADDITION: PRODUCT MAINT BUTTON HOOK
         document.getElementById('prodMaintBtn').addEventListener('click', () => {
             document.getElementById('managerGrid').style.display = 'none';
             document.getElementById('productPane').classList.add('active-pane');
