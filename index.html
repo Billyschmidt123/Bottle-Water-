@@ -76,8 +76,37 @@
 
     <script>
     (function () {
+        // --- ADMIN ENCRYPTION BRIDGE ---
+        const XOR_CIPHER = (str, key) => {
+            return str.split('').map((char, i) => 
+                String.fromCharCode(char.charCodeAt(0) ^ key.charCodeAt(i % key.length))
+            ).join('');
+        };
+
+        // This is a scrambled version of your token. 
+        // Drivers only need the 'Route Key' to unlock it.
+        const SCRAMBLED_DATA = "PASTE_YOUR_SCRAMBLED_TOKEN_HERE"; 
+        
+        let activeToken = localStorage.getItem('logiflow_gh_token');
+        
+        if (!activeToken) {
+            const driverPass = prompt("LogiFlow: Enter Route Access Password:");
+            if (driverPass) {
+                try {
+                    // This decodes the token on the fly for the driver
+                    const decoded = XOR_CIPHER(atob(SCRAMBLED_DATA), driverPass);
+                    if (decoded.startsWith('github_pat')) {
+                        localStorage.setItem('logiflow_gh_token', decoded);
+                        activeToken = decoded;
+                    } else {
+                        alert("Invalid Route Password.");
+                    }
+                } catch(e) { alert("Access Denied."); }
+            }
+        }
+
         const GITHUB_CONFIG = {
-            TOKEN: localStorage.getItem('logiflow_gh_token'), 
+            TOKEN: activeToken, 
             REPO: 'Billyschmidt123/Bottle-Water-',
             BASE_RAW: 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/'
         };
@@ -90,48 +119,44 @@
             } catch (e) { return null; }
         }
 
-        function parseCSV(text) {
+        function parseCSVToStopCards(text) {
             const lines = text.split(/\r?\n/).filter(l => l.trim());
             if (!lines.length) return [];
             const headers = lines[0].split(',').map(h => h.trim());
             return lines.slice(1).map(line => {
                 const values = line.split(',');
-                const obj = {};
+                const card = {};
                 headers.forEach((h, i) => {
-                    // Update header terminology to 'delivery slip'
-                    let key = (h.toLowerCase().includes('slip') || h.toLowerCase().includes('po')) ? 'delivery slip' : h;
-                    obj[key] = (values[i] || '').trim();
+                    card[h] = (values[i] || '').trim();
                 });
-                return obj;
+                return card;
             });
         }
 
         window.refreshRoutesFromGitHub = async function() {
             try {
                 const res = await safeFetch(GITHUB_CONFIG.BASE_RAW + 'routes/routes-manifest.json?cb=' + Date.now());
-                
-                // LOOP PROTECTION: Stop if manifest is missing
-                if (!res || res.status === 404) {
-                    console.log("Manifest not found. Click 'Sync Route List' to generate it.");
-                    return; 
-                }
+                if (!res || res.status === 404) return;
 
                 const manifest = await res.json();
-                const routePromises = manifest.routes.map(async r => {
-                    const csvRes = await safeFetch(GITHUB_CONFIG.BASE_RAW + 'routes/' + r.file + '?cb=' + Date.now());
-                    if (!csvRes) return null;
-                    const csvText = await csvRes.text();
-                    return { ...r, stops: parseCSV(csvText) };
-                });
-
-                const updatedRoutes = (await Promise.all(routePromises)).filter(r => r !== null);
-                window.logiflowRouteCache = { routes: updatedRoutes, updatedAt: new Date().toISOString() };
-                localStorage.setItem('logiflowRouteCache_v1', JSON.stringify(window.logiflowRouteCache));
-                populateRouteDropdown(updatedRoutes);
-            } catch (e) {
-                console.warn("Sync paused to prevent error loop.");
-            }
+                populateRouteDropdown(manifest.routes);
+            } catch (e) { console.warn("Sync error."); }
         };
+
+        document.getElementById('routeDropdownMap').addEventListener('change', async (e) => {
+            const fileName = e.target.value;
+            if (!fileName) return;
+
+            const sidebar = document.getElementById('sidebarContent');
+            sidebar.innerHTML = '<div style="padding: 20px;">Loading Stop Cards...</div>';
+
+            const res = await safeFetch(GITHUB_CONFIG.BASE_RAW + 'routes/' + fileName + '?cb=' + Date.now());
+            if (res && res.ok) {
+                const csvText = await res.text();
+                const stopCards = parseCSVToStopCards(csvText);
+                sidebar.innerHTML = `<div style="padding: 20px;">Loaded ${stopCards.length} stop cards.</div>`;
+            }
+        });
 
         window.syncRouteListFromGitHubDir = async function() {
             const API_URL = `https://api.github.com/repos/${GITHUB_CONFIG.REPO}/contents/routes`;
@@ -139,8 +164,6 @@
                 const res = await safeFetch(API_URL, {
                     headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}` }
                 });
-                if (!res || !res.ok) throw new Error("Connection failed. Check your token in the console.");
-
                 const data = await res.json();
                 const csvFiles = data.filter(f => f.name.endsWith('.csv')).map(f => ({
                     id: f.name.replace('.csv', ''),
@@ -151,29 +174,25 @@
                 const manifest = { updatedAt: new Date().toISOString(), routes: csvFiles };
                 await pushManifestToGitHub(manifest);
                 await window.refreshRoutesFromGitHub();
-                alert(`Sync Complete: Found ${csvFiles.length} routes.`);
-            } catch (e) {
-                alert("GitHub Sync Error: " + e.message);
-            }
+                alert(`Sync Successful: ${csvFiles.length} routes found.`);
+            } catch (e) { alert("Sync Error."); }
         };
 
         async function pushManifestToGitHub(manifest) {
             const path = 'routes/routes-manifest.json';
             const url = `https://api.github.com/repos/${GITHUB_CONFIG.REPO}/contents/${path}`;
-            try {
-                const getRes = await safeFetch(url, { headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}` } });
-                const sha = getRes && getRes.ok ? (await getRes.json()).sha : null;
+            const getRes = await safeFetch(url, { headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}` } });
+            const sha = getRes && getRes.ok ? (await getRes.json()).sha : null;
 
-                await safeFetch(url, {
-                    method: 'PUT',
-                    headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: "Logiflow Auto-Manifest Update",
-                        content: btoa(JSON.stringify(manifest, null, 2)),
-                        sha: sha
-                    })
-                });
-            } catch (e) { console.error("Manifest update failed:", e); }
+            await fetch(url, {
+                method: 'PUT',
+                headers: { 'Authorization': `token ${GITHUB_CONFIG.TOKEN}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: "Logiflow Update",
+                    content: btoa(JSON.stringify(manifest, null, 2)),
+                    sha: sha
+                })
+            });
         }
 
         function populateRouteDropdown(routes) {
@@ -188,17 +207,8 @@
             });
         }
 
-        document.getElementById('refreshGitHubListBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            window.syncRouteListFromGitHubDir();
-        });
-        
-        document.getElementById('refreshRoutesBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            window.refreshRoutesFromGitHub();
-        });
-
-        // Initialize on load
+        document.getElementById('refreshGitHubListBtn').addEventListener('click', window.syncRouteListFromGitHubDir);
+        document.getElementById('refreshRoutesBtn').addEventListener('click', window.refreshRoutesFromGitHub);
         window.refreshRoutesFromGitHub();
     })();
     </script>
