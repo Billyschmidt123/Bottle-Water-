@@ -35,6 +35,13 @@
         .btn-delete { background: #dc3545; color: #fff; }
         .mgmt-filter-bar { display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap; }
         .mgmt-filter-bar input, .mgmt-filter-bar select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+
+        /* ADDITION: FULL PAGE OVERLAY & MODAL STYLES */
+        #fullPageOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 10000; overflow-y: auto; padding: 20px; }
+        #mgmtModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; align-items: center; justify-content: center; }
+        .modal-content { background: white; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; padding: 25px; border-radius: 8px; position: relative; }
+        .modal-section { border-top: 1px solid #eee; margin-top: 15px; padding-top: 15px; }
+        .route-chip { display: inline-block; background: #e9ecef; padding: 5px 10px; border-radius: 15px; margin: 3px; font-size: 12px; }
     </style>
 </head>
 
@@ -97,6 +104,12 @@
         </aside>
     </div>
 
+    <!-- ADDITION: FULL PAGE TABLE OVERLAY AND MODAL CONTAINER -->
+    <div id="fullPageOverlay"></div>
+    <div id="mgmtModal">
+        <div class="modal-content" id="modalBody"></div>
+    </div>
+
     <div id="modalContainer"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -132,7 +145,7 @@
                         populateRouteDropdown(window.logiflowRouteCache.routes);
                     }
 
-                    // ADDITION: Inject Customer Mgmt Button into Manager Portal
+                    // ADDITION: Inject Button to Trigger Full Page Table
                     if (moduleName === 'manager-portal') {
                         injectMgmtButton();
                     }
@@ -322,7 +335,7 @@
             });
         });
 
-        // --- NEW ADDITIONS START HERE: CUSTOMER MANAGEMENT & FILTERING ---
+        // --- ADDITIONS: FULL PAGE TABLE AND MODAL LOGIC ---
 
         function injectMgmtButton() {
             setTimeout(() => {
@@ -334,178 +347,185 @@
                     btn.style.marginTop = '10px';
                     btn.style.background = '#007bff';
                     btn.style.color = '#fff';
-                    btn.innerHTML = '<i class="fas fa-users-gear"></i> Customer Management';
-                    btn.onclick = window.openCustomerManagement;
+                    btn.innerHTML = '<i class="fas fa-table"></i> Open Full Customer Table';
+                    btn.onclick = () => window.openFullPageTable();
                     container.appendChild(btn);
                 }
             }, 300);
         }
 
-        window.openCustomerManagement = function() {
-            const container = document.getElementById('sidebarContent');
-            if (!container) return;
+        window.openFullPageTable = function() {
+            const overlay = document.getElementById('fullPageOverlay');
+            if (!window.logiflowRouteCache || !window.logiflowRouteCache.routes) return alert("Import data first.");
 
-            if (!window.logiflowRouteCache || !window.logiflowRouteCache.routes || window.logiflowRouteCache.routes.length === 0) {
-                alert("Please import files from Local Drive first to read customer data.");
-                return;
-            }
-
-            let allStops = [];
+            let allUniqueStops = {}; 
             let headers = [];
 
-            // Read all stops from all cached CSV routes
             window.logiflowRouteCache.routes.forEach(route => {
-                if (route.stops && Array.isArray(route.stops)) {
-                    route.stops.forEach((stop, index) => {
+                route.stops.forEach(stop => {
+                    const key = stop.Address + (stop.Company || '');
+                    if (!allUniqueStops[key]) {
                         if (headers.length === 0) headers = Object.keys(stop);
-                        allStops.push({ ...stop, _routeId: route.id, _routeName: route.name, _localIndex: index });
-                    });
-                }
+                        allUniqueStops[key] = { ...stop, _routes: [] };
+                    }
+                    allUniqueStops[key]._routes.push({ id: route.id, name: route.name, status: stop.Status });
+                });
             });
 
-            window._allStopsReference = allStops;
-            window._headersReference = headers;
+            window._fullTableData = Object.values(allUniqueStops);
+            overlay.style.display = 'block';
 
-            renderMgmtUI(allStops);
-        };
-
-        function renderMgmtUI(dataList) {
-            const container = document.getElementById('sidebarContent');
-            const headers = window._headersReference;
-            const routes = window.logiflowRouteCache.routes;
-
-            let html = `
-                <div style="padding:15px;">
-                    <h3>Customer Management</h3>
-                    <div class="mgmt-filter-bar">
-                        <select id="filterRoute" onchange="window.filterMgmtTable()">
-                            <option value="">All Routes</option>
-                            ${routes.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
-                        </select>
-                        <input type="text" id="filterCompany" placeholder="Search Company..." onkeyup="window.filterMgmtTable()">
-                        <input type="text" id="filterPhone" placeholder="Search Phone..." onkeyup="window.filterMgmtTable()">
-                        <button class="btn-top" onclick="window.loadModule('manager-portal')">Exit</button>
-                        <button class="btn-top btn-success" onclick="window.customerCRUD('create')">Add New</button>
+            overlay.innerHTML = `
+                <div style="max-width:1400px; margin:auto;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                        <h2>Master Customer Database</h2>
+                        <div>
+                            <input type="text" id="fullSearch" placeholder="Search Database..." style="padding:10px; width:300px; border:1px solid #ccc; border-radius:4px;" onkeyup="window.filterFullTable()">
+                            <button class="btn-top" onclick="document.getElementById('fullPageOverlay').style.display='none'">Close Table</button>
+                        </div>
                     </div>
-                    
                     <div class="mgmt-table-container">
                         <table class="mgmt-table">
                             <thead>
                                 <tr>
-                                    <th>Route</th>
                                     ${headers.map(h => `<th>${h}</th>`).join('')}
-                                    <th>Status</th>
-                                    <th>Actions</th>
+                                    <th>Assigned Routes</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
-                            <tbody id="mgmtTableBody">
-                                ${renderTableRows(dataList)}
+                            <tbody id="fullTableBody">
+                                ${renderFullRows(window._fullTableData, headers)}
                             </tbody>
                         </table>
                     </div>
                 </div>
             `;
-            container.innerHTML = html;
+        };
+
+        function renderFullRows(data, headers) {
+            return data.map((stop, idx) => `
+                <tr>
+                    ${headers.map(h => `<td>${stop[h] || ''}</td>`).join('')}
+                    <td>${stop._routes.map(r => `<span class="route-chip" style="${r.status==='Inactive'?'text-decoration:line-through;opacity:0.5':''}">${r.name}</span>`).join('')}</td>
+                    <td><button class="btn-edit" onclick="window.openEditModal(${idx})">Edit</button></td>
+                </tr>
+            `).join('');
         }
 
-        function renderTableRows(list) {
-            const headers = window._headersReference;
-            return list.map((stop, idx) => {
-                const isActive = stop.Status !== 'Inactive';
-                return `
-                    <tr>
-                        <td style="font-weight:bold; font-size:11px;">${stop._routeName}</td>
-                        ${headers.map(h => `<td>${stop[h] || ''}</td>`).join('')}
-                        <td><span class="status-pill ${isActive ? 'status-active' : 'status-inactive'}">${isActive ? 'Active' : 'Inactive'}</span></td>
-                        <td class="mgmt-actions">
-                            <button class="btn-edit" onclick="window.customerCRUD('update', ${idx})"><i class="fas fa-edit"></i></button>
-                            <button class="btn-toggle" onclick="window.customerCRUD('toggle', ${idx})"><i class="fas fa-power-off"></i></button>
-                            <button class="btn-delete" onclick="window.customerCRUD('delete', ${idx})"><i class="fas fa-trash"></i></button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
+        window.filterFullTable = function() {
+            const term = document.getElementById('fullSearch').value.toLowerCase();
+            const filtered = window._fullTableData.filter(s => Object.values(s).some(v => String(v).toLowerCase().includes(term)));
+            const headers = Object.keys(window._fullTableData[0]).filter(k => !k.startsWith('_'));
+            document.getElementById('fullTableBody').innerHTML = renderFullRows(filtered, headers);
+        };
 
-        window.filterMgmtTable = function() {
-            const routeVal = document.getElementById('filterRoute').value.toLowerCase();
-            const compVal = document.getElementById('filterCompany').value.toLowerCase();
-            const phoneVal = document.getElementById('filterPhone').value.toLowerCase();
+        window.openEditModal = function(index) {
+            const stop = window._fullTableData[index];
+            const modal = document.getElementById('mgmtModal');
+            const body = document.getElementById('modalBody');
+            const headers = Object.keys(stop).filter(k => !k.startsWith('_'));
+            const allRoutes = window.logiflowRouteCache.routes;
+
+            modal.style.display = 'flex';
+            body.innerHTML = `
+                <h3>Edit Customer Profile</h3>
+                <form id="modalEditForm">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        ${headers.map(h => `
+                            <div>
+                                <label style="display:block; font-size:11px; color:#666;">${h}</label>
+                                <input type="text" name="${h}" value="${stop[h] || ''}" style="width:100%; padding:5px;">
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <div class="modal-section">
+                        <h4>Scheduled Routes</h4>
+                        <div id="modalRouteList">
+                            ${stop._routes.map((r, rIdx) => `
+                                <div style="display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; padding:8px; margin-bottom:5px; border-radius:4px;">
+                                    <span>${r.name}</span>
+                                    <div>
+                                        <button type="button" class="btn-toggle" onclick="window.toggleRouteInModal(${index}, ${rIdx})">${r.status==='Inactive'?'Activate':'Deactivate'}</button>
+                                        <button type="button" class="btn-delete" onclick="window.removeRouteInModal(${index}, ${rIdx})"><i class="fas fa-trash"></i></button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div style="margin-top:10px;">
+                            <label>Assign to Route:</label>
+                            <select id="modalRouteAdd" style="width:70%; padding:5px;">
+                                <option value="">-- Choose Route --</option>
+                                ${allRoutes.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+                            </select>
+                            <button type="button" class="btn-top btn-success" onclick="window.addRouteToStop(${index})">Add</button>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:20px; display:flex; gap:10px;">
+                        <button type="button" class="btn-top btn-success" style="flex:1;" onclick="window.saveMasterChange(${index})">Save All Changes</button>
+                        <button type="button" class="btn-top" onclick="document.getElementById('mgmtModal').style.display='none'">Cancel</button>
+                    </div>
+                </form>
+            `;
+        };
+
+        window.toggleRouteInModal = function(stopIdx, routeIdx) {
+            const stop = window._fullTableData[stopIdx];
+            stop._routes[routeIdx].status = stop._routes[routeIdx].status === 'Inactive' ? 'Active' : 'Inactive';
+            window.openEditModal(stopIdx);
+        };
+
+        window.removeRouteInModal = function(stopIdx, routeIdx) {
+            if(!confirm("Remove from this route?")) return;
+            window._fullTableData[stopIdx]._routes.splice(routeIdx, 1);
+            window.openEditModal(stopIdx);
+        };
+
+        window.addRouteToStop = function(stopIdx) {
+            const routeId = document.getElementById('modalRouteAdd').value;
+            if(!routeId) return;
+            const route = window.logiflowRouteCache.routes.find(r => r.id === routeId);
+            window._fullTableData[stopIdx]._routes.push({ id: route.id, name: route.name, status: 'Active' });
+            window.openEditModal(stopIdx);
+        };
+
+        window.saveMasterChange = function(index) {
+            const formData = new FormData(document.getElementById('modalEditForm'));
+            const updatedData = {};
+            formData.forEach((v, k) => updatedData[k] = v);
             
-            const filtered = window._allStopsReference.filter(s => {
-                const routeMatch = !routeVal || s._routeId.toLowerCase() === routeVal;
-                // Assuming 'Company' and 'Phone' are common headers. If headers differ, we check all keys.
-                const compMatch = !compVal || Object.values(s).some(v => String(v).toLowerCase().includes(compVal));
-                const phoneMatch = !phoneVal || Object.values(s).some(v => String(v).toLowerCase().includes(phoneVal));
-                return routeMatch && compMatch && phoneMatch;
+            const masterStop = window._fullTableData[index];
+            const originalRoutes = masterStop._routes;
+
+            // Update CSV data across all routes
+            window.logiflowRouteCache.routes.forEach(route => {
+                // Remove existing instances of this customer address from routes not in the list
+                route.stops = route.stops.filter(s => {
+                    const match = (s.Address === masterStop.Address);
+                    return !match || originalRoutes.some(r => r.id === route.id);
+                });
+
+                // Update or Add new instances
+                const assigned = originalRoutes.find(r => r.id === route.id);
+                if (assigned) {
+                    const existing = route.stops.find(s => s.Address === masterStop.Address);
+                    if (existing) {
+                        Object.assign(existing, updatedData);
+                        existing.Status = assigned.status;
+                    } else {
+                        route.stops.push({ ...updatedData, Status: assigned.status });
+                    }
+                }
             });
 
-            document.getElementById('mgmtTableBody').innerHTML = renderTableRows(filtered);
-        };
-
-        window.customerCRUD = function(action, globalIdx) {
-            const stops = window._allStopsReference;
-            const headers = window._headersReference;
-            const stop = globalIdx !== undefined ? stops[globalIdx] : null;
-
-            if (action === 'delete') {
-                if (!confirm("Delete this customer?")) return;
-                const route = window.logiflowRouteCache.routes.find(r => r.id === stop._routeId);
-                route.stops.splice(stop._localIndex, 1);
-                saveAndRefreshMgmt();
-            } 
-            else if (action === 'toggle') {
-                const route = window.logiflowRouteCache.routes.find(r => r.id === stop._routeId);
-                const target = route.stops[stop._localIndex];
-                target.Status = (target.Status === 'Inactive') ? 'Active' : 'Inactive';
-                saveAndRefreshMgmt();
-            }
-            else if (action === 'create' || action === 'update') {
-                let formHtml = `<div style="padding:20px;"><h3>${action === 'create' ? 'Add' : 'Edit'} Customer</h3><form id="mgmtForm">`;
-                headers.forEach(h => {
-                    if (h.startsWith('_')) return;
-                    formHtml += `
-                        <div style="margin-bottom:10px;">
-                            <label style="display:block;font-size:12px;color:#666;">${h}</label>
-                            <input type="text" name="${h}" value="${stop ? (stop[h] || '') : ''}" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
-                        </div>
-                    `;
-                });
-                if (action === 'create') {
-                    formHtml += `<div style="margin-bottom:10px;"><label>Route</label><select name="_targetRoute" style="width:100%;padding:8px;">`;
-                    window.logiflowRouteCache.routes.forEach(r => formHtml += `<option value="${r.id}">${r.name}</option>`);
-                    formHtml += `</select></div>`;
-                }
-                formHtml += `<div style="margin-top:20px;"><button type="button" class="btn-top btn-success" onclick="window.saveMgmtForm('${action}', ${globalIdx})">Save</button>
-                    <button type="button" class="btn-top" onclick="window.openCustomerManagement()">Cancel</button></div></form></div>`;
-                document.getElementById('sidebarContent').innerHTML = formHtml;
-            }
-        };
-
-        window.saveMgmtForm = function(action, globalIdx) {
-            const formData = new FormData(document.getElementById('mgmtForm'));
-            const data = {};
-            formData.forEach((v, k) => { data[k] = v; });
-
-            if (action === 'update') {
-                const stopRef = window._allStopsReference[globalIdx];
-                const route = window.logiflowRouteCache.routes.find(r => r.id === stopRef._routeId);
-                Object.assign(route.stops[stopRef._localIndex], data);
-            } else {
-                const route = window.logiflowRouteCache.routes.find(r => r.id === data._targetRoute);
-                delete data._targetRoute;
-                route.stops.push(data);
-            }
-            saveAndRefreshMgmt();
-        };
-
-        function saveAndRefreshMgmt() {
             localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(window.logiflowRouteCache));
-            window.openCustomerManagement();
-            alert("Updated successfully.");
-        }
+            document.getElementById('mgmtModal').style.display = 'none';
+            window.openFullPageTable();
+            alert("Database Updated and synced to all local route files.");
+        };
 
-        // --- NEW ADDITIONS END ---
+        // --- END ADDITIONS ---
 
         document.addEventListener('DOMContentLoaded', () => {
             initManagerButtons();
