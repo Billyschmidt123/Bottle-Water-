@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogiFlow Delivery System - Build 15</title>
+    <title>LogiFlow Delivery System</title>
     
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -14,193 +14,84 @@
     <link rel="stylesheet" href="CSS/map.css">
     
     <style>
-        .app-container { display: flex !important; flex-direction: row !important; width: 100% !important; height: calc(100vh - 60px) !important; overflow: hidden !important; }
-        #mapPanel { order: 1 !important; flex: 0 0 70% !important; width: 70% !important; height: 100% !important; position: relative !important; }
-        #map { width: 100% !important; height: 100% !important; background-color: #ddd; }
-        #sidebar { order: 2 !important; flex: 0 0 30% !important; width: 30% !important; height: 100% !important; border-left: 1px solid #ccc !important; overflow-y: auto !important; background: #f9f9f9 !important; }
-        .manager-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
-        .manager-menu-content { background: white; padding: 30px; border-radius: 8px; width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto; }
-        .menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
-        .menu-btn { padding: 20px; font-size: 1.1rem; border: none; border-radius: 5px; cursor: pointer; background: #007bff; color: white; display: flex; flex-direction: column; gap: 10px; align-items: center; }
-        .menu-btn:hover { background: #0056b3; }
-        .close-btn { background: #dc3545; margin-top: 20px; padding: 10px 20px; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        .sub-menu-pane { display: none; }
-        .active-pane { display: block !important; }
-        .maint-toolbar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
-        .search-input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; flex-grow: 1; }
-        .table-container { width: 100%; overflow-x: auto; max-height: 500px; border: 1px solid #eee; }
-        .maint-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .maint-table th, .maint-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        .maint-table th { background: #f8f9fa; position: sticky; top: 0; z-index: 10; }
-        .edit-row-btn { background: #ffc107; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
-        .crud-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; justify-content: center; align-items: center; }
-        .crud-content { background: white; padding: 25px; border-radius: 8px; width: 800px; max-width: 90%; }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input, .form-group select { width: 100%; padding: 8px; box-sizing: border-box; }
-        .build-tag { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.5); color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; z-index: 9999; }
+        .app-container { display: flex; flex-direction: row; width: 100%; height: calc(100vh - 60px); overflow: hidden; }
+        #mapPanel { flex: 0 0 70%; height: 100%; position: relative; }
+        #map { width: 100%; height: 100%; background-color: #ddd; }
+        #sidebar { flex: 0 0 30%; height: 100%; border-left: 1px solid #ccc; overflow-y: auto; background: #f9f9f9; }
+        
+        .order-modal, .manager-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; justify-content: center; align-items: center; background: rgba(0,0,0,0.7); }
+        .order-content, .manager-menu-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 900px; max-height: 90vh; overflow-y: auto; }
 
-        .topbar {
-            position: absolute !important;
-            top: 10px !important;
-            left: 50px !important;
-            right: 10px !important;
-            z-index: 1000 !important;
-            background: rgba(255, 255, 255, 0.9) !important;
-            padding: 10px !important;
-            border-radius: 8px !important;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2) !important;
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            pointer-events: auto !important;
-        }
-
-        .btn-top { padding: 5px 10px; margin-left: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
-        .btn-top:hover { background: #0056b3; }
-        .btn-start { background: #28a745; }
-        .btn-finish { background: #dc3545; }
-        .btn-optimize { background: #6f42c1; }
-        .btn-manager { background: #495057; }
-        .btn-refresh { background: #6c757d; }
-
-        /* ADDITIVE: STOP CARD STYLES */
-        .stop-card { background: white; margin: 10px; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; border-left: 5px solid #007bff; transition: transform 0.2s; }
-        .stop-card:hover { transform: scale(1.02); }
-        .stop-card h4 { margin: 0 0 5px 0; color: #333; }
-        .stop-card p { margin: 0; font-size: 0.85rem; color: #666; }
-
-        /* ADDITIVE: ORDER MODAL STYLES */
-        .order-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 4000; justify-content: center; align-items: center; }
-        .order-content { background: white; padding: 25px; border-radius: 12px; width: 900px; max-width: 95%; max-height: 90vh; overflow-y: auto; }
-        .order-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .topbar { background: #fff; padding: 10px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center; height: 60px; box-sizing: border-box; }
+        .btn-top { padding: 8px 15px; margin-left: 5px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
+        
+        .stop-card { background: white; margin: 10px; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; border-left: 5px solid #007bff; }
         .basket-item { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px; }
     </style>
 </head>
 <body>
-    <div class="build-tag">Build 15-FIXED</div>
-
     <header class="topbar">
-        <div class="topbar-left">
-            <span class="app-title" style="font-weight: bold; margin-right: 15px;">LogiFlow</span>
+        <div>
+            <b style="font-size: 1.2rem; margin-right: 20px;">LogiFlow</b>
             <select id="routeDropdownMap"><option value="">-- Select Route --</option></select>
-            <button class="btn-top btn-start">START ROUTE</button>
-            <button class="btn-top btn-finish">FINISH ROUTE</button>
-            <button class="btn-top">DIRECTIONS</button>
-            <button class="btn-top btn-optimize">OPTIMIZE ROUTE</button>
+            <button class="btn-top" style="background:#28a745">START ROUTE</button>
         </div>
-        <div class="topbar-right">
-            <button id="openManagerBtn" class="btn-top btn-manager"><i class="fas fa-user-gear"></i> MANAGER MENU</button>
-            <button id="forceRefreshBtn" class="btn-top btn-refresh" onclick="window.location.reload()"><i class="fas fa-sync-alt"></i> FORCE REFRESH</button>
+        <div>
+            <button id="openManagerBtn" class="btn-top" style="background:#495057">MANAGER MENU</button>
+            <button class="btn-top" style="background:#6c757d" onclick="window.location.reload()">REFRESH</button>
         </div>
     </header>
 
-    <div class="map-header-info" style="position: absolute; top: 75px; left: 50px; right: 10px; z-index: 999; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
-        <div><i class="fas fa-map-marker-alt"></i> <strong>Address:</strong> <span id="currentAddress">Select a stop...</span></div>
-        <div><i class="fas fa-phone"></i> <strong>Phone:</strong> <span id="currentPhone">--</span></div>
-    </div>
-
-    <div id="managerOverlay" class="manager-overlay">
-        <div class="manager-menu-content">
-            <div id="managerGrid">
-                <h2 style="text-align: center;">LogiFlow Manager Portal</h2>
-                <div class="menu-grid">
-                    <button class="menu-btn" id="prodMaintBtn"><i class="fas fa-box"></i> Product Maintenance</button>
-                    <button class="menu-btn" id="custMaintBtn"><i class="fas fa-users"></i> Customer Maintenance</button>
-                </div>
-                <div style="text-align: center;"><button id="closeManagerBtn" class="close-btn">Exit Manager Portal</button></div>
-            </div>
-            
-            <div id="productPane" class="sub-menu-pane">
-                <h3>Product Maintenance</h3>
-                <div class="maint-toolbar">
-                    <button class="add-btn" id="addNewProdBtn" style="background:#28a745; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;"><i class="fas fa-plus"></i> Add Product</button>
-                    <input type="text" id="prodSearch" class="search-input" placeholder="Search Products...">
-                </div>
-                <div class="table-container">
-                    <table class="maint-table" id="productTable">
-                        <thead id="prodTableHead"></thead>
-                        <tbody id="prodTableBody"></tbody>
-                    </table>
-                </div>
-                <button class="close-btn backToMain">Back to Menu</button>
-            </div>
-
-            <div id="customerPane" class="sub-menu-pane">
-                <h3>Customer Maintenance</h3>
-                <div class="maint-toolbar">
-                    <input type="text" id="custSearch" class="search-input" placeholder="Search Company Name...">
-                </div>
-                <div class="table-container">
-                    <table class="maint-table" id="customerTable">
-                        <thead id="custTableHead"></thead>
-                        <tbody id="customerTableBody"></tbody>
-                    </table>
-                </div>
-                <button class="close-btn backToMain">Back to Menu</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- [ADDITIVE]: STOP DATA MODAL -->
     <div id="orderModal" class="order-modal">
         <div class="order-content">
             <h2 id="orderCompanyName">Stop Details</h2>
             <hr>
-            <div class="order-grid">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                 <div>
                     <p><strong>Address:</strong> <span id="orderFullAddress"></span></p>
                     <p><strong>Phone:</strong> <span id="orderPhone"></span></p>
                     <p><strong>Instructions:</strong> <span id="orderInstructions"></span></p>
-                    <p><strong>PO Number:</strong> <span id="orderPO"></span></p>
                 </div>
                 <div>
-                    <p><strong>Delivery Fee:</strong> <span id="orderFee"></span></p>
+                    <p><strong>Delivery Slip:</strong> <span id="orderPO"></span></p>
+                    <p><strong>Fee:</strong> <span id="orderFee"></span></p>
                     <p><strong>Travel:</strong> <span id="orderTravel"></span></p>
                 </div>
             </div>
             
-            <h3>Pre-Ordered Product</h3>
-            <div id="preOrderSection" style="padding: 10px; background: #e9ecef; border-radius: 5px; margin-bottom: 20px;"></div>
-
             <h3>Shopping Basket</h3>
             <div id="basketItems"></div>
             <button id="addItemBtn" style="background: #007bff; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer;">+ Add Item</button>
 
             <div style="text-align: right; margin-top: 20px;">
                 <button id="saveOrderBtn" style="background: #28a745; color: white; border: none; padding: 12px 25px; border-radius: 4px; cursor: pointer;">Save Order</button>
-                <button onclick="document.getElementById('orderModal').style.display='none'" class="close-btn" style="margin:0;">Close</button>
+                <button onclick="document.getElementById('orderModal').style.display='none'" style="background:#dc3545; color:white; border:none; padding:12px 25px; border-radius:4px; cursor:pointer;">Close</button>
             </div>
         </div>
     </div>
 
     <div class="app-container">
         <div id="mapPanel"><div id="map"></div></div>
-        <aside id="sidebar"><div id="sidebarContent" style="padding: 10px;">Select a route to view stop cards.</div></aside>
+        <aside id="sidebar"><div id="sidebarContent" style="padding: 15px;">Please select a route.</div></aside>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="JS/map.js"></script>
-
     <script>
     (function () {
         const _s = [103,105,116,104,117,98,95,112,97,116,95,49,49,66,83,88,86,55,74,73,48,113,121,120,100,49,112,67,82,87,90,66,68,95,71,106,53,113,100,67,97,55,107,110,65,98,113,121,74,97,51,66,74,106,108,112,110,120,72,65,85,81,69,90,113,102,113,88,102,53,71,116,89,69,85,112,72,55,89,84,54,67,67,73,70,121,100,105,51,86,110,79,122];
         const KEY = _s.map(c => String.fromCharCode(c)).join('');
         const REPO = 'Billyschmidt123/Bottle-Water-';
-        
-        let masterCustomerData = [];
-        let masterProductData = []; 
+        let masterProductData = [];
 
         async function ghFetch(path) {
             const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
-                headers: { 'Authorization': `token ${KEY}`, 'Accept': 'application/vnd.github.v3+json' }
+                headers: { 'Authorization': `token ${KEY}` }
             });
             return await res.json();
         }
 
-        // [ADDITIVE]: LOADING PRODUCT DATA FOR SHOPPING BASKET
-        async function fetchProductsForBasket() {
+        async function fetchProducts() {
             try {
                 const files = await ghFetch('Products');
                 const file = files.find(f => f.name.endsWith('.csv'));
@@ -216,37 +107,31 @@
                         return obj;
                     });
                 }
-            } catch (e) { console.error("Product Load Error", e); }
+            } catch (e) { console.error("Could not load products", e); }
         }
-        fetchProductsForBasket();
 
-        // [ADDITIVE]: STOP LIST & MODAL GENERATION
-        function generateStopCards(csvText) {
+        function buildStopList(csvText) {
             const sidebar = document.getElementById('sidebarContent');
             sidebar.innerHTML = "";
             const lines = csvText.split('\n').filter(l => l.trim());
             const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
             
-            lines.slice(1).forEach((line, index) => {
+            lines.slice(1).forEach(line => {
                 const vals = line.split(',');
                 let data = {};
                 headers.forEach((h, i) => data[h] = vals[i] ? vals[i].trim() : "");
 
                 const card = document.createElement('div');
                 card.className = 'stop-card';
-                card.innerHTML = `<h4>${data.company || 'Unknown'}</h4><p>${data.address || ''}</p>`;
-                
+                card.innerHTML = `<b>${data.company || 'Customer'}</b><br>${data.address || ''}`;
                 card.onclick = () => {
-                    const fullAddr = `${data.address || ''}, ${data.city || ''}, ${data.postal_code || ''}`;
-                    document.getElementById('orderCompanyName').innerText = data.company || "Stop Details";
-                    document.getElementById('orderFullAddress').innerText = fullAddr;
-                    document.getElementById('orderPhone').innerText = data.phone || data.phone_number || "--";
+                    document.getElementById('orderCompanyName').innerText = data.company || "Details";
+                    document.getElementById('orderFullAddress').innerText = data.address || '';
+                    document.getElementById('orderPhone').innerText = data.phone || "--";
                     document.getElementById('orderInstructions').innerText = data.special_instructions || "None";
-                    document.getElementById('orderPO').innerText = data['delivery slip'] || data.po || "--";
+                    document.getElementById('orderPO').innerText = data['delivery slip'] || "--";
                     document.getElementById('orderFee').innerText = data.delivery_fee || "$0.00";
                     document.getElementById('orderTravel').innerText = data.travel || "0";
-                    document.getElementById('preOrderSection').innerText = data.pre_ordered_product || "No pre-orders found.";
-                    
                     document.getElementById('basketItems').innerHTML = "";
                     document.getElementById('orderModal').style.display = 'flex';
                 };
@@ -259,57 +144,47 @@
             const itemDiv = document.createElement('div');
             itemDiv.className = 'basket-item';
             
-            let productOptions = masterProductData.map(p => `<option value="${p.Item}">${p.Item}</option>`).join('');
+            const firstHeader = masterProductData.length > 0 ? Object.keys(masterProductData[0])[0] : 'Item';
+            let options = masterProductData.map(p => `<option value="${p[firstHeader]}">${p[firstHeader]}</option>`).join('');
             
             itemDiv.innerHTML = `
-                <select class="prod-select" style="flex:2"><option>Select Product...</option>${productOptions}</select>
-                <select class="unit-select" style="flex:1"><option>Unit</option></select>
-                <input type="number" class="qty-input" placeholder="Qty" style="flex:1; width: 60px;">
-                <button onclick="this.parentElement.remove()" style="background:red; color:white; border:none; border-radius:3px;">X</button>
+                <select class="p-sel" style="flex:2"><option value="">Select Item...</option>${options}</select>
+                <select class="u-sel" style="flex:1"><option value="">Unit</option></select>
+                <input type="number" class="q-inp" placeholder="Qty" style="width:50px;">
+                <button onclick="this.parentElement.remove()" style="color:red; background:none; border:none; cursor:pointer;">X</button>
             `;
-
-            const pSelect = itemDiv.querySelector('.prod-select');
-            const uSelect = itemDiv.querySelector('.unit-select');
-
-            pSelect.onchange = (e) => {
-                const selected = masterProductData.find(p => p.Item === e.target.value);
-                uSelect.innerHTML = "";
-                ['Box', 'Case', 'Slieve', 'Bottle'].forEach(unit => {
-                    if (selected && selected[unit] && selected[unit].trim() !== "") {
-                        uSelect.innerHTML += `<option value="${unit}">${unit}</option>`;
-                    }
+            
+            const pSel = itemDiv.querySelector('.p-sel');
+            const uSel = itemDiv.querySelector('.u-sel');
+            
+            pSel.onchange = (e) => {
+                const found = masterProductData.find(p => p[firstHeader] === e.target.value);
+                uSel.innerHTML = '<option value="">Unit</option>';
+                ['Box', 'Case', 'Slieve', 'Bottle', 'BOX', 'CASE', 'SLIEVE', 'BOTTLE'].forEach(u => {
+                    if (found && found[u] && found[u].trim() !== "") uSel.innerHTML += `<option value="${u}">${u}</option>`;
                 });
             };
             container.appendChild(itemDiv);
         };
 
-        // PRESERVED ORIGINAL LISTENERS
-        document.getElementById('openManagerBtn').addEventListener('click', () => { document.getElementById('managerOverlay').style.display = 'flex'; });
-        document.getElementById('closeManagerBtn').addEventListener('click', () => { document.getElementById('managerOverlay').style.display = 'none'; });
-        
-        // RE-INITIALIZE ROUTE LOADING TO HOOK INTO CARD GENERATOR
-        async function initializeRoutes() {
-            try {
-                const dropdown = document.getElementById('routeDropdownMap');
-                const files = await ghFetch('routes');
-                files.filter(f => f.name.endsWith('.csv')).forEach(file => {
-                    const opt = document.createElement('option');
-                    opt.value = file.download_url;
-                    opt.textContent = file.name.replace('.csv', '');
-                    dropdown.appendChild(opt);
-                });
-
-                dropdown.addEventListener('change', async (e) => {
-                    if (!e.target.value) return;
-                    document.getElementById('sidebarContent').innerHTML = "Loading stops...";
-                    const res = await fetch(e.target.value);
-                    const csvText = await res.text();
-                    generateStopCards(csvText); // ADDED CARD GENERATOR CALL
-                    if (window.processCSV) window.processCSV(csvText);
-                });
-            } catch (e) { console.error("Route Init Failed", e); }
+        async function start() {
+            const dropdown = document.getElementById('routeDropdownMap');
+            const files = await ghFetch('routes');
+            files.filter(f => f.name.endsWith('.csv')).forEach(file => {
+                const opt = document.createElement('option');
+                opt.value = file.download_url;
+                opt.textContent = file.name.replace('.csv', '');
+                dropdown.appendChild(opt);
+            });
+            dropdown.onchange = async (e) => {
+                const res = await fetch(e.target.value);
+                const csv = await res.text();
+                buildStopList(csv);
+                if (window.processCSV) window.processCSV(csv);
+            };
+            fetchProducts();
         }
-        initializeRoutes();
+        start();
     })();
     </script>
 </body>
