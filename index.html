@@ -228,7 +228,13 @@
 
             fields.innerHTML = headers.map((th, i) => {
                 const headerText = th.innerText.trim();
-                const cellValue = cells[i] ? cells[i].innerText.trim() : "";
+                // CLEANUP ADDITION: Strip literal quotes and ensure empty strings aren't shown as placeholders
+                let cellValue = cells[i] ? cells[i].innerText.trim() : "";
+                if (cellValue === '""' || cellValue === '""' || cellValue === '""') {
+                    cellValue = "";
+                }
+                cellValue = cellValue.replace(/^"|"$/g, ''); // Removes leading/trailing quotes
+
                 return `
                     <div class="form-group">
                         <label>${headerText}</label>
