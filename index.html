@@ -19,8 +19,8 @@
         #map { width: 100%; height: 100%; background-color: #ddd; }
         #sidebar { flex: 0 0 30%; height: 100%; border-left: 1px solid #ccc; overflow-y: auto; background: #f9f9f9; }
         
-        .order-modal, .manager-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; justify-content: center; align-items: center; background: rgba(0,0,0,0.7); }
-        .order-content, .manager-menu-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 900px; max-height: 90vh; overflow-y: auto; }
+        .order-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; justify-content: center; align-items: center; background: rgba(0,0,0,0.7); }
+        .order-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 900px; max-height: 90vh; overflow-y: auto; }
 
         .topbar { background: #fff; padding: 10px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center; height: 60px; box-sizing: border-box; }
         .btn-top { padding: 8px 15px; margin-left: 5px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
@@ -37,7 +37,7 @@
             <button class="btn-top" style="background:#28a745">START ROUTE</button>
         </div>
         <div>
-            <button id="openManagerBtn" class="btn-top" style="background:#495057">MANAGER MENU</button>
+            <button class="btn-top" style="background:#495057">MANAGER MENU</button>
             <button class="btn-top" style="background:#6c757d" onclick="window.location.reload()">REFRESH</button>
         </div>
     </header>
@@ -107,7 +107,7 @@
                         return obj;
                     });
                 }
-            } catch (e) { console.error("Could not load products", e); }
+            } catch (e) { console.error("Error loading products", e); }
         }
 
         function buildStopList(csvText) {
@@ -144,11 +144,15 @@
             const itemDiv = document.createElement('div');
             itemDiv.className = 'basket-item';
             
-            const firstHeader = masterProductData.length > 0 ? Object.keys(masterProductData[0])[0] : 'Item';
-            let options = masterProductData.map(p => `<option value="${p[firstHeader]}">${p[firstHeader]}</option>`).join('');
+            const allHeaders = masterProductData.length > 0 ? Object.keys(masterProductData[0]) : [];
+            const nameHeader = allHeaders.find(h => h.toLowerCase() === 'item') || 
+                               allHeaders.find(h => h.toLowerCase() === 'product') || 
+                               allHeaders[0] || 'Item';
+            
+            let options = masterProductData.map(p => `<option value="${p[nameHeader]}">${p[nameHeader]}</option>`).join('');
             
             itemDiv.innerHTML = `
-                <select class="p-sel" style="flex:2"><option value="">Select Item...</option>${options}</select>
+                <select class="p-sel" style="flex:2"><option value="">Select ${nameHeader}...</option>${options}</select>
                 <select class="u-sel" style="flex:1"><option value="">Unit</option></select>
                 <input type="number" class="q-inp" placeholder="Qty" style="width:50px;">
                 <button onclick="this.parentElement.remove()" style="color:red; background:none; border:none; cursor:pointer;">X</button>
@@ -158,7 +162,7 @@
             const uSel = itemDiv.querySelector('.u-sel');
             
             pSel.onchange = (e) => {
-                const found = masterProductData.find(p => p[firstHeader] === e.target.value);
+                const found = masterProductData.find(p => p[nameHeader] === e.target.value);
                 uSel.innerHTML = '<option value="">Unit</option>';
                 ['Box', 'Case', 'Slieve', 'Bottle', 'BOX', 'CASE', 'SLIEVE', 'BOTTLE'].forEach(u => {
                     if (found && found[u] && found[u].trim() !== "") uSel.innerHTML += `<option value="${u}">${u}</option>`;
