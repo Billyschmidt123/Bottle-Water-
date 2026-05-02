@@ -2,7 +2,7 @@ let map;
 let markers = [];
 
 function initMap() {
-    // Centers the map on the Grande Prairie region
+    // Defaulting to Grande Prairie area
     map = L.map('map').setView([55.1707, -118.7947], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
@@ -27,7 +27,7 @@ window.processCSV = function(csvText) {
         const lng = parseFloat(data.longitude || data.lng || data.long);
 
         if (!isNaN(lat) && !isNaN(lng)) {
-            const m = L.marker([lat, lng]).addTo(map).bindPopup(`<b>${data.company || "Delivery Stop"}</b><br>${data.address || ''}`);
+            const m = L.marker([lat, lng]).addTo(map).bindPopup(data.company || "Delivery Stop");
             markers.push(m);
         }
     });
