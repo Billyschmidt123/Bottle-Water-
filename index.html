@@ -9,6 +9,35 @@
     <link rel="stylesheet" href="CSS/main.css">
     <link rel="stylesheet" href="CSS/theme.css">
     <link rel="stylesheet" href="CSS/map.css">
+    
+    <style>
+        /* ADDITION START: RESTORE 70/30 SPLIT AND BUTTON STYLING */
+        .app-container {
+            display: flex;
+            flex-direction: row;
+            width: 100%;
+            height: calc(100vh - 60px);
+        }
+        #mapPanel {
+            flex: 0 0 70%;
+            width: 70%;
+            height: 100%;
+        }
+        #sidebar {
+            flex: 0 0 30%;
+            width: 30%;
+            height: 100%;
+            border-left: 1px solid #ccc;
+            overflow-y: auto;
+            background: #f9f9f9;
+        }
+        .topbar-right {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        /* ADDITION END */
+    </style>
 </head>
 <body>
     <header class="topbar">
@@ -19,17 +48,31 @@
             </select>
         </div>
         <div class="topbar-right">
+            <!-- ADDITION START: RESTORE MISSING BUTTONS -->
+            <button id="refreshGitHubListBtn" class="btn-top" style="background:#6f42c1; color:white;">
+                <i class="fab fa-github"></i> Sync Route List
+            </button>
+            <button class="btn-top openManagerBtn">
+                <i class="fas fa-user-gear"></i> Manager Portal
+            </button>
+            <button id="forceRefreshBtn" class="btn-top" onclick="window.location.reload()">
+                <i class="fas fa-sync-alt"></i> Force Refresh
+            </button>
+            <!-- ADDITION END -->
             <button id="refreshRoutesBtn" class="btn-top"><i class="fas fa-sync"></i> Refresh List</button>
         </div>
     </header>
 
     <div class="app-container">
+        <!-- POSITION MAINTAINED: MAP LEFT (70%), SIDEBAR RIGHT (30%) -->
+        <div id="mapPanel">
+            <div id="map" style="height: 100%; min-height: 600px;"></div>
+        </div>
         <aside id="sidebar">
             <div id="sidebarContent" style="padding: 20px; text-align: center; color: #666;">
                 Select a route to view stop cards.
             </div>
         </aside>
-        <div id="mapPanel"><div id="map" style="height: 600px;"></div></div>
     </div>
 
     <script>
@@ -101,6 +144,13 @@
         });
 
         document.getElementById('refreshRoutesBtn').addEventListener('click', autoSyncRoutes);
+
+        /* ADDITION START: BIND RESTORED SYNC BUTTON */
+        const syncBtn = document.getElementById('refreshGitHubListBtn');
+        if(syncBtn) {
+            syncBtn.addEventListener('click', autoSyncRoutes);
+        }
+        /* ADDITION END */
         
         // Start the auto-sync immediately
         autoSyncRoutes();
