@@ -48,7 +48,7 @@
     <div class="app-container">
         <div id="mapPanel">
 
-            <!-- === ADDED: Map top bar with current stop + controls === -->
+<!-- === ADDED: Map top bar with current stop + controls === -->
             <div id="mapTopBar">
                 <div id="currentStopInfo">
                     No stop selected
@@ -213,14 +213,6 @@
             });
         }
 
-        // Expected manifest file (you create this in the repo):
-        // ROUTES/routes-manifest.json
-        // {
-        //   "routes": [
-        //     { "id": "R1", "name": "Route 1", "file": "ROUTES/Week 1/route1.csv" },
-        //     { "id": "R2", "name": "Route 2", "file": "ROUTES/Week 2/route2.csv" }
-        //   ]
-        // }
         function fetchRouteManifest() {
             var url = 'ROUTES/routes-manifest.json?cacheBust=' + Date.now();
             return fetch(url, { cache: 'no-store' }).then(function (res) {
@@ -259,7 +251,6 @@
                     }
                     var promises = manifest.routes.map(function (routeDef) {
                         return fetchRouteCSV(routeDef).catch(function () {
-                            // If a single route fails, skip it but continue others
                             return null;
                         });
                     });
@@ -268,13 +259,11 @@
                         var cache = { routes: routes, refreshedAt: new Date().toISOString() };
                         saveRouteCache(cache);
                         populateRouteDropdown(routes);
-                        // expose for other scripts if needed
                         window.logiflowRouteCache = cache;
                         return cache;
                     });
                 })
                 .catch(function () {
-                    // On failure, keep whatever cache exists
                     var existing = loadRouteCache();
                     if (existing) {
                         populateRouteDropdown(existing.routes);
@@ -286,17 +275,14 @@
         }
 
         function initRouteSystem() {
-            // Load from cache first for speed
             var cached = loadRouteCache();
             if (cached && cached.routes && cached.routes.length) {
                 populateRouteDropdown(cached.routes);
                 window.logiflowRouteCache = cached;
             }
 
-            // Always refresh from GitHub on startup to keep data fresh
             refreshRoutesFromGitHub();
 
-            // Wire up Refresh button
             var refreshBtn = document.getElementById('refreshRoutesBtn');
             if (refreshBtn && !refreshBtn.__logiflowRoutesBound) {
                 refreshBtn.addEventListener('click', function (event) {
@@ -311,8 +297,7 @@
 
         document.addEventListener('DOMContentLoaded', function () {
             initManagerButtons();
-           // initRouteSystem();
-
+            // initRouteSystem();
         });
     })();
     </script>
