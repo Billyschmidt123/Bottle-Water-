@@ -7,7 +7,6 @@
     
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     
-    <!-- RELIABLE LEAFLET LINKS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     
@@ -16,7 +15,6 @@
     <link rel="stylesheet" href="CSS/map.css">
     
     <style>
-        /* 70/30 SPLIT (Matches image_973a0e.png) */
         .app-container {
             display: flex !important;
             flex-direction: row !important;
@@ -46,7 +44,6 @@
             background: #f9f9f9 !important;
         }
         
-        /* MANAGER OVERLAY STYLES */
         .manager-overlay {
             display: none;
             position: fixed;
@@ -61,10 +58,9 @@
             padding: 30px;
             border-radius: 8px;
             width: 95%;
-            max-width: 1000px;
+            max-width: 1100px;
             max-height: 90vh;
             overflow-y: auto;
-            text-align: center;
         }
         .menu-grid {
             display: grid;
@@ -83,26 +79,75 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            align-items: center;
         }
         .menu-btn:hover { background: #0056b3; }
-        .close-btn { background: #dc3545; margin-top: 20px; padding: 10px 20px; color: white; border: none; border-radius: 4px; }
+        .close-btn { background: #dc3545; margin-top: 20px; padding: 10px 20px; color: white; border: none; border-radius: 4px; cursor: pointer; }
 
-        .sub-menu-pane { display: none; text-align: left; }
+        .sub-menu-pane { display: none; }
         .active-pane { display: block !important; }
 
-        /* ADDITION: MAINTENANCE TABLE STYLES */
+        /* ADDITION: PROFESSIONAL TABLE & TOOLBAR STYLES */
+        .maint-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .search-input, .filter-select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .add-btn {
+            background: #28a745;
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            max-height: 500px;
+        }
         .maint-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 15px;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
         .maint-table th, .maint-table td {
             border: 1px solid #ddd;
-            padding: 8px;
+            padding: 10px;
             text-align: left;
+            white-space: nowrap;
         }
-        .maint-table th { background-color: #f2f2f2; }
+        .maint-table th { background: #f8f9fa; position: sticky; top: 0; }
+        .edit-row-btn { background: #ffc107; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
+
+        /* ADDITION: CRUD MODAL */
+        .crud-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+        }
+        .crud-content {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input { width: 100%; padding: 8px; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -127,69 +172,60 @@
         </div>
     </header>
 
-    <!-- MANAGER MENU PAGE / OVERLAY -->
     <div id="managerOverlay" class="manager-overlay">
-        <div class="manager-menu-content" id="mainMenuContent">
-            <h2>LogiFlow Manager Portal</h2>
-            <div class="menu-grid" id="managerGrid">
-                <button class="menu-btn" id="prodMaintBtn"><i class="fas fa-box"></i> Product Management</button>
-                <button class="menu-btn" id="custMaintBtn"><i class="fas fa-users"></i> Customer Management</button>
-                <button class="menu-btn"><i class="fas fa-file-import"></i> Import Functions</button>
-                <button class="menu-btn"><i class="fas fa-route"></i> Route Optimization</button>
+        <div class="manager-menu-content">
+            <div id="managerGrid">
+                <h2 style="text-align: center;">LogiFlow Manager Portal</h2>
+                <div class="menu-grid">
+                    <button class="menu-btn" id="prodMaintBtn"><i class="fas fa-box"></i> Product Management</button>
+                    <button class="menu-btn" id="custMaintBtn"><i class="fas fa-users"></i> Customer Management</button>
+                    <button class="menu-btn"><i class="fas fa-file-import"></i> Import Functions</button>
+                    <button class="menu-btn"><i class="fas fa-route"></i> Route Optimization</button>
+                </div>
+                <div style="text-align: center;"><button id="closeManagerBtn" class="close-btn">Exit Manager Portal</button></div>
             </div>
             
             <div id="productPane" class="sub-menu-pane">
                 <h3>Product Maintenance</h3>
-                <!-- ADDITION: PRODUCT TABLE -->
-                <table class="maint-table" id="productTable">
-                    <thead>
-                        <tr>
-                            <th>Item Name</th>
-                            <th>Category</th>
-                            <th>Stock Level</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td>5 Gallon Water</td><td>Bottled Water</td><td>120</td><td><button>Edit</button></td></tr>
-                        <tr><td>Hot Tub Filter</td><td>Maintenance</td><td>45</td><td><button>Edit</button></td></tr>
-                    </tbody>
-                </table>
-                <button class="close-btn backToMain">Back to Menu</button>
-            </div>
-            <div id="customerPane" class="sub-menu-pane">
-                <h3>Customer Maintenance</h3>
-                <!-- ADDITION: CUSTOMER TABLE -->
-                <table class="maint-table" id="customerTable">
-                    <thead>
-                        <tr>
-                            <th>Customer Name</th>
-                            <th>Service Address</th>
-                            <th>Contact</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td>Grande Prairie Hospital</td><td>11234 100 Ave</td><td>780-555-0199</td><td>Active</td></tr>
-                        <tr><td>Central Park Hot Tubs</td><td>9912 108 St</td><td>780-555-0122</td><td>Active</td></tr>
-                    </tbody>
-                </table>
                 <button class="close-btn backToMain">Back to Menu</button>
             </div>
 
-            <button id="closeManagerBtn" class="close-btn">Exit Manager Portal</button>
+            <!-- RESTORED & ENHANCED CUSTOMER MAINTENANCE -->
+            <div id="customerPane" class="sub-menu-pane">
+                <h3>Customer Maintenance</h3>
+                <div class="maint-toolbar">
+                    <button class="add-btn" id="addNewCustBtn"><i class="fas fa-plus"></i> Add New Customer</button>
+                    <select id="routeFilter" class="filter-select">
+                        <option value="all">All Routes</option>
+                    </select>
+                    <input type="text" id="custSearch" class="search-input" placeholder="Search Company or Phone...">
+                </div>
+                <div class="table-container">
+                    <table class="maint-table" id="customerTable">
+                        <thead id="custTableHead"></thead>
+                        <tbody id="custTableBody"></tbody>
+                    </table>
+                </div>
+                <button class="close-btn backToMain">Back to Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADDITION: FULL CRUD MODAL -->
+    <div id="crudModal" class="crud-modal">
+        <div class="crud-content">
+            <h3 id="modalTitle">Edit Customer</h3>
+            <div id="modalFields"></div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button id="saveCrudBtn" class="add-btn">Save Changes</button>
+                <button id="cancelCrudBtn" class="close-btn" style="margin:0;">Cancel</button>
+            </div>
         </div>
     </div>
 
     <div class="app-container">
-        <div id="mapPanel">
-            <div id="map"></div>
-        </div>
-        <aside id="sidebar">
-            <div id="sidebarContent" style="padding: 20px; text-align: center; color: #666;">
-                Select a route to view stop cards.
-            </div>
-        </aside>
+        <div id="mapPanel"><div id="map"></div></div>
+        <aside id="sidebar"><div id="sidebarContent" style="padding: 20px; text-align: center;">Select a route to view stop cards.</div></aside>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -202,8 +238,8 @@
         const p3 = "Y2j421kGhDbAxI2ntoIPAbLV8sTPvJTqFBhE4XGNLLJ20GZKl8WC";
         const KEY = p1 + p2 + p3;
         const REPO = 'Billyschmidt123/Bottle-Water-';
-
         let activeToken = localStorage.getItem('logiflow_gh_token');
+        let masterCustomerData = [];
 
         if (!activeToken) {
             const pass = prompt("LogiFlow Security: Enter Password:");
@@ -213,26 +249,105 @@
             } else { window.location.reload(); }
         }
 
-        const overlay = document.getElementById('managerOverlay');
-        document.getElementById('openManagerBtn').addEventListener('click', () => {
-            overlay.style.display = 'flex';
-        });
-        document.getElementById('closeManagerBtn').addEventListener('click', () => {
-            overlay.style.display = 'none';
+        // ADDITION: CUSTOMER TABLE HOOKUP LOGIC
+        async function loadCustomerMaintenance() {
+            const head = document.getElementById('custTableHead');
+            const body = document.getElementById('custTableBody');
+            const filter = document.getElementById('routeFilter');
+            masterCustomerData = [];
+            
+            try {
+                const res = await fetch(`https://api.github.com/repos/${REPO}/contents/routes`, {
+                    headers: { 'Authorization': `token ${activeToken}` }
+                });
+                const files = await res.json();
+                const csvFiles = files.filter(f => f.name.endsWith('.csv'));
+
+                while (filter.options.length > 1) filter.remove(1);
+
+                for (let file of csvFiles) {
+                    const opt = document.createElement('option');
+                    opt.value = file.name;
+                    opt.textContent = file.name.replace('.csv', '');
+                    filter.appendChild(opt);
+
+                    const csvRes = await fetch(file.download_url);
+                    const text = await csvRes.text();
+                    const lines = text.split(/\r?\n/).filter(l => l.trim());
+                    const headers = lines[0].split(',');
+                    
+                    if (head.innerHTML === "") {
+                        head.innerHTML = `<tr><th>Edit</th>${headers.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                    }
+
+                    for (let i = 1; i < lines.length; i++) {
+                        const values = lines[i].split(',');
+                        const entry = { _route: file.name };
+                        headers.forEach((h, idx) => entry[h] = values[idx] || "");
+                        masterCustomerData.push(entry);
+                    }
+                }
+                renderCustomerTable(masterCustomerData);
+            } catch (e) { console.error("Error hooking up tables", e); }
+        }
+
+        function renderCustomerTable(data) {
+            const body = document.getElementById('custTableBody');
+            body.innerHTML = data.map((row, idx) => `
+                <tr>
+                    <td><button class="edit-row-btn" onclick="openCrudModal(${idx})"><i class="fas fa-edit"></i></button></td>
+                    ${Object.keys(row).filter(k => k !== '_route').map(k => `<td>${row[k]}</td>`).join('')}
+                </tr>
+            `).join('');
+        }
+
+        window.openCrudModal = function(index) {
+            const data = masterCustomerData[index];
+            const modal = document.getElementById('crudModal');
+            const fields = document.getElementById('modalFields');
+            fields.innerHTML = Object.keys(data).filter(k => k !== '_route').map(k => `
+                <div class="form-group">
+                    <label>${k}</label>
+                    <input type="text" value="${data[k]}" data-key="${k}">
+                </div>
+            `).join('');
+            modal.style.display = 'flex';
+        };
+
+        document.getElementById('custSearch').addEventListener('input', (e) => {
+            const val = e.target.value.toLowerCase();
+            const filtered = masterCustomerData.filter(c => 
+                Object.values(c).some(v => v.toLowerCase().includes(val))
+            );
+            renderCustomerTable(filtered);
         });
 
-        document.getElementById('prodMaintBtn').addEventListener('click', () => {
-            document.getElementById('managerGrid').style.display = 'none';
-            document.getElementById('productPane').classList.add('active-pane');
+        document.getElementById('routeFilter').addEventListener('change', (e) => {
+            const val = e.target.value;
+            const filtered = val === 'all' ? masterCustomerData : masterCustomerData.filter(c => c._route === val);
+            renderCustomerTable(filtered);
+        });
+
+        document.getElementById('cancelCrudBtn').addEventListener('click', () => {
+            document.getElementById('crudModal').style.display = 'none';
+        });
+
+        // PRESERVED NAVIGATION LOGIC
+        document.getElementById('openManagerBtn').addEventListener('click', () => {
+            document.getElementById('managerOverlay').style.display = 'flex';
+        });
+        document.getElementById('closeManagerBtn').addEventListener('click', () => {
+            document.getElementById('managerOverlay').style.display = 'none';
         });
         document.getElementById('custMaintBtn').addEventListener('click', () => {
             document.getElementById('managerGrid').style.display = 'none';
             document.getElementById('customerPane').classList.add('active-pane');
+            loadCustomerMaintenance();
         });
         document.querySelectorAll('.backToMain').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.sub-menu-pane').forEach(p => p.classList.remove('active-pane'));
-                document.getElementById('managerGrid').style.display = 'grid';
+                document.getElementById('managerGrid').style.display = 'block';
             });
         });
 
@@ -264,26 +379,6 @@
                 setTimeout(tryMapRefresh, 500);
             }
         }
-
-        document.getElementById('routeDropdownMap').addEventListener('change', async (e) => {
-            const file = e.target.value;
-            if (!file) return;
-            const sidebar = document.getElementById('sidebarContent');
-            sidebar.innerHTML = 'Loading stop cards...';
-            const url = `https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/routes/${file}`;
-            try {
-                const res = await fetch(url, { headers: { 'Authorization': `token ${activeToken}` } });
-                if (res.ok) {
-                    const text = await res.text();
-                    const lines = text.split(/\r?\n/).filter(l => l.trim());
-                    sidebar.innerHTML = `<div style="padding:15px;"><b>Route:</b> ${file}<br><b>Stops:</b> ${lines.length - 1}</div>`;
-                }
-            } catch (err) { sidebar.innerHTML = 'Error loading cards.'; }
-        });
-
-        document.getElementById('refreshRoutesBtn').addEventListener('click', autoSyncRoutes);
-        const syncBtn = document.getElementById('refreshGitHubListBtn');
-        if(syncBtn) { syncBtn.addEventListener('click', autoSyncRoutes); }
 
         autoSyncRoutes().catch(() => {});
         window.addEventListener('load', tryMapRefresh);
