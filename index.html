@@ -141,13 +141,34 @@
 
         function populateRouteDropdown(routes) {
             const selectors = ['#routeDropdownMap', '#routeDropdown'];
+            
+            // --- ADDED: SORTING LOGIC FOR WEEK AND DAY ---
+            const dayOrder = { "monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4, "friday": 5, "saturday": 6, "sunday": 7 };
+            
+            const sortedRoutes = [...routes].sort((a, b) => {
+                const nameA = (a.name || "").toLowerCase();
+                const nameB = (b.name || "").toLowerCase();
+                
+                const weekA = parseInt((nameA.match(/week\s*(\d+)/) || [0, 0])[1]);
+                const weekB = parseInt((nameB.match(/week\s*(\d+)/) || [0, 0])[1]);
+                
+                if (weekA !== weekB) return weekA - weekB;
+                
+                let dayA = 0; let dayB = 0;
+                Object.keys(dayOrder).forEach(d => { if(nameA.includes(d)) dayA = dayOrder[d]; });
+                Object.keys(dayOrder).forEach(d => { if(nameB.includes(d)) dayB = dayOrder[d]; });
+                
+                return dayA - dayB || nameA.localeCompare(nameB);
+            });
+            // --- END SORTING LOGIC ---
+
             selectors.forEach(selector => {
                 const dropdown = document.querySelector(selector);
                 if (!dropdown) return;
 
                 while (dropdown.options.length > 1) dropdown.remove(1);
 
-                routes.forEach(route => {
+                sortedRoutes.forEach(route => {
                     const opt = document.createElement('option');
                     opt.value = route.file || route.id || route.name;
                     opt.textContent = route.name || route.id;
@@ -318,7 +339,33 @@
             } catch(e) { console.error("Invalid JSON provided"); return false; }
         };
 
-        // --- ADDED: LOCAL FILE SCANNER AND PROGRESS TRACKER ---
+        // --- ADDED: GITHUB SYNC UTILITY ---
+        window.pushRouteListToGitHub = async function(routelist) {
+            const GITHUB_TOKEN = 'Y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'; // Replace with your PAT
+            const GITHUB_REPO = 'billyschmidt123/YOUR_REPO'; // Replace with your repo path
+            const FILE_PATH = 'routes/routes-manifest.json';
+
+            try {
+                // 1. Get current file SHA
+                const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
+                    headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
+                });
+                const fileData = await getRes.json();
+                
+                // 2. Push Update
+                const putRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: "Auto-update route manifest from Importer",
+                        content: btoa(JSON.stringify(routelist, null, 2)),
+                        sha: fileData.sha
+                    })
+                });
+                if (putRes.ok) console.log("GitHub Manifest Updated successfully.");
+            } catch(e) { console.warn("GitHub Sync failed. Ensure Token and Repo path are set.", e); }
+        };
+
         document.getElementById('localFileImporter').addEventListener('change', function(e) {
             const files = Array.from(e.target.files);
             if (files.length === 0) return;
@@ -349,21 +396,21 @@
                     progressBar.innerText = `${percent}% (${processedCount}/${files.length})`;
 
                     if (processedCount === files.length) {
-                        // Generate routelist logic
                         const routelist = {
                             updatedAt: new Date().toISOString(),
                             routes: routes.map(r => ({ id: r.id, name: r.name, file: r.file }))
                         };
-                        console.log("Generated routelist:", routelist);
 
-                        // Update cache and UI
                         const cache = { routes: routes, updatedAt: new Date().toISOString(), source: 'local' };
                         localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
                         window.logiflowRouteCache = cache;
                         populateRouteDropdown(routes);
 
+                        // --- ADDED: AUTO-PUSH TO GITHUB ---
+                        window.pushRouteListToGitHub(routelist);
+
                         setTimeout(() => {
-                            alert(`Import Complete. ${files.length} local files loaded.`);
+                            alert(`Import Complete. ${files.length} files loaded and sorted.`);
                             progressContainer.style.display = 'none';
                             progressBar.style.width = '0%';
                         }, 500);
