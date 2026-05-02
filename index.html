@@ -141,7 +141,6 @@
 
         window.refreshRoutesFromGitHub = function() {
             console.log("Syncing with GitHub...");
-            // Use ROUTES/ for manifest but we'll check paths carefully for stops
             const manifestUrl = 'ROUTES/routes-manifest.json?cb=' + Date.now();
             
             return fetch(manifestUrl)
@@ -151,15 +150,15 @@
                 })
                 .then(manifest => {
                     const promises = manifest.routes.map(r => {
-                        // --- FIX ADDED HERE: Match the specific nested tree structure ---
+                        // --- FIX ADDED HERE: Match the exact triple-nesting in image_052f76.png ---
                         let targetPath = r.file;
                         
-                        // Handle the 'Others' path specifically based on the screenshot tree
+                        // If the path contains 'Others/', rewrite it to match the exact tree:
+                        // routes -> Others-20260423... -> Others -> file.csv
                         if (targetPath.includes('Others/')) {
-                            // Map to: routes/Others-20260423T171847Z-3-001/Others/
-                            targetPath = targetPath.replace('Others/', 'routes/Others-20260423T171847Z-3-001/Others/');
+                            const fileName = targetPath.split('/').pop();
+                            targetPath = 'routes/Others-20260423T171847Z-3-001/Others/' + fileName;
                         } else if (!targetPath.startsWith('routes/') && !targetPath.startsWith('ROUTES/')) {
-                            // Default to lowercase 'routes/' to match tree
                             targetPath = 'routes/' + targetPath;
                         }
                         // --- END FIX ---
