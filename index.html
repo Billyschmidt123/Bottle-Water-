@@ -15,6 +15,12 @@
     <link rel="stylesheet" href="CSS/map.css?v=1">
     <link rel="stylesheet" href="CSS/modal.css?v=1">
     <link rel="stylesheet" href="CSS/manager.css?v=1">
+    <!-- ADDED STYLES FOR PROGRESS TRACKER -->
+    <style>
+        #uploadProgressContainer { width: 100%; background: #eee; border-radius: 5px; margin: 10px 0; display: none; }
+        #uploadProgressBar { width: 0%; height: 20px; background: #28a745; border-radius: 5px; text-align: center; color: white; line-height: 20px; font-size: 12px; transition: width 0.3s; }
+        .upload-section { padding: 15px; border: 2px dashed #007bff; border-radius: 8px; margin: 10px; background: #f8f9fa; }
+    </style>
 </head>
 
 <body>
@@ -28,6 +34,14 @@
         </div>
 
         <div class="topbar-right">
+            <!-- NEW UPLOAD INTERFACE ADDED TO HEADER AREA -->
+            <div id="bulkUploadControls" style="display:inline-block; margin-right:10px; vertical-align: middle;">
+                <input type="file" id="bulkFilePicker" multiple accept=".csv" style="display:none;">
+                <button class="btn-top" onclick="document.getElementById('bulkFilePicker').click()">
+                    <i class="fas fa-upload"></i> Upload Routes (28)
+                </button>
+            </div>
+
             <button class="btn-top openManagerBtn">
                 <i class="fas fa-user-gear"></i> Manager Portal
             </button>
@@ -39,6 +53,11 @@
     </header>
 
     <div class="app-container">
+        <!-- PROGRESS BAR DISPLAY AREA -->
+        <div id="uploadProgressContainer">
+            <div id="uploadProgressBar">0%</div>
+        </div>
+
         <div id="mapPanel">
             <div id="mapTopBar">
                 <div id="currentStopInfo">No stop selected</div>
@@ -139,7 +158,6 @@
             });
         }
 
-        // --- UPDATED SEARCH LOGIC: Scans all routes and prevents overwriting ---
         window.searchAllRoutes = function(query) {
             const resultsBox = document.getElementById('searchResultsBox');
             if (!resultsBox) return;
@@ -160,7 +178,6 @@
             window.logiflowRouteCache.routes.forEach(route => {
                 if (route.stops && Array.isArray(route.stops)) {
                     const matches = route.stops.filter(stop => {
-                        // Check every field in the CSV row for a match
                         return Object.values(stop).some(val => 
                             String(val).toLowerCase().includes(searchTerm)
                         );
@@ -191,7 +208,6 @@
         window.selectSearchStop = function(encodedData) {
             const stopData = JSON.parse(decodeURIComponent(encodedData));
             console.log("Selected Stop Data:", stopData);
-            // This can be expanded to highlight the stop on the map
             if (window.showStopOnMap) window.showStopOnMap(stopData);
         };
 
@@ -303,6 +319,60 @@
                 }
             } catch(e) { console.error("Invalid JSON provided"); return false; }
         };
+
+        // --- NEW BULK UPLOAD AND PROGRESS LOGIC ADDED BELOW ---
+        document.getElementById('bulkFilePicker').addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+
+            const progressContainer = document.getElementById('uploadProgressContainer');
+            const progressBar = document.getElementById('uploadProgressBar');
+            progressContainer.style.display = 'block';
+
+            let routes = [];
+            let processedCount = 0;
+
+            files.forEach((file) => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const csvContent = event.target.result;
+                    const stops = parseCSV(csvContent);
+                    
+                    routes.push({
+                        id: file.name.replace('.csv', ''),
+                        name: file.name.replace('.csv', ''),
+                        file: file.name,
+                        stops: stops
+                    });
+
+                    processedCount++;
+                    const percent = Math.round((processedCount / files.length) * 100);
+                    progressBar.style.width = percent + '%';
+                    progressBar.innerText = `Processing: ${percent}% (${processedCount}/${files.length})`;
+
+                    if (processedCount === files.length) {
+                        // Create the routelist file structure in memory
+                        const routelist = {
+                            updatedAt: new Date().toISOString(),
+                            routes: routes.map(r => ({ id: r.id, name: r.name, file: r.file }))
+                        };
+
+                        // Update the system cache and dropdowns
+                        const cache = { routes: routes, updatedAt: new Date().toISOString() };
+                        localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
+                        window.logiflowRouteCache = cache;
+                        populateRouteDropdown(routes);
+
+                        setTimeout(() => {
+                            alert(`Success: ${files.length} routes imported and routelist created.`);
+                            progressContainer.style.display = 'none';
+                            progressBar.style.width = '0%';
+                        }, 500);
+                    }
+                };
+                reader.readAsText(file);
+            });
+        });
 
         document.addEventListener('DOMContentLoaded', () => {
             initManagerButtons();
