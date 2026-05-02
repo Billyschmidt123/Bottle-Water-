@@ -4,18 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LogiFlow Delivery System</title>
-    <meta name="theme-color" content="#007bff">
-
-    <link rel="icon" type="image/x-icon" href="./favicon.ico">
-    <link rel="stylesheet" href="ASSETS/LEAFLET/leaflet.css?v=1">
+    <link rel="stylesheet" href="ASSETS/LEAFLET/leaflet.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="CSS/main.css?v=1">
-    <link rel="stylesheet" href="CSS/theme.css?v=1">
-    <link rel="stylesheet" href="CSS/map.css?v=1">
-    <link rel="stylesheet" href="CSS/modal.css?v=1">
-    <link rel="stylesheet" href="CSS/manager.css?v=1">
+    <link rel="stylesheet" href="CSS/main.css">
+    <link rel="stylesheet" href="CSS/theme.css">
+    <link rel="stylesheet" href="CSS/map.css">
 </head>
-
 <body>
     <header class="topbar">
         <div class="topbar-left">
@@ -25,127 +19,91 @@
             </select>
         </div>
         <div class="topbar-right">
-            <button id="refreshGitHubListBtn" class="btn-top" style="background:#6f42c1; color:white;">
-                <i class="fab fa-github"></i> Sync Route List
-            </button>
-            <button class="btn-top openManagerBtn">
-                <i class="fas fa-user-gear"></i> Manager Portal
-            </button>
-            <button id="refreshRoutesBtn" class="btn-top">
-                <i class="fas fa-sync"></i> Force Refresh
-            </button>
+            <button id="refreshRoutesBtn" class="btn-top"><i class="fas fa-sync"></i> Refresh List</button>
         </div>
     </header>
 
     <div class="app-container">
         <aside id="sidebar">
-            <div id="sidebarContent">
-                <div style="padding: 20px; text-align: center; color: #666;">Ready for Route Selection</div>
+            <div id="sidebarContent" style="padding: 20px; text-align: center; color: #666;">
+                Select a route to view stop cards.
             </div>
         </aside>
-        <div id="mapPanel">
-            <div id="map" style="height: 600px;"></div>
-        </div>
+        <div id="mapPanel"><div id="map" style="height: 600px;"></div></div>
     </div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="JS/loader.js?v=1"></script>
 
     <script>
     (function () {
-        const STORAGE_KEY = 'logiflow_gh_token';
-        
-        // Split key to prevent simple scraping while maintaining stability
         const p1 = "github_pat_11BSXV7JI0";
         const p2 = "k1iv7Q6uVTCg_pJeYK0I";
         const p3 = "Y2j421kGhDbAxI2ntoIPAbLV8sTPvJTqFBhE4XGNLLJ20GZKl8WC";
-        const FINAL_KEY = p1 + p2 + p3;
+        const KEY = p1 + p2 + p3;
+        const REPO = 'Billyschmidt123/Bottle-Water-';
 
-        let token = localStorage.getItem(STORAGE_KEY);
+        let activeToken = localStorage.getItem('logiflow_gh_token');
 
-        // Security check for technicians
-        if (!token || token === "null" || token === "undefined") {
-            const pass = prompt("LogiFlow Security: Enter Access Password:");
-            
+        // Simple password gate
+        if (!activeToken) {
+            const pass = prompt("LogiFlow Security: Enter Password:");
             if (pass && pass.trim() === "2026!") {
-                localStorage.setItem(STORAGE_KEY, FINAL_KEY);
-                token = FINAL_KEY;
-                console.log("LogiFlow Unlocked.");
-            } else if (pass !== null) {
-                alert("Access Denied: Incorrect Password.");
-                window.location.reload();
-            }
+                localStorage.setItem('logiflow_gh_token', KEY);
+                activeToken = KEY;
+            } else { window.location.reload(); }
         }
 
-        const GITHUB = {
-            TOKEN: token,
-            REPO: 'Billyschmidt123/Bottle-Water-',
-            BASE: 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/'
-        };
-
-        async function apiCall(url, opts = {}) {
-            if (!GITHUB.TOKEN) return null;
+        // The "Set it and Forget it" Sync
+        async function autoSyncRoutes() {
+            const dropdown = document.getElementById('routeDropdownMap');
+            const url = `https://api.github.com/repos/${REPO}/contents/routes`;
+            
             try {
-                return await fetch(url, {
-                    ...opts,
-                    headers: { ...opts.headers, 'Authorization': `token ${GITHUB.TOKEN}` }
+                const res = await fetch(url, {
+                    headers: { 'Authorization': `token ${activeToken}` }
                 });
-            } catch (e) { return null; }
+                
+                if (res.ok) {
+                    const files = await res.json();
+                    const csvFiles = files.filter(f => f.name.endsWith('.csv'));
+                    
+                    // Clear and fill dropdown
+                    while (dropdown.options.length > 1) dropdown.remove(1);
+                    csvFiles.forEach(f => {
+                        const opt = document.createElement('option');
+                        opt.value = f.name;
+                        opt.textContent = f.name.replace('.csv', '');
+                        dropdown.appendChild(opt);
+                    });
+                    console.log("Routes synced automatically.");
+                } else {
+                    // Try again in 3 seconds if GitHub is busy
+                    setTimeout(autoSyncRoutes, 3000);
+                }
+            } catch (e) {
+                setTimeout(autoSyncRoutes, 3000);
+            }
         }
 
-        // --- STOP CARD HANDLER ---
-        window.refreshRoutesFromGitHub = async function() {
-            const res = await apiCall(GITHUB.BASE + 'routes/routes-manifest.json?cb=' + Date.now());
-            if (res && res.ok) {
-                const manifest = await res.json();
-                const dropdown = document.querySelector('#routeDropdownMap');
-                while (dropdown.options.length > 1) dropdown.remove(1);
-                manifest.routes.forEach(r => {
-                    const opt = document.createElement('option');
-                    opt.value = r.file;
-                    opt.textContent = r.name;
-                    dropdown.appendChild(opt);
-                });
-            }
-        };
-
+        // Handle Stop Card selection
         document.getElementById('routeDropdownMap').addEventListener('change', async (e) => {
             const file = e.target.value;
             if (!file) return;
             const sidebar = document.getElementById('sidebarContent');
-            sidebar.innerHTML = '<div style="padding: 20px;">Fetching Stop Cards...</div>';
+            sidebar.innerHTML = 'Loading stop cards...';
 
-            const res = await apiCall(GITHUB.BASE + 'routes/' + file + '?cb=' + Date.now());
-            if (res && res.ok) {
+            const url = `https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/routes/${file}`;
+            const res = await fetch(url, { headers: { 'Authorization': `token ${activeToken}` } });
+            
+            if (res.ok) {
                 const text = await res.text();
-                const count = text.split(/\r?\n/).filter(l => l.trim()).length - 1;
-                sidebar.innerHTML = `<div style="padding: 20px;">Loaded ${count} stop cards for delivery.</div>`;
+                const lines = text.split(/\r?\n/).filter(l => l.trim());
+                sidebar.innerHTML = `<div style="padding:15px;"><b>Route:</b> ${file}<br><b>Stops:</b> ${lines.length - 1}</div>`;
             }
         });
 
-        document.getElementById('refreshGitHubListBtn').addEventListener('click', async () => {
-            const res = await apiCall(`https://api.github.com/repos/${GITHUB.REPO}/contents/routes`);
-            if (res && res.ok) {
-                const files = (await res.json()).filter(f => f.name.endsWith('.csv')).map(f => ({
-                    id: f.name.replace('.csv', ''), name: f.name.replace('.csv', ''), file: f.name
-                }));
-                const manifest = { updatedAt: new Date().toISOString(), routes: files };
-                const manifestUrl = `https://api.github.com/repos/${GITHUB.REPO}/contents/routes/routes-manifest.json`;
-                const getRes = await apiCall(manifestUrl);
-                const sha = getRes && getRes.ok ? (await getRes.json()).sha : null;
-
-                await fetch(manifestUrl, {
-                    method: 'PUT',
-                    headers: { 'Authorization': `token ${GITHUB.TOKEN}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: "Update Route Manifest", content: btoa(JSON.stringify(manifest, null, 2)), sha })
-                });
-                await window.refreshRoutesFromGitHub();
-                alert("Route list synced successfully.");
-            }
-        });
-
-        document.getElementById('refreshRoutesBtn').addEventListener('click', window.refreshRoutesFromGitHub);
-        window.refreshRoutesFromGitHub();
+        document.getElementById('refreshRoutesBtn').addEventListener('click', autoSyncRoutes);
+        
+        // Start the auto-sync immediately
+        autoSyncRoutes();
     })();
     </script>
 </body>
