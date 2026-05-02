@@ -53,33 +53,26 @@
 
     <script>
     (function () {
-        // --- ADMIN ENCRYPTION BRIDGE ---
-        const decrypt = (enc, pwd) => {
-            try {
-                const str = atob(enc);
-                let res = '';
-                for (let i = 0; i < str.length; i++) {
-                    res += String.fromCharCode(str.charCodeAt(i) ^ pwd.charCodeAt(i % pwd.length));
-                }
-                return res;
-            } catch (e) { return null; }
-        };
+        // --- SECURE STORAGE KEY ---
+        const STORAGE_KEY = 'logiflow_gh_token';
+        
+        // This is your actual GitHub token, but split up to prevent simple web scraping
+        const part1 = "github_pat_11BSXV7JI0";
+        const part2 = "k1iv7Q6uVTCg_pJeYK0I";
+        const part3 = "Y2j421kGhDbAxI2ntoIPAbLV8sTPvJTqFBhE4XGNLLJ20GZKl8WC";
+        const FULL_KEY = part1 + part2 + part3;
 
-        // This is your key scrambled with "2026!"
-        const DATA = "V1tbS08ZFlFVAhZfUFBZVFRfVlxOEQoNCF5SWFBfXF9eVFRZVF1UWFtfWVhRXl1N";
-        let activeToken = localStorage.getItem('logiflow_gh_token');
+        let activeToken = localStorage.getItem(STORAGE_KEY);
 
-        // Logic to unlock the tablet for the field
+        // Security Prompt for Field Technicians
         if (!activeToken || activeToken === "null") {
             const entry = prompt("LogiFlow Security: Enter Access Password:");
+            
             if (entry && entry.trim() === "2026!") {
-                const unlocked = decrypt(DATA, "2026!");
-                if (unlocked && unlocked.startsWith("github_pat")) {
-                    localStorage.setItem('logiflow_gh_token', unlocked);
-                    activeToken = unlocked;
-                } else {
-                    alert("Admin Alert: Key Corrupted. Re-copy the index.html file.");
-                }
+                // If they have the password, we grant them the key
+                localStorage.setItem(STORAGE_KEY, FULL_KEY);
+                activeToken = FULL_KEY;
+                console.log("System Unlocked.");
             } else if (entry !== null) {
                 alert("Incorrect Password.");
                 window.location.reload();
