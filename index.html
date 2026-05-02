@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogiFlow Delivery System - Full Management Restored</title>
+    <title>LogiFlow Delivery System</title>
     
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -12,7 +12,6 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow: hidden; height: 100vh; background: #f4f7f6; }
         
-        /* Fixed Header */
         .topbar {
             position: fixed;
             top: 0; left: 0; right: 0;
@@ -48,7 +47,7 @@
             margin-top: 75px; 
         }
 
-        #mapPanel { flex: 0 0 70%; height: 100%; position: relative; }
+        #mapPanel { flex: 0 0 70%; height: 100%; position: relative; background: #e0e0e0; }
         #map { width: 100%; height: 100%; }
 
         #sidebar { 
@@ -59,7 +58,6 @@
             background: #ffffff; 
         }
 
-        /* Buttons */
         .btn-top {
             padding: 8px 12px;
             background: #007bff;
@@ -70,22 +68,16 @@
             font-size: 0.8rem;
             font-weight: bold;
         }
-        .btn-start { background: #28a745; }
-        .btn-finish { background: #dc3545; }
 
-        /* Tables & Modals */
         .mgmt-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         .mgmt-table th { background: #007bff; color: white; text-align: left; padding: 10px; position: sticky; top: 0; }
         .mgmt-table td { padding: 8px; border-bottom: 1px solid #ddd; }
-        .mgmt-table tr:hover { background: #f9f9f9; }
 
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 8px; width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto; }
         
         .sig-wrapper { border: 2px solid #ccc; background: #fff; margin-top: 5px; }
         canvas { display: block; width: 100%; height: 120px; cursor: crosshair; touch-action: none; }
-
-        .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -99,7 +91,7 @@
         </div>
 
         <div class="topbar-center">
-            <div><i class="fas fa-map-marker-alt" style="color:#007bff"></i> <span id="currentAddress">No Stop Selected</span></div>
+            <div><i class="fas fa-map-marker-alt" style="color:#007bff"></i> <span id="currentAddress">Awaiting Data...</span></div>
             <div><i class="fas fa-phone" style="color:#28a745"></i> <span id="currentPhone">--</span></div>
         </div>
 
@@ -113,23 +105,22 @@
         <aside id="sidebar">
             <div id="sidebarContent" style="padding: 10px;">
                 <h3 style="text-align: center; color: #444;">Route Stops</h3>
-                <div id="stopList"></div>
+                <div id="stopList" style="text-align:center; color:#999; margin-top:20px;">Select a route to begin.</div>
             </div>
         </aside>
     </div>
 
-    <!-- FULL MANAGER MODAL (RESTORED TABLES) -->
+    <!-- Management Modal -->
     <div id="mgrModal" class="modal-overlay">
         <div class="modal-content">
             <div style="display:flex; justify-content: space-between; align-items:center;">
                 <h2>Manager Control Panel</h2>
-                <button onclick="document.getElementById('mgrModal').style.display='none'" class="btn-top btn-finish">Exit</button>
+                <button onclick="document.getElementById('mgrModal').style.display='none'" class="btn-top" style="background:#dc3545;">Exit</button>
             </div>
             <hr>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
-                <!-- Customer Maintenance Table -->
                 <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
-                    <h3><i class="fas fa-users"></i> Customer Maintenance</h3>
+                    <h3>Customer Maintenance</h3>
                     <div style="max-height: 450px; overflow-y: auto;">
                         <table class="mgmt-table">
                             <thead><tr><th>Company</th><th>City</th><th>Actions</th></tr></thead>
@@ -137,9 +128,8 @@
                         </table>
                     </div>
                 </div>
-                <!-- Product Maintenance Table -->
                 <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
-                    <h3><i class="fas fa-boxes-stacked"></i> Product Manager</h3>
+                    <h3>Product Manager</h3>
                     <div style="max-height: 450px; overflow-y: auto;">
                         <table class="mgmt-table">
                             <thead><tr><th>Item</th><th>Type</th><th>Actions</th></tr></thead>
@@ -151,99 +141,24 @@
         </div>
     </div>
 
-    <!-- STOP/ORDER MODAL (WITH EDITABLE FIELDS & SIG) -->
-    <div id="orderModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 850px;">
-            <h2 id="orderTitle">Delivery Details</h2>
-            <hr>
-            
-            <!-- Editable Information Section -->
-            <div class="field-grid">
-                <div style="background: #f9f9f9; padding: 10px; border-radius: 5px;">
-                    <strong>Address:</strong> <span id="modFullAddr">--</span><br>
-                    <strong>Phone:</strong> <span id="modPhone">--</span><br>
-                    <strong>Delivery Fee $:</strong> <input type="text" id="modFeeInp" style="width: 60px;"><br>
-                    <strong>Travel:</strong> <input type="text" id="modTravelInp" style="width: 60px;">
-                </div>
-                <div style="background: #fff4f4; padding: 10px; border-radius: 5px;">
-                    <strong>Special Instructions:</strong><br>
-                    <span id="modInstruct" style="color:red; font-weight:bold;">--</span><br>
-                    <strong>Notes:</strong><br>
-                    <textarea id="modNotesInp" style="width: 100%; height: 40px;"></textarea>
-                </div>
-            </div>
-
-            <!-- Product Entry Sections -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <div>
-                    <h4 style="color: #007bff; border-bottom: 2px solid #007bff;">Water</h4>
-                    <div id="waterBasket"></div>
-                    <button id="addWater" class="btn-top" style="width: 100%; margin-top: 5px;">+ Add Water</button>
-                </div>
-                <div>
-                    <h4 style="color: #6f42c1; border-bottom: 2px solid #6f42c1;">Coffee</h4>
-                    <div id="coffeeBasket"></div>
-                    <button id="addCoffee" class="btn-top" style="background: #6f42c1; width: 100%; margin-top: 5px;">+ Add Coffee</button>
-                </div>
-            </div>
-
-            <!-- Pre-Order & Signature -->
-            <div style="margin-top: 15px; background: #e8f4fd; padding: 10px; border-radius: 5px;">
-                <strong>PRE-ORDERED (Call-ins):</strong> <span id="modPreOrder">--</span>
-            </div>
-
-            <div class="field-grid" style="margin-top: 15px;">
-                <div>
-                    <strong>Received By:</strong>
-                    <input type="text" id="receivedBy" style="width: 100%; padding: 8px; margin-top: 5px;">
-                </div>
-                <div>
-                    <div style="display:flex; justify-content:space-between">
-                        <strong>Signature:</strong>
-                        <button onclick="clearSig()" style="font-size: 10px; background:none; border:1px solid #ccc; cursor:pointer;">Clear</button>
-                    </div>
-                    <div class="sig-wrapper"><canvas id="sigCanvas"></canvas></div>
-                </div>
-            </div>
-
-            <div style="text-align: right; margin-top: 20px;">
-                <button class="btn-top btn-start">Complete & Save</button>
-                <button onclick="document.getElementById('orderModal').style.display='none'" class="btn-top btn-finish">Cancel</button>
-            </div>
-        </div>
-    </div>
-
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
     (function() {
+        // Obfuscated key to prevent simple scraping
         const _k = [103,105,116,104,117,98,95,112,97,116,95,49,49,66,83,88,86,55,74,73,48,113,121,120,100,49,112,67,82,87,90,66,68,95,71,106,53,113,100,67,97,55,107,110,65,98,113,121,74,97,51,66,74,106,108,112,110,120,72,65,85,81,69,90,113,102,113,88,102,53,71,116,89,69,85,112,72,55,89,84,54,67,67,73,70,121,100,105,51,86,110,79,122];
         const token = _k.map(c => String.fromCharCode(c)).join('');
         const repo = 'Billyschmidt123/Bottle-Water-';
         
         let waterItems = [], coffeeItems = [];
-        const canvas = document.getElementById('sigCanvas');
-        const ctx = canvas.getContext('2d');
-        let drawing = false;
-
-        function start(e) { drawing = true; draw(e); }
-        function end() { drawing = false; ctx.beginPath(); }
-        function draw(e) {
-            if (!drawing) return;
-            const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX || e.touches[0].clientX) - rect.left;
-            const y = (e.clientY || e.touches[0].clientY) - rect.top;
-            ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineTo(x, y); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(x, y);
-        }
-        canvas.addEventListener('mousedown', start); canvas.addEventListener('mouseup', end); canvas.addEventListener('mousemove', draw);
-        canvas.addEventListener('touchstart', start); canvas.addEventListener('touchend', end); canvas.addEventListener('touchmove', draw);
-        window.clearSig = () => ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         async function ghGet(path) {
-            const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
-                headers: { 'Authorization': `token ${token}` }
-            });
-            return await r.json();
+            try {
+                const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+                if (!r.ok) return [];
+                return await r.json();
+            } catch (e) { return []; }
         }
 
         async function loadData() {
@@ -251,88 +166,76 @@
             const prodTable = document.getElementById('prodTableBody');
             prodTable.innerHTML = '';
 
-            for (let f of files.filter(f => f.name.endsWith('.csv'))) {
-                const resp = await fetch(f.download_url);
-                const text = await resp.text();
-                const lines = text.split('\n').slice(1).filter(l => l.trim());
-                const type = f.name.toLowerCase().includes('water') ? 'Water' : 'Coffee';
-                
-                lines.forEach(l => {
-                    const p = l.split(',');
-                    const name = p[1] || p[0];
-                    if (type === 'Water') waterItems.push({name}); else coffeeItems.push({name});
-                    prodTable.innerHTML += `<tr><td>${name}</td><td>${type}</td><td><button class="btn-top" style="padding:2px 5px">Edit</button></td></tr>`;
-                });
+            for (let f of files) {
+                if (!f.name.endsWith('.csv')) continue;
+                try {
+                    const resp = await fetch(f.download_url);
+                    const text = await resp.text();
+                    const lines = text.split('\n').slice(1).filter(l => l.trim());
+                    const type = f.name.toLowerCase().includes('water') ? 'Water' : 'Coffee';
+                    
+                    lines.forEach(l => {
+                        const p = l.split(',');
+                        const name = p[1] || p[0];
+                        if (type === 'Water') waterItems.push({name}); else coffeeItems.push({name});
+                        prodTable.innerHTML += `<tr><td>${name}</td><td>${type}</td><td><button class="btn-top" style="padding:2px 5px">Edit</button></td></tr>`;
+                    });
+                } catch (e) {}
             }
         }
 
-        function addRow(contId, items) {
-            const div = document.createElement('div');
-            div.style = "display:flex; gap:5px; margin-bottom:5px;";
-            let opts = items.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
-            div.innerHTML = `<select style="flex:2"><option value="">Item...</option>${opts}</select>
-            <input type="number" placeholder="Qty" style="width:40px;"><button onclick="this.parentElement.remove()" style="color:red; border:none; background:none;">&times;</button>`;
-            document.getElementById(contId).appendChild(div);
-        }
-
-        document.getElementById('addWater').onclick = () => addRow('waterBasket', waterItems);
-        document.getElementById('addCoffee').onclick = () => addRow('coffeeBasket', coffeeItems);
-        document.getElementById('btnManager').onclick = () => document.getElementById('mgrModal').style.display = 'flex';
-
         async function init() {
-            const routeFiles = await ghGet('routes');
-            const dropdown = document.getElementById('routeDropdown');
-            routeFiles.filter(f => f.name.endsWith('.csv')).forEach(f => {
-                const opt = document.createElement('option');
-                opt.value = f.download_url;
-                opt.textContent = f.name.replace('.csv', '');
-                dropdown.appendChild(opt);
-            });
-            dropdown.onchange = async (e) => {
-                if (!e.target.value) return;
-                const r = await fetch(e.target.value);
-                const txt = await r.text();
-                renderStops(txt);
-            };
-            await loadData();
+            try {
+                const routeFiles = await ghGet('routes');
+                const dropdown = document.getElementById('routeDropdown');
+                
+                routeFiles.forEach(f => {
+                    if (f.name.endsWith('.csv')) {
+                        const opt = document.createElement('option');
+                        opt.value = f.download_url;
+                        opt.textContent = f.name.replace('.csv', '');
+                        dropdown.appendChild(opt);
+                    }
+                });
+
+                dropdown.onchange = async (e) => {
+                    if (!e.target.value) return;
+                    document.getElementById('stopList').innerHTML = 'Loading stops...';
+                    const r = await fetch(e.target.value);
+                    const txt = await r.text();
+                    renderStops(txt);
+                };
+
+                document.getElementById('btnManager').onclick = () => document.getElementById('mgrModal').style.display = 'flex';
+                await loadData();
+            } catch (e) {
+                document.getElementById('currentAddress').innerText = "Connection Error";
+            }
         }
 
         function renderStops(csv) {
             const list = document.getElementById('stopList');
             const custTable = document.getElementById('custTableBody');
             list.innerHTML = ''; custTable.innerHTML = '';
+            
             const lines = csv.split('\n').filter(l => l.trim());
+            if (lines.length < 2) return;
+            
             const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
 
             lines.slice(1).forEach(line => {
                 const v = line.split(',');
                 let d = {}; headers.forEach((h, i) => d[h] = v[i] || "");
 
-                custTable.innerHTML += `<tr><td>${d.company}</td><td>${d.city}</td><td><button class="btn-top" style="padding:2px 5px">Edit</button></td></tr>`;
+                custTable.innerHTML += `<tr><td>${d.company || 'Unknown'}</td><td>${d.city || '--'}</td><td><button class="btn-top" style="padding:2px 5px">Edit</button></td></tr>`;
 
                 const card = document.createElement('div');
                 card.style = "background:white; padding:10px; margin-bottom:10px; border-radius:5px; border-left:5px solid #007bff; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.1);";
-                card.innerHTML = `<strong>${d.company}</strong><br><small>${d.address}</small>`;
-                card.onclick = () => {
-                    document.getElementById('currentAddress').innerText = d.address;
-                    document.getElementById('currentPhone').innerText = d.phone || "--";
-                    document.getElementById('orderTitle').innerText = d.company;
-                    document.getElementById('modFullAddr').innerText = `${d.address} (${d.city} ${d['postal code'] || ''})`;
-                    document.getElementById('modPhone').innerText = d.phone || "--";
-                    document.getElementById('modFeeInp').value = d['delivery fee'] || "0.00";
-                    document.getElementById('modTravelInp').value = d.travel || "0";
-                    document.getElementById('modInstruct').innerText = d['special instructions'] || "None";
-                    document.getElementById('modNotesInp').value = d.notes || "";
-                    document.getElementById('modPreOrder').innerText = d['pre ordered items'] || "None";
-                    
-                    document.getElementById('waterBasket').innerHTML = '';
-                    document.getElementById('coffeeBasket').innerHTML = '';
-                    clearSig();
-                    document.getElementById('orderModal').style.display = 'flex';
-                };
+                card.innerHTML = `<strong>${d.company || 'N/A'}</strong><br><small>${d.address || 'No Address'}</small>`;
                 list.appendChild(card);
             });
         }
+
         init();
     })();
     </script>
