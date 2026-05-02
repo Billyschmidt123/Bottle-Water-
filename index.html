@@ -5,16 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LogiFlow Delivery System</title>
     
+    <!-- ADDITION: SILENCE FAVICON 404 ERRORS -->
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     
-    <link rel="stylesheet" href="ASSETS/LEAFLET/leaflet.css">
+    <!-- ADDITION: RELIABLE LEAFLET LINKS TO FIX 404 ERRORS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    
+    <!-- EXISTING CSS FILES -->
     <link rel="stylesheet" href="CSS/main.css">
     <link rel="stylesheet" href="CSS/theme.css">
     <link rel="stylesheet" href="CSS/map.css">
     
     <style>
-        /* 70/30 SPLIT (Matches image_973a0e.png) */
+        /* ADDITION: FORCE 70/30 SPLIT (Matches image_973a0e.png) */
         .app-container {
             display: flex !important;
             flex-direction: row !important;
@@ -23,7 +27,7 @@
             overflow: hidden !important;
         }
         #mapPanel {
-            order: 1 !important;
+            order: 1 !important; /* Map on Left */
             flex: 0 0 70% !important;
             width: 70% !important;
             height: 100% !important;
@@ -35,13 +39,18 @@
             background-color: #ddd; 
         }
         #sidebar {
-            order: 2 !important;
+            order: 2 !important; /* Sidebar on Right */
             flex: 0 0 30% !important;
             width: 30% !important;
             height: 100% !important;
             border-left: 1px solid #ccc !important;
             overflow-y: auto !important;
             background: #f9f9f9 !important;
+        }
+        .topbar-right {
+            display: flex !important;
+            gap: 10px !important;
+            align-items: center !important;
         }
     </style>
 </head>
@@ -54,6 +63,7 @@
             </select>
         </div>
         <div class="topbar-right">
+            <!-- RESTORED HEADER BUTTONS -->
             <button id="refreshGitHubListBtn" class="btn-top" style="background:#6f42c1; color:white;">
                 <i class="fab fa-github"></i> Sync Route List
             </button>
@@ -78,11 +88,13 @@
         </aside>
     </div>
 
-    <!-- 1. Load Leaflet Library -->
+    <!-- 1. LOAD LEAFLET FIRST -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- 2. Load your map initialization -->
+    
+    <!-- 2. LOAD YOUR MAP INITIALIZATION -->
     <script src="JS/map.js"></script>
 
+    <!-- 3. MAIN APPLICATION LOGIC -->
     <script>
     (function () {
         const p1 = "github_pat_11BSXV7JI0";
@@ -93,6 +105,7 @@
 
         let activeToken = localStorage.getItem('logiflow_gh_token');
 
+        // Password Security Gate
         if (!activeToken) {
             const pass = prompt("LogiFlow Security: Enter Password:");
             if (pass && pass.trim() === "2026!") {
@@ -101,6 +114,7 @@
             } else { window.location.reload(); }
         }
 
+        // GitHub Sync Logic
         async function autoSyncRoutes() {
             const dropdown = document.getElementById('routeDropdownMap');
             const url = `https://api.github.com/repos/${REPO}/contents/routes`;
@@ -120,25 +134,39 @@
             } catch (e) { setTimeout(autoSyncRoutes, 5000); }
         }
 
-        // Logic for refreshing the map size
+        // Map Size Recovery Logic
         let refreshAttempts = 0;
         function tryMapRefresh() {
             if (window.map && typeof window.map.invalidateSize === 'function') {
                 window.map.invalidateSize();
-                console.log("Map size successfully refreshed.");
+                console.log("LogiFlow: Map layout rendered.");
             } else if (refreshAttempts < 10) {
                 refreshAttempts++;
-                console.log("Waiting for map object... attempt " + refreshAttempts);
                 setTimeout(tryMapRefresh, 500);
-            } else {
-                console.error("Map object not found after 5 seconds. Check JS/map.js variable names.");
             }
         }
 
+        document.getElementById('routeDropdownMap').addEventListener('change', async (e) => {
+            const file = e.target.value;
+            if (!file) return;
+            const sidebar = document.getElementById('sidebarContent');
+            sidebar.innerHTML = 'Loading stop cards...';
+            const url = `https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/routes/${file}`;
+            try {
+                const res = await fetch(url, { headers: { 'Authorization': `token ${activeToken}` } });
+                if (res.ok) {
+                    const text = await res.text();
+                    const lines = text.split(/\r?\n/).filter(l => l.trim());
+                    sidebar.innerHTML = `<div style="padding:15px;"><b>Route:</b> ${file}<br><b>Stops:</b> ${lines.length - 1}</div>`;
+                }
+            } catch (err) { sidebar.innerHTML = 'Error loading cards.'; }
+        });
+
         document.getElementById('refreshRoutesBtn').addEventListener('click', autoSyncRoutes);
+        const syncBtn = document.getElementById('refreshGitHubListBtn');
+        if(syncBtn) { syncBtn.addEventListener('click', autoSyncRoutes); }
+
         autoSyncRoutes().catch(() => {});
-        
-        // Trigger the refresh loop
         window.addEventListener('load', tryMapRefresh);
     })();
     </script>
