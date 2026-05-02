@@ -95,18 +95,25 @@
                     const res = await fetch(file.download_url);
                     const text = await res.text();
                     const lines = text.split('\n').filter(l => l.trim());
+                    if (lines.length < 2) continue;
+
                     const headers = lines[0].split(',').map(h => h.trim());
+                    
                     const data = lines.slice(1).map(line => {
                         let obj = {};
                         const vals = line.split(',');
-                        headers.forEach((h, i) => obj[h] = vals[i] ? vals[i].trim() : "");
+                        headers.forEach((h, i) => {
+                            obj[h] = vals[i] ? vals[i].trim() : "";
+                        });
+                        // Use column 2 specifically as a fallback "itemName" property
+                        obj.itemName = vals[1] ? vals[1].trim() : obj[headers[1]];
                         return obj;
                     });
 
                     if (file.name.toLowerCase().includes('water')) waterProducts = data;
                     if (file.name.toLowerCase().includes('coffee')) coffeeProducts = data;
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error("Error loading CSVs:", e); }
         }
 
         function createRow(containerId, list, units) {
@@ -114,7 +121,9 @@
             const div = document.createElement('div');
             div.className = 'basket-item';
             
-            let opts = list.map(p => `<option value="${p.Item}">${p.Item}</option>`).join('');
+            // Build options using the dedicated itemName (Column 2)
+            let opts = list.map(p => `<option value="${p.itemName}">${p.itemName}</option>`).join('');
+            
             div.innerHTML = `
                 <select class="p-sel" style="flex:2"><option value="">Select Item...</option>${opts}</select>
                 <select class="u-sel" style="flex:1"><option value="">Unit</option></select>
@@ -126,9 +135,10 @@
             const uSel = div.querySelector('.u-sel');
             
             pSel.onchange = (e) => {
-                const found = list.find(p => p.Item === e.target.value);
+                const found = list.find(p => p.itemName === e.target.value);
                 uSel.innerHTML = '<option value="">Unit</option>';
                 if (!found) return;
+
                 units.forEach(u => {
                     const key = Object.keys(found).find(k => k.toLowerCase() === u.toLowerCase());
                     if (key && found[key] && found[key].toLowerCase() !== 'na' && found[key] !== "") {
@@ -139,8 +149,8 @@
             container.appendChild(div);
         }
 
-        document.getElementById('addWaterBtn').onclick = () => createRow('waterBasketItems', waterProducts, ['bottle', 'Case', 'Sleive']);
-        document.getElementById('addCoffeeBtn').onclick = () => createRow('coffeeBasketItems', coffeeProducts, ['Box', 'Case']);
+        document.getElementById('addWaterBtn').onclick = () => createRow('waterBasketItems', waterProducts, ['bottle', 'Case', 'Sleive', 'Sleeve']);
+        document.getElementById('addCoffeeBtn').onclick = () => createRow('coffeeBasketItems', coffeeProducts, ['Box', 'Case', 'Sleeve']);
 
         async function start() {
             const dropdown = document.getElementById('routeDropdownMap');
@@ -165,11 +175,14 @@
             const sidebar = document.getElementById('sidebarContent');
             sidebar.innerHTML = "";
             const lines = csv.split('\n').filter(l => l.trim());
+            if (lines.length < 2) return;
+
             const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
             lines.slice(1).forEach(line => {
                 const vals = line.split(',');
                 let data = {};
                 headers.forEach((h, i) => data[h] = vals[i] ? vals[i].trim() : "");
+                
                 const card = document.createElement('div');
                 card.className = 'stop-card';
                 card.innerHTML = `<b>${data.company || 'Customer'}</b><br>${data.address || ''}`;
