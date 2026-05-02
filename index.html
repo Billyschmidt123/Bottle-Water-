@@ -76,8 +76,8 @@
 
     <script>
     (function () {
-        // Simple XOR decoder
-        const decodeToken = (encoded, key) => {
+        // Core decryption math
+        const xorDecode = (encoded, key) => {
             try {
                 return atob(encoded).split('').map((char, i) => 
                     String.fromCharCode(char.charCodeAt(0) ^ key.charCodeAt(i % key.length))
@@ -85,149 +85,115 @@
             } catch(e) { return null; }
         };
 
-        // Your specific scrambled token
-        const SCRAMBLED = "V1tbS08ZFlFVAhZfUFBZVFRfVlxOEQoNCF5SWFBfXF9eVFRZVF1UWFtfWVhRXl1N"; 
+        // Scrambled version of your specific GitHub Token
+        const ENCODED_TOKEN = "V1tbS08ZFlFVAhZfUFBZVFRfVlxOEQoNCF5SWFBfXF9eVFRZVF1UWFtfWVhRXl1N"; 
+        const REQUIRED_PASS = "2026!"; // Hard-coded validation check
         
-        let activeToken = localStorage.getItem('logiflow_gh_token');
+        let token = localStorage.getItem('logiflow_gh_token');
         
-        // Force the prompt if no token is saved
-        if (!activeToken || activeToken === "null" || activeToken === "undefined") {
-            const driverPass = prompt("LogiFlow Security: Enter Route Access Password:");
+        // Validation loop to ensure the driver gets in
+        if (!token || token === "null") {
+            let entry = prompt("LogiFlow Security: Enter Route Access Password:");
             
-            // Clean the input to remove accidental spaces
-            const cleanPass = (driverPass || "").trim();
-
-            if (cleanPass === "2026!") {
-                const result = decodeToken(SCRAMBLED, "2026!");
-                if (result && result.startsWith("github_pat")) {
-                    localStorage.setItem('logiflow_gh_token', result);
-                    activeToken = result;
+            if (entry && entry.trim() === REQUIRED_PASS) {
+                const decrypted = xorDecode(ENCODED_TOKEN, REQUIRED_PASS);
+                if (decrypted && decrypted.startsWith("github_pat")) {
+                    localStorage.setItem('logiflow_gh_token', decrypted);
+                    token = decrypted;
                 } else {
-                    alert("System Error: Failed to unlock the key. Contact Admin.");
+                    alert("Security Error: Key decryption failed. Please contact the administrator.");
                 }
-            } else if (driverPass !== null) {
-                alert("Incorrect password. Please try again.");
-                window.location.reload(); // Refresh to try again
+            } else if (entry !== null) {
+                alert("Access Denied: Incorrect password.");
+                window.location.reload();
             }
         }
 
-        const GITHUB_CONFIG = {
-            TOKEN: activeToken, 
+        const GITHUB = {
+            KEY: token, 
             REPO: 'Billyschmidt123/Bottle-Water-',
-            BASE_RAW: 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/'
+            RAW: 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/'
         };
 
-        // Standard fetch wrapper
-        async function safeFetch(url, options = {}) {
-            if (!GITHUB_CONFIG.TOKEN) return null;
+        async function fetchGH(url, options = {}) {
+            if (!GITHUB.KEY) return null;
             try {
-                const response = await fetch(url, {
+                return await fetch(url, {
                     ...options,
-                    headers: { 
-                        ...(options.headers || {}),
-                        'Authorization': `token ${GITHUB_CONFIG.TOKEN}`
-                    }
+                    headers: { ...(options.headers || {}), 'Authorization': `token ${GITHUB.KEY}` }
                 });
-                return response;
             } catch (e) { return null; }
         }
 
-        // CSV to Stop Card Logic
-        function parseCSVToStopCards(text) {
-            const lines = text.split(/\r?\n/).filter(l => l.trim());
-            if (!lines.length) return [];
-            const headers = lines[0].split(',').map(h => h.trim());
-            return lines.slice(1).map(line => {
-                const values = line.split(',');
+        // Logic for Stop Cards
+        function processStopCards(text) {
+            const rows = text.split(/\r?\n/).filter(r => r.trim());
+            if (!rows.length) return [];
+            const cols = rows[0].split(',').map(c => c.trim());
+            return rows.slice(1).map(row => {
+                const vals = row.split(',');
                 const card = {};
-                headers.forEach((h, i) => {
-                    card[h] = (values[i] || '').trim();
-                });
+                cols.forEach((c, i) => { card[c] = (vals[i] || '').trim(); });
                 return card;
             });
         }
 
         window.refreshRoutesFromGitHub = async function() {
             try {
-                const res = await safeFetch(GITHUB_CONFIG.BASE_RAW + 'routes/routes-manifest.json?cb=' + Date.now());
+                const res = await fetchGH(GITHUB.RAW + 'routes/routes-manifest.json?cb=' + Date.now());
                 if (res && res.ok) {
                     const manifest = await res.json();
-                    populateRouteDropdown(manifest.routes);
+                    const dropdown = document.querySelector('#routeDropdownMap');
+                    while (dropdown.options.length > 1) dropdown.remove(1);
+                    manifest.routes.forEach(r => {
+                        const opt = document.createElement('option');
+                        opt.value = r.file;
+                        opt.textContent = r.name;
+                        dropdown.appendChild(opt);
+                    });
                 }
-            } catch (e) { console.warn("List sync failed."); }
+            } catch (e) { console.error("Manifest refresh failed."); }
         };
 
         document.getElementById('routeDropdownMap').addEventListener('change', async (e) => {
-            const fileName = e.target.value;
-            if (!fileName) return;
+            const file = e.target.value;
+            if (!file) return;
 
             const sidebar = document.getElementById('sidebarContent');
             sidebar.innerHTML = '<div style="padding: 20px;">Loading Stop Cards...</div>';
 
-            const res = await safeFetch(GITHUB_CONFIG.BASE_RAW + 'routes/' + fileName + '?cb=' + Date.now());
+            const res = await fetchGH(GITHUB.RAW + 'routes/' + file + '?cb=' + Date.now());
             if (res && res.ok) {
-                const csvText = await res.text();
-                const stopCards = parseCSVToStopCards(csvText);
-                sidebar.innerHTML = `<div style="padding: 20px;">Loaded ${stopCards.length} stop cards.</div>`;
+                const cards = processStopCards(await res.text());
+                sidebar.innerHTML = `<div style="padding: 20px;">Loaded ${cards.length} stop cards for field technician.</div>`;
             }
         });
 
-        window.syncRouteListFromGitHubDir = async function() {
-            const API_URL = `https://api.github.com/repos/${GITHUB_CONFIG.REPO}/contents/routes`;
+        document.getElementById('refreshGitHubListBtn').addEventListener('click', async () => {
+            const API = `https://api.github.com/repos/${GITHUB.REPO}/contents/routes`;
             try {
-                const res = await safeFetch(API_URL);
-                if (!res || !res.ok) throw new Error("GitHub Connection Failed.");
-
-                const data = await res.json();
-                const csvFiles = data.filter(f => f.name.endsWith('.csv')).map(f => ({
-                    id: f.name.replace('.csv', ''),
-                    name: f.name.replace('.csv', ''),
-                    file: f.name
+                const res = await fetchGH(API);
+                if (!res || !res.ok) throw new Error("GitHub access denied.");
+                const files = (await res.json()).filter(f => f.name.endsWith('.csv')).map(f => ({
+                    id: f.name.replace('.csv', ''), name: f.name.replace('.csv', ''), file: f.name
                 }));
+                
+                const manifest = { updatedAt: new Date().toISOString(), routes: files };
+                const manifestUrl = `https://api.github.com/repos/${GITHUB.REPO}/contents/routes/routes-manifest.json`;
+                const getRes = await fetchGH(manifestUrl);
+                const sha = getRes && getRes.ok ? (await getRes.json()).sha : null;
 
-                const manifest = { updatedAt: new Date().toISOString(), routes: csvFiles };
-                await pushManifestToGitHub(manifest);
+                await fetch(manifestUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `token ${GITHUB.KEY}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: "Update Manifest", content: btoa(JSON.stringify(manifest, null, 2)), sha })
+                });
                 await window.refreshRoutesFromGitHub();
-                alert(`Success: Found ${csvFiles.length} routes.`);
-            } catch (e) { alert("Sync Error: " + e.message); }
-        };
+                alert("Route list synced successfully.");
+            } catch (e) { alert("Sync failed: " + e.message); }
+        });
 
-        async function pushManifestToGitHub(manifest) {
-            const path = 'routes/routes-manifest.json';
-            const url = `https://api.github.com/repos/${GITHUB_CONFIG.REPO}/contents/${path}`;
-            const getRes = await safeFetch(url);
-            const sha = getRes && getRes.ok ? (await getRes.json()).sha : null;
-
-            await fetch(url, {
-                method: 'PUT',
-                headers: { 
-                    'Authorization': `token ${GITHUB_CONFIG.TOKEN}`, 
-                    'Content-Type': 'application/json' 
-                },
-                body: JSON.stringify({
-                    message: "Logiflow: Syncing Routes",
-                    content: btoa(JSON.stringify(manifest, null, 2)),
-                    sha: sha
-                })
-            });
-        }
-
-        function populateRouteDropdown(routes) {
-            const dropdown = document.querySelector('#routeDropdownMap');
-            if (!dropdown) return;
-            while (dropdown.options.length > 1) dropdown.remove(1);
-            routes.forEach(r => {
-                const opt = document.createElement('option');
-                opt.value = r.file;
-                opt.textContent = r.name;
-                dropdown.appendChild(opt);
-            });
-        }
-
-        document.getElementById('refreshGitHubListBtn').addEventListener('click', window.syncRouteListFromGitHubDir);
         document.getElementById('refreshRoutesBtn').addEventListener('click', window.refreshRoutesFromGitHub);
-
-        // Run on startup
         window.refreshRoutesFromGitHub();
     })();
     </script>
