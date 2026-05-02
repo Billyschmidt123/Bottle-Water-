@@ -155,10 +155,20 @@
                         populateRouteDropdown(window.logiflowRouteCache.routes);
                     }
 
-                    // ADDITION: Inject Buttons to Trigger Full Page Tables in Manager Portal
+                    // ADDITION: Inject Maintenance Buttons when Manager Portal is loaded
                     if (moduleName === 'manager-portal') {
-                        injectMgmtButton();
-                        injectProductMgmtButton();
+                        // Using a repeating interval to ensure buttons appear even if the DOM takes a moment to settle
+                        let checkCount = 0;
+                        const checkInterval = setInterval(() => {
+                            const sideContent = document.getElementById('sidebarContent');
+                            if (sideContent && sideContent.innerHTML.length > 100) {
+                                injectMgmtButton();
+                                injectProductMgmtButton();
+                                clearInterval(checkInterval);
+                            }
+                            if (checkCount > 10) clearInterval(checkInterval);
+                            checkCount++;
+                        }, 200);
                     }
                 })
                 .catch(err => console.error(err));
@@ -346,23 +356,21 @@
             });
         });
 
-        // --- ADDITIONS: FULL PAGE CUSTOMER TABLE ---
+        // --- CUSTOMER MAINTENANCE LOGIC ---
 
         function injectMgmtButton() {
-            setTimeout(() => {
-                const container = document.getElementById('sidebarContent');
-                if (container && !container.querySelector('.customer-mgmt-trigger')) {
-                    const btn = document.createElement('button');
-                    btn.className = 'btn-top customer-mgmt-trigger';
-                    btn.style.width = '100%';
-                    btn.style.marginTop = '10px';
-                    btn.style.background = '#007bff';
-                    btn.style.color = '#fff';
-                    btn.innerHTML = '<i class="fas fa-table"></i> Open Full Customer Table';
-                    btn.onclick = () => window.openFullPageTable();
-                    container.appendChild(btn);
-                }
-            }, 300);
+            const container = document.getElementById('sidebarContent');
+            if (container && !container.querySelector('.customer-mgmt-trigger')) {
+                const btn = document.createElement('button');
+                btn.className = 'btn-top customer-mgmt-trigger';
+                btn.style.width = '100%';
+                btn.style.marginTop = '10px';
+                btn.style.background = '#007bff';
+                btn.style.color = '#fff';
+                btn.innerHTML = '<i class="fas fa-table"></i> Open Full Customer Table';
+                btn.onclick = () => window.openFullPageTable();
+                container.appendChild(btn);
+            }
         }
 
         window.openFullPageTable = function() {
@@ -608,27 +616,25 @@
         // --- ADDITION: PRODUCT MAINTENANCE LOGIC ---
 
         function injectProductMgmtButton() {
-            setTimeout(() => {
-                const container = document.getElementById('sidebarContent');
-                if (container && !container.querySelector('.product-mgmt-trigger')) {
-                    const btn = document.createElement('button');
-                    btn.className = 'btn-top product-mgmt-trigger';
-                    btn.style.width = '100%';
-                    btn.style.marginTop = '10px';
-                    btn.style.background = '#28a745';
-                    btn.style.color = '#fff';
-                    btn.innerHTML = '<i class="fas fa-boxes-stacked"></i> Open Product Maintenance';
-                    btn.onclick = () => window.openProductTable();
-                    container.appendChild(btn);
-                }
-            }, 300);
+            const container = document.getElementById('sidebarContent');
+            if (container && !container.querySelector('.product-mgmt-trigger')) {
+                const btn = document.createElement('button');
+                btn.className = 'btn-top product-mgmt-trigger';
+                btn.style.width = '100%';
+                btn.style.marginTop = '10px';
+                btn.style.background = '#28a745';
+                btn.style.color = '#fff';
+                btn.innerHTML = '<i class="fas fa-boxes-stacked"></i> Open Product Maintenance';
+                btn.onclick = () => window.openProductTable();
+                container.appendChild(btn);
+            }
         }
 
         window.openProductTable = async function() {
             const overlay = document.getElementById('productOverlay');
             overlay.style.display = 'block';
 
-            // Load initial product data
+            // Load initial product data if not loaded
             if (!window._productData) {
                 await window.loadProductsFromGitHub();
             }
@@ -825,6 +831,22 @@
 
         initRouteSystem();
         initManagerButtons();
+        
+        // --- ADDITION: PERSISTENT UI OBSERVER ---
+        // This mutation observer ensures that if the sidebar content changes (e.g. Manager Portal is opened), 
+        // the Product Maintenance button is re-injected if it is missing.
+        const observer = new MutationObserver((mutations) => {
+            const sidebar = document.getElementById('sidebarContent');
+            if (sidebar && sidebar.innerText.includes('Manager Portal')) {
+                if (!sidebar.querySelector('.product-mgmt-trigger')) {
+                    injectProductMgmtButton();
+                }
+            }
+        });
+        const sidebarEl = document.getElementById('sidebarContent');
+        if (sidebarEl) {
+            observer.observe(sidebarEl, { childList: true, subtree: true });
+        }
     })();
     </script>
 </body>
