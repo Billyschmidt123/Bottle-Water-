@@ -84,6 +84,10 @@
         }
         .menu-btn:hover { background: #0056b3; }
         .close-btn { background: #dc3545; margin-top: 20px; padding: 10px 20px; color: white; border: none; border-radius: 4px; }
+
+        /* ADDITION: SUB-MENU STYLING */
+        .sub-menu-pane { display: none; text-align: left; }
+        .active-pane { display: block !important; }
     </style>
 </head>
 <body>
@@ -110,14 +114,28 @@
 
     <!-- MANAGER MENU PAGE / OVERLAY -->
     <div id="managerOverlay" class="manager-overlay">
-        <div class="manager-menu-content">
+        <div class="manager-menu-content" id="mainMenuContent">
             <h2>LogiFlow Manager Portal</h2>
-            <div class="menu-grid">
-                <button class="menu-btn"><i class="fas fa-box"></i> Product Management</button>
-                <button class="menu-btn"><i class="fas fa-users"></i> Customer Management</button>
+            <div class="menu-grid" id="managerGrid">
+                <!-- ADDITION: ID added to buttons for maintenance logic -->
+                <button class="menu-btn" id="prodMaintBtn"><i class="fas fa-box"></i> Product Management</button>
+                <button class="menu-btn" id="custMaintBtn"><i class="fas fa-users"></i> Customer Management</button>
                 <button class="menu-btn"><i class="fas fa-file-import"></i> Import Functions</button>
                 <button class="menu-btn"><i class="fas fa-route"></i> Route Optimization</button>
             </div>
+            
+            <!-- ADDITION: MAINTENANCE SUB-PAGES -->
+            <div id="productPane" class="sub-menu-pane">
+                <h3>Product Maintenance</h3>
+                <p>Loading Product Inventory...</p>
+                <button class="close-btn backToMain">Back to Menu</button>
+            </div>
+            <div id="customerPane" class="sub-menu-pane">
+                <h3>Customer Maintenance</h3>
+                <p>Loading Customer Records...</p>
+                <button class="close-btn backToMain">Back to Menu</button>
+            </div>
+
             <button id="closeManagerBtn" class="close-btn">Exit Manager Portal</button>
         </div>
     </div>
@@ -161,6 +179,22 @@
         });
         document.getElementById('closeManagerBtn').addEventListener('click', () => {
             overlay.style.display = 'none';
+        });
+
+        // ADDITION: MAINTENANCE BUTTON LOGIC
+        document.getElementById('prodMaintBtn').addEventListener('click', () => {
+            document.getElementById('managerGrid').style.display = 'none';
+            document.getElementById('productPane').classList.add('active-pane');
+        });
+        document.getElementById('custMaintBtn').addEventListener('click', () => {
+            document.getElementById('managerGrid').style.display = 'none';
+            document.getElementById('customerPane').classList.add('active-pane');
+        });
+        document.querySelectorAll('.backToMain').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.sub-menu-pane').forEach(p => p.classList.remove('active-pane'));
+                document.getElementById('managerGrid').style.display = 'grid';
+            });
         });
 
         async function autoSyncRoutes() {
