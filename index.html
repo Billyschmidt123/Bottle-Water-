@@ -15,7 +15,6 @@
     <link rel="stylesheet" href="CSS/map.css?v=1">
     <link rel="stylesheet" href="CSS/modal.css?v=1">
     <link rel="stylesheet" href="CSS/manager.css?v=1">
-    <!-- ADDED STYLES FOR PROGRESS TRACKER AND UPLOAD UI -->
     <style>
         #uploadProgressContainer { width: 100%; background: #eee; border-radius: 5px; margin: 10px 0; display: none; }
         #uploadProgressBar { width: 0%; height: 20px; background: #28a745; border-radius: 5px; text-align: center; color: white; line-height: 20px; font-size: 12px; transition: width 0.3s; }
@@ -35,10 +34,8 @@
         </div>
 
         <div class="topbar-right">
-            <!-- NEW LOCAL FILE PICKER ADDED -->
             <input type="file" id="localFileImporter" multiple accept=".csv" style="display:none;">
             
-            <!-- ADDED: REFRESH ROUTE LIST BUTTON -->
             <button id="refreshGitHubListBtn" class="btn-top github-refresh-btn">
                 <i class="fab fa-github"></i> Refresh Route List
             </button>
@@ -58,7 +55,6 @@
     </header>
 
     <div class="app-container">
-        <!-- ADDED PROGRESS TRACKER UI -->
         <div id="uploadProgressContainer" style="position: absolute; top: 60px; left: 50%; transform: translateX(-50%); width: 300px; z-index: 9999;">
             <div id="uploadProgressBar">0%</div>
         </div>
@@ -148,33 +144,24 @@
 
         function populateRouteDropdown(routes) {
             const selectors = ['#routeDropdownMap', '#routeDropdown'];
-            
-            // --- ADDED: SORTING LOGIC FOR WEEK AND DAY ---
             const dayOrder = { "monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4, "friday": 5, "saturday": 6, "sunday": 7 };
             
             const sortedRoutes = [...routes].sort((a, b) => {
                 const nameA = (a.name || "").toLowerCase();
                 const nameB = (b.name || "").toLowerCase();
-                
                 const weekA = parseInt((nameA.match(/week\s*(\d+)/) || [0, 0])[1]);
                 const weekB = parseInt((nameB.match(/week\s*(\d+)/) || [0, 0])[1]);
-                
                 if (weekA !== weekB) return weekA - weekB;
-                
                 let dayA = 0; let dayB = 0;
                 Object.keys(dayOrder).forEach(d => { if(nameA.includes(d)) dayA = dayOrder[d]; });
                 Object.keys(dayOrder).forEach(d => { if(nameB.includes(d)) dayB = dayOrder[d]; });
-                
                 return dayA - dayB || nameA.localeCompare(nameB);
             });
-            // --- END SORTING LOGIC ---
 
             selectors.forEach(selector => {
                 const dropdown = document.querySelector(selector);
                 if (!dropdown) return;
-
                 while (dropdown.options.length > 1) dropdown.remove(1);
-
                 sortedRoutes.forEach(route => {
                     const opt = document.createElement('option');
                     opt.value = route.file || route.id || route.name;
@@ -184,89 +171,24 @@
             });
         }
 
-        window.searchAllRoutes = function(query) {
-            const resultsBox = document.getElementById('searchResultsBox');
-            if (!resultsBox) return;
-
-            const searchTerm = query.toLowerCase().trim();
-            if (!searchTerm) {
-                resultsBox.innerHTML = '';
-                return;
-            }
-
-            if (!window.logiflowRouteCache || !window.logiflowRouteCache.routes) {
-                resultsBox.innerHTML = '<div class="search-item">Syncing routes... please wait.</div>';
-                return;
-            }
-
-            let allMatches = [];
-
-            window.logiflowRouteCache.routes.forEach(route => {
-                if (route.stops && Array.isArray(route.stops)) {
-                    const matches = route.stops.filter(stop => {
-                        return Object.values(stop).some(val => 
-                            String(val).toLowerCase().includes(searchTerm)
-                        );
-                    });
-
-                    matches.forEach(match => {
-                        allMatches.push({
-                            routeId: route.name || route.id,
-                            data: match
-                        });
-                    });
-                }
-            });
-
-            if (allMatches.length === 0) {
-                resultsBox.innerHTML = '<div class="search-item">No matches found in any file.</div>';
-            } else {
-                resultsBox.innerHTML = allMatches.map(item => `
-                    <div class="search-item" onclick="selectSearchStop('${encodeURIComponent(JSON.stringify(item.data))}')">
-                        <small style="color:#007bff;">[${item.routeId}]</small><br>
-                        <strong>${item.data.Customer || item.data.Name || 'Client'}</strong><br>
-                        <span style="font-size:0.85em;">${item.data.Address || 'No Address'}</span>
-                    </div>
-                `).join('');
-            }
-        };
-
-        window.selectSearchStop = function(encodedData) {
-            const stopData = JSON.parse(decodeURIComponent(encodedData));
-            console.log("Selected Stop Data:", stopData);
-            if (window.showStopOnMap) window.showStopOnMap(stopData);
-        };
-
         window.refreshRoutesFromGitHub = function() {
-            console.log("Syncing with GitHub...");
-            
             const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/';
             const manifestPath = 'routes/routes-manifest.json';
 
             return fetch(GITHUB_RAW_BASE + manifestPath + '?cb=' + Date.now())
                 .then(res => {
-                    // --- MODIFIED: SILENTLY HANDLE MISSING MANIFEST ---
-                    if (!res.ok) {
-                        console.warn("Manifest not found on GitHub. Application will use cached routes until 'Refresh Route List' is clicked.");
-                        return { routes: [] };
-                    }
+                    if (!res.ok) return { routes: [] };
                     return res.json();
                 })
                 .then(manifest => {
-                    if (!manifest.routes || manifest.routes.length === 0) return loadRouteCache();
-
+                    if (!manifest.routes || manifest.routes.length === 0) return;
                     const promises = manifest.routes.map(r => {
                         const targetPath = 'routes/' + r.file;
-                        
                         return fetch(GITHUB_RAW_BASE + targetPath + '?cb=' + Date.now())
-                            .then(res => {
-                                if (!res.ok) return null;
-                                return res.text();
-                            })
+                            .then(res => res.ok ? res.text() : null)
                             .then(csv => csv ? ({ ...r, stops: parseCSV(csv) }) : null)
                             .catch(() => null);
                     });
-
                     return Promise.all(promises);
                 })
                 .then(results => {
@@ -276,134 +198,58 @@
                     localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
                     window.logiflowRouteCache = cache;
                     populateRouteDropdown(routes);
-                    return cache;
                 });
         };
 
-        // --- FIXED: IMPROVED ERROR HANDLING FOR DIRECTORY SYNC ---
         window.syncRouteListFromGitHubDir = async function() {
             const GITHUB_REPO = 'Billyschmidt123/Bottle-Water-';
             const DIR_PATH = 'routes';
             const API_URL = `https://api.github.com/repos/${GITHUB_REPO}/contents/${DIR_PATH}`;
-
             try {
                 const res = await fetch(API_URL);
-                if (!res.ok) throw new Error("Could not access routes folder on GitHub.");
-                
+                if (!res.ok) throw new Error("Folder access failed.");
                 const files = await res.json();
                 const csvFiles = files.filter(f => f.name.endsWith('.csv')).map(f => ({
                     id: f.name.replace('.csv', ''),
                     name: f.name.replace('.csv', ''),
                     file: f.name
                 }));
-
-                if (csvFiles.length === 0) {
-                    alert("No CSV files found in the 'routes' folder on GitHub.");
-                    return;
-                }
-
-                const routelist = {
-                    updatedAt: new Date().toISOString(),
-                    routes: csvFiles
-                };
-
-                // Push new manifest then refresh
-                await window.pushRouteListToGitHub(routelist);
+                if (csvFiles.length === 0) return alert("No CSVs found.");
+                await window.pushRouteListToGitHub({ updatedAt: new Date().toISOString(), routes: csvFiles });
                 await window.refreshRoutesFromGitHub();
-                alert(`Success: ${csvFiles.length} routes imported from GitHub directory.`);
-            } catch (e) {
-                console.error(e);
-                alert("Error: " + e.message);
-            }
+                alert(`Synced ${csvFiles.length} routes.`);
+            } catch (e) { alert("Sync Error: " + e.message); }
         };
 
-        function loadRouteCache() {
-            try {
-                const raw = localStorage.getItem(ROUTE_CACHE_KEY);
-                return raw ? JSON.parse(raw) : null;
-            } catch (e) { return null; }
-        }
-
         function initRouteSystem() {
-            let cached = loadRouteCache();
-            
-            if (!cached) {
-                console.log("Initializing local cache...");
-                cached = { routes: [], updatedAt: new Date().toISOString() };
-                localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cached));
-            }
-
+            let cached = (function(){ try { return JSON.parse(localStorage.getItem(ROUTE_CACHE_KEY)); } catch(e){return null;}})();
             if (cached) {
                 window.logiflowRouteCache = cached;
                 populateRouteDropdown(cached.routes);
             }
-            
-            window.refreshRoutesFromGitHub().catch(e => console.warn("Initial sync check: " + e));
-
-            document.getElementById('refreshRoutesBtn').addEventListener('click', (e) => {
-                e.preventDefault();
-                window.refreshRoutesFromGitHub().then(() => alert("Routes Updated")).catch(err => alert("Update failed: " + err));
-            });
-
-            document.getElementById('refreshGitHubListBtn').addEventListener('click', () => {
-                window.syncRouteListFromGitHubDir();
-            });
+            window.refreshRoutesFromGitHub().catch(() => {});
+            document.getElementById('refreshGitHubListBtn').addEventListener('click', () => window.syncRouteListFromGitHubDir());
         }
-
-        window.closeModal = function() {
-            const container = document.getElementById('sidebarContent');
-            const header = container.querySelector('h2');
-            if (header && (header.textContent === 'Bulk Route Importer' || header.textContent === 'Bulk Route Importer & GitHub Sync')) {
-                window.loadModule('manager-portal');
-            } else {
-                container.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Select a route to begin.</div>';
-            }
-        };
-
-        window.updateManifestManually = function(jsonString) {
-            try {
-                const data = JSON.parse(jsonString);
-                if (data.routes) {
-                    const cache = { routes: data.routes, updatedAt: new Date().toISOString(), manual: true };
-                    localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
-                    window.logiflowRouteCache = cache;
-                    populateRouteDropdown(data.routes);
-                    return true;
-                }
-            } catch(e) { console.error("Invalid JSON provided"); return false; }
-        };
 
         window.pushRouteListToGitHub = async function(routelist) {
             const GITHUB_TOKEN = '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';
             const GITHUB_REPO = 'Billyschmidt123/Bottle-Water-';
             const FILE_PATH = 'routes/routes-manifest.json';
-
             try {
                 const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
                     headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
                 });
-                let sha = null;
-                if (getRes.ok) {
-                    const fileData = await getRes.json();
-                    sha = fileData.sha;
-                }
-                
-                const putRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
+                let sha = getRes.ok ? (await getRes.json()).sha : null;
+                await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
                     method: 'PUT',
                     headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        message: "Auto-update route manifest",
+                        message: "Update route manifest",
                         content: btoa(JSON.stringify(routelist, null, 2)),
                         sha: sha
                     })
                 });
-                
-                if (putRes.ok) {
-                    console.log("GitHub Manifest Updated successfully.");
-                } else {
-                    console.error("GitHub API response error:", await putRes.text());
-                }
-            } catch(e) { console.warn("GitHub Sync failed.", e); }
+            } catch(e) { console.error("GitHub push failed"); }
         };
 
         document.getElementById('localFileImporter').addEventListener('change', function(e) {
@@ -420,39 +266,29 @@
             files.forEach((file) => {
                 const reader = new FileReader();
                 reader.onload = function(event) {
-                    const csvContent = event.target.result;
-                    const stops = parseCSV(csvContent);
-                    
-                    routes.push({
-                        id: file.name.replace('.csv', ''),
-                        name: file.name.replace('.csv', ''),
-                        file: file.name,
-                        stops: stops
-                    });
-
+                    const stops = parseCSV(event.target.result);
+                    routes.push({ id: file.name.replace('.csv', ''), name: file.name.replace('.csv', ''), file: file.name, stops: stops });
                     processedCount++;
-                    const percent = Math.round((processedCount / files.length) * 100);
-                    progressBar.style.width = percent + '%';
-                    progressBar.innerText = `${percent}% (${processedCount}/${files.length})`;
+                    progressBar.style.width = Math.round((processedCount / files.length) * 100) + '%';
 
                     if (processedCount === files.length) {
-                        const routelist = {
-                            updatedAt: new Date().toISOString(),
-                            routes: routes.map(r => ({ id: r.id, name: r.name, file: r.file }))
-                        };
-
-                        const cache = { routes: routes, updatedAt: new Date().toISOString(), source: 'local' };
+                        // 1. Load routes into local cache first
+                        const cache = { routes: routes, updatedAt: new Date().toISOString() };
                         localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cache));
                         window.logiflowRouteCache = cache;
                         populateRouteDropdown(routes);
+                        
+                        progressContainer.style.display = 'none';
 
-                        window.pushRouteListToGitHub(routelist);
-
-                        setTimeout(() => {
-                            alert(`Import Complete. ${files.length} files loaded and synced.`);
-                            progressContainer.style.display = 'none';
-                            progressBar.style.width = '0%';
-                        }, 500);
+                        // 2. Ask if user wants to create the JSON route list
+                        const confirmSync = confirm(`Successfully loaded ${files.length} routes locally. \n\nWould you like to generate and sync the Route List (JSON) to GitHub now?`);
+                        
+                        if (confirmSync) {
+                            const routelist = { updatedAt: new Date().toISOString(), routes: routes.map(r => ({ id: r.id, name: r.name, file: r.file })) };
+                            window.pushRouteListToGitHub(routelist).then(() => {
+                                alert("Route List created and pushed to GitHub.");
+                            });
+                        }
                     }
                 };
                 reader.readAsText(file);
