@@ -139,10 +139,65 @@
             });
         }
 
+        // --- UPDATED SEARCH LOGIC: Scans all routes and prevents overwriting ---
+        window.searchAllRoutes = function(query) {
+            const resultsBox = document.getElementById('searchResultsBox');
+            if (!resultsBox) return;
+
+            const searchTerm = query.toLowerCase().trim();
+            if (!searchTerm) {
+                resultsBox.innerHTML = '';
+                return;
+            }
+
+            if (!window.logiflowRouteCache || !window.logiflowRouteCache.routes) {
+                resultsBox.innerHTML = '<div class="search-item">Syncing routes... please wait.</div>';
+                return;
+            }
+
+            let allMatches = [];
+
+            window.logiflowRouteCache.routes.forEach(route => {
+                if (route.stops && Array.isArray(route.stops)) {
+                    const matches = route.stops.filter(stop => {
+                        // Check every field in the CSV row for a match
+                        return Object.values(stop).some(val => 
+                            String(val).toLowerCase().includes(searchTerm)
+                        );
+                    });
+
+                    matches.forEach(match => {
+                        allMatches.push({
+                            routeId: route.name || route.id,
+                            data: match
+                        });
+                    });
+                }
+            });
+
+            if (allMatches.length === 0) {
+                resultsBox.innerHTML = '<div class="search-item">No matches found in any file.</div>';
+            } else {
+                resultsBox.innerHTML = allMatches.map(item => `
+                    <div class="search-item" onclick="selectSearchStop('${encodeURIComponent(JSON.stringify(item.data))}')">
+                        <small style="color:#007bff;">[${item.routeId}]</small><br>
+                        <strong>${item.data.Customer || item.data.Name || 'Client'}</strong><br>
+                        <span style="font-size:0.85em;">${item.data.Address || 'No Address'}</span>
+                    </div>
+                `).join('');
+            }
+        };
+
+        window.selectSearchStop = function(encodedData) {
+            const stopData = JSON.parse(decodeURIComponent(encodedData));
+            console.log("Selected Stop Data:", stopData);
+            // This can be expanded to highlight the stop on the map
+            if (window.showStopOnMap) window.showStopOnMap(stopData);
+        };
+
         window.refreshRoutesFromGitHub = function() {
             console.log("Syncing with GitHub...");
             
-            // FIX ADDED HERE: Attempting to find the manifest in updated locations
             const manifestOptions = [
                 'routes/routes-manifest.json',
                 'routes-manifest.json',
@@ -161,10 +216,8 @@
             return fetchManifest(0)
                 .then(manifest => {
                     const promises = manifest.routes.map(r => {
-                        // FIX ADDED HERE: Robust path resolution after directory deletion
                         let targetPath = r.file;
                         
-                        // Check if file is in an 'Others' folder or root
                         const tryPaths = [
                             targetPath,
                             'routes/' + targetPath,
@@ -210,12 +263,8 @@
             let cached = loadRouteCache();
             
             if (!cached) {
-                console.log("No manifest found. Creating initial JSON structure.");
-                cached = { 
-                    routes: [], 
-                    updatedAt: new Date().toISOString(),
-                    status: "initialized" 
-                };
+                console.log("Initializing local cache...");
+                cached = { routes: [], updatedAt: new Date().toISOString() };
                 localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(cached));
             }
 
