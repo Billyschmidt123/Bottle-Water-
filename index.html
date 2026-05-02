@@ -129,6 +129,11 @@
                     if (window.logiflowRouteCache) {
                         populateRouteDropdown(window.logiflowRouteCache.routes);
                     }
+
+                    // --- ADDED FIX: ENSURE CUSTOMER MGMT BUTTON APPEARS REGARDLESS OF 404 ---
+                    if (moduleName === 'manager-portal') {
+                        injectMgmtButton();
+                    }
                 })
                 .catch(err => console.error(err));
         };
@@ -191,7 +196,10 @@
 
             return fetch(GITHUB_RAW_BASE + manifestPath + '?cb=' + Date.now())
                 .then(res => {
-                    if (!res.ok) return { routes: [] };
+                    if (!res.ok) {
+                        console.warn("Manifest 404 - Normal for first-time setup.");
+                        return { routes: [] }; 
+                    }
                     return res.json();
                 })
                 .then(manifest => {
@@ -215,7 +223,8 @@
                         populateRouteDropdown(routes);
                     }
                     return safeResults;
-                });
+                })
+                .catch(err => console.log("Silent catch for initial fetch: ", err));
         };
 
         window.syncRouteListFromGitHubDir = async function() {
@@ -311,13 +320,30 @@
             });
         });
 
-        // --- NEW ADDITIONS START HERE: CUSTOMER MANAGEMENT FUNCTIONALITY ---
+        // --- NEW ADDITIONS START HERE ---
+
+        function injectMgmtButton() {
+            setTimeout(() => {
+                const container = document.getElementById('sidebarContent');
+                if (container && !container.querySelector('.customer-mgmt-trigger')) {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn-top customer-mgmt-trigger';
+                    btn.style.width = '100%';
+                    btn.style.marginTop = '10px';
+                    btn.style.background = '#007bff';
+                    btn.style.color = '#fff';
+                    btn.innerHTML = '<i class="fas fa-users-gear"></i> Customer Management';
+                    btn.onclick = window.openCustomerManagement;
+                    container.appendChild(btn);
+                }
+            }, 300);
+        }
 
         window.openCustomerManagement = function() {
             const container = document.getElementById('sidebarContent');
             if (!container) return;
 
-            if (!window.logiflowRouteCache || !window.logiflowRouteCache.routes) {
+            if (!window.logiflowRouteCache || !window.logiflowRouteCache.routes || window.logiflowRouteCache.routes.length === 0) {
                 alert("No route data found. Please import routes first.");
                 return;
             }
@@ -325,12 +351,10 @@
             let allStops = [];
             let headers = [];
 
-            // Extract all stops and find headers from the first valid stop
             window.logiflowRouteCache.routes.forEach(route => {
                 if (route.stops && Array.isArray(route.stops)) {
                     route.stops.forEach((stop, index) => {
                         if (headers.length === 0) headers = Object.keys(stop);
-                        // Store route info so we know where to save changes
                         allStops.push({ ...stop, _routeId: route.id, _localIndex: index });
                     });
                 }
@@ -338,9 +362,9 @@
 
             let html = `
                 <div style="padding:15px;">
-                    <h2>Customer Management</h2>
+                    <h3>Customer Management</h3>
                     <button class="btn-top" onclick="window.loadModule('manager-portal')">Back to Manager</button>
-                    <button class="btn-top btn-success" onclick="window.customerCRUD('create')">Add New Customer</button>
+                    <button class="btn-top btn-success" onclick="window.customerCRUD('create')">Add New</button>
                     
                     <div class="mgmt-table-container">
                         <table class="mgmt-table">
@@ -376,7 +400,7 @@
                 </div>
             `;
             container.innerHTML = html;
-            window._allStopsReference = allStops; // Temporary reference for CRUD
+            window._allStopsReference = allStops;
             window._headersReference = headers;
         };
 
@@ -386,7 +410,7 @@
             const stop = index !== undefined ? stops[index] : null;
 
             if (action === 'delete') {
-                if (!confirm("Are you sure you want to delete this customer?")) return;
+                if (!confirm("Delete this customer?")) return;
                 const rId = stop._routeId;
                 const route = window.logiflowRouteCache.routes.find(r => r.id === rId);
                 route.stops.splice(stop._localIndex, 1);
@@ -412,7 +436,7 @@
                 });
                 
                 if (action === 'create') {
-                    formHtml += `<div style="margin-bottom:10px;"><label>Select Route</label><select name="_targetRoute" style="width:100%;padding:8px;">`;
+                    formHtml += `<div style="margin-bottom:10px;"><label>Target Route</label><select name="_targetRoute" style="width:100%;padding:8px;">`;
                     window.logiflowRouteCache.routes.forEach(r => {
                         formHtml += `<option value="${r.id}">${r.name}</option>`;
                     });
@@ -421,7 +445,7 @@
 
                 formHtml += `
                     <div style="margin-top:20px;">
-                        <button type="button" class="btn-top btn-success" onclick="window.saveMgmtForm('${action}', ${index})">Save Changes</button>
+                        <button type="button" class="btn-top btn-success" onclick="window.saveMgmtForm('${action}', ${index})">Save</button>
                         <button type="button" class="btn-top" onclick="window.openCustomerManagement()">Cancel</button>
                     </div>
                 </form></div>`;
@@ -449,30 +473,8 @@
         function saveAndRefreshMgmt() {
             localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(window.logiflowRouteCache));
             window.openCustomerManagement();
-            alert("Changes saved to local memory.");
+            alert("Changes saved locally.");
         }
-
-        // Intercept module loading to inject the button into the Manager Portal UI dynamically
-        const originalLoadModule = window.loadModule;
-        window.loadModule = function(moduleName) {
-            originalLoadModule(moduleName);
-            if (moduleName === 'manager-portal') {
-                setTimeout(() => {
-                    const container = document.getElementById('sidebarContent');
-                    if (container && !container.querySelector('.customer-mgmt-trigger')) {
-                        const btn = document.createElement('button');
-                        btn.className = 'btn-top customer-mgmt-trigger';
-                        btn.style.width = '100%';
-                        btn.style.marginTop = '10px';
-                        btn.style.background = '#007bff';
-                        btn.style.color = '#fff';
-                        btn.innerHTML = '<i class="fas fa-users-gear"></i> Customer Management';
-                        btn.onclick = window.openCustomerManagement;
-                        container.appendChild(btn);
-                    }
-                }, 300);
-            }
-        };
 
         // --- NEW ADDITIONS END ---
 
