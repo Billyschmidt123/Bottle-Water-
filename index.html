@@ -33,6 +33,8 @@
         .btn-edit { background: #ffc107; color: #000; }
         .btn-toggle { background: #17a2b8; color: #fff; }
         .btn-delete { background: #dc3545; color: #fff; }
+        .mgmt-filter-bar { display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap; }
+        .mgmt-filter-bar input, .mgmt-filter-bar select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
     </style>
 </head>
 
@@ -130,7 +132,7 @@
                         populateRouteDropdown(window.logiflowRouteCache.routes);
                     }
 
-                    // --- ADDED FIX: ENSURE CUSTOMER MGMT BUTTON APPEARS REGARDLESS OF 404 ---
+                    // ADDITION: Inject Customer Mgmt Button into Manager Portal
                     if (moduleName === 'manager-portal') {
                         injectMgmtButton();
                     }
@@ -197,8 +199,8 @@
             return fetch(GITHUB_RAW_BASE + manifestPath + '?cb=' + Date.now())
                 .then(res => {
                     if (!res.ok) {
-                        console.warn("Manifest 404 - Normal for first-time setup.");
-                        return { routes: [] }; 
+                        console.warn("Manifest not found on GitHub yet.");
+                        return { routes: [] };
                     }
                     return res.json();
                 })
@@ -224,7 +226,7 @@
                     }
                     return safeResults;
                 })
-                .catch(err => console.log("Silent catch for initial fetch: ", err));
+                .catch(err => console.log("Initial load check: ", err));
         };
 
         window.syncRouteListFromGitHubDir = async function() {
@@ -320,7 +322,7 @@
             });
         });
 
-        // --- NEW ADDITIONS START HERE ---
+        // --- NEW ADDITIONS START HERE: CUSTOMER MANAGEMENT & FILTERING ---
 
         function injectMgmtButton() {
             setTimeout(() => {
@@ -344,81 +346,116 @@
             if (!container) return;
 
             if (!window.logiflowRouteCache || !window.logiflowRouteCache.routes || window.logiflowRouteCache.routes.length === 0) {
-                alert("No route data found. Please import routes first.");
+                alert("Please import files from Local Drive first to read customer data.");
                 return;
             }
 
             let allStops = [];
             let headers = [];
 
+            // Read all stops from all cached CSV routes
             window.logiflowRouteCache.routes.forEach(route => {
                 if (route.stops && Array.isArray(route.stops)) {
                     route.stops.forEach((stop, index) => {
                         if (headers.length === 0) headers = Object.keys(stop);
-                        allStops.push({ ...stop, _routeId: route.id, _localIndex: index });
+                        allStops.push({ ...stop, _routeId: route.id, _routeName: route.name, _localIndex: index });
                     });
                 }
             });
 
+            window._allStopsReference = allStops;
+            window._headersReference = headers;
+
+            renderMgmtUI(allStops);
+        };
+
+        function renderMgmtUI(dataList) {
+            const container = document.getElementById('sidebarContent');
+            const headers = window._headersReference;
+            const routes = window.logiflowRouteCache.routes;
+
             let html = `
                 <div style="padding:15px;">
                     <h3>Customer Management</h3>
-                    <button class="btn-top" onclick="window.loadModule('manager-portal')">Back to Manager</button>
-                    <button class="btn-top btn-success" onclick="window.customerCRUD('create')">Add New</button>
+                    <div class="mgmt-filter-bar">
+                        <select id="filterRoute" onchange="window.filterMgmtTable()">
+                            <option value="">All Routes</option>
+                            ${routes.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+                        </select>
+                        <input type="text" id="filterCompany" placeholder="Search Company..." onkeyup="window.filterMgmtTable()">
+                        <input type="text" id="filterPhone" placeholder="Search Phone..." onkeyup="window.filterMgmtTable()">
+                        <button class="btn-top" onclick="window.loadModule('manager-portal')">Exit</button>
+                        <button class="btn-top btn-success" onclick="window.customerCRUD('create')">Add New</button>
+                    </div>
                     
                     <div class="mgmt-table-container">
                         <table class="mgmt-table">
                             <thead>
                                 <tr>
+                                    <th>Route</th>
                                     ${headers.map(h => `<th>${h}</th>`).join('')}
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                ${allStops.map((stop, globalIndex) => {
-                                    const isActive = stop.Status !== 'Inactive';
-                                    return `
-                                        <tr>
-                                            ${headers.map(h => `<td>${stop[h] || ''}</td>`).join('')}
-                                            <td>
-                                                <span class="status-pill ${isActive ? 'status-active' : 'status-inactive'}">
-                                                    ${isActive ? 'Active' : 'Inactive'}
-                                                </span>
-                                            </td>
-                                            <td class="mgmt-actions">
-                                                <button class="btn-edit" onclick="window.customerCRUD('update', ${globalIndex})"><i class="fas fa-edit"></i></button>
-                                                <button class="btn-toggle" onclick="window.customerCRUD('toggle', ${globalIndex})"><i class="fas fa-power-off"></i></button>
-                                                <button class="btn-delete" onclick="window.customerCRUD('delete', ${globalIndex})"><i class="fas fa-trash"></i></button>
-                                            </td>
-                                        </tr>
-                                    `;
-                                }).join('')}
+                            <tbody id="mgmtTableBody">
+                                ${renderTableRows(dataList)}
                             </tbody>
                         </table>
                     </div>
                 </div>
             `;
             container.innerHTML = html;
-            window._allStopsReference = allStops;
-            window._headersReference = headers;
+        }
+
+        function renderTableRows(list) {
+            const headers = window._headersReference;
+            return list.map((stop, idx) => {
+                const isActive = stop.Status !== 'Inactive';
+                return `
+                    <tr>
+                        <td style="font-weight:bold; font-size:11px;">${stop._routeName}</td>
+                        ${headers.map(h => `<td>${stop[h] || ''}</td>`).join('')}
+                        <td><span class="status-pill ${isActive ? 'status-active' : 'status-inactive'}">${isActive ? 'Active' : 'Inactive'}</span></td>
+                        <td class="mgmt-actions">
+                            <button class="btn-edit" onclick="window.customerCRUD('update', ${idx})"><i class="fas fa-edit"></i></button>
+                            <button class="btn-toggle" onclick="window.customerCRUD('toggle', ${idx})"><i class="fas fa-power-off"></i></button>
+                            <button class="btn-delete" onclick="window.customerCRUD('delete', ${idx})"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        window.filterMgmtTable = function() {
+            const routeVal = document.getElementById('filterRoute').value.toLowerCase();
+            const compVal = document.getElementById('filterCompany').value.toLowerCase();
+            const phoneVal = document.getElementById('filterPhone').value.toLowerCase();
+            
+            const filtered = window._allStopsReference.filter(s => {
+                const routeMatch = !routeVal || s._routeId.toLowerCase() === routeVal;
+                // Assuming 'Company' and 'Phone' are common headers. If headers differ, we check all keys.
+                const compMatch = !compVal || Object.values(s).some(v => String(v).toLowerCase().includes(compVal));
+                const phoneMatch = !phoneVal || Object.values(s).some(v => String(v).toLowerCase().includes(phoneVal));
+                return routeMatch && compMatch && phoneMatch;
+            });
+
+            document.getElementById('mgmtTableBody').innerHTML = renderTableRows(filtered);
         };
 
-        window.customerCRUD = function(action, index) {
+        window.customerCRUD = function(action, globalIdx) {
             const stops = window._allStopsReference;
             const headers = window._headersReference;
-            const stop = index !== undefined ? stops[index] : null;
+            const stop = globalIdx !== undefined ? stops[globalIdx] : null;
 
             if (action === 'delete') {
                 if (!confirm("Delete this customer?")) return;
-                const rId = stop._routeId;
-                const route = window.logiflowRouteCache.routes.find(r => r.id === rId);
+                const route = window.logiflowRouteCache.routes.find(r => r.id === stop._routeId);
                 route.stops.splice(stop._localIndex, 1);
                 saveAndRefreshMgmt();
             } 
             else if (action === 'toggle') {
-                const rId = stop._routeId;
-                const route = window.logiflowRouteCache.routes.find(r => r.id === rId);
+                const route = window.logiflowRouteCache.routes.find(r => r.id === stop._routeId);
                 const target = route.stops[stop._localIndex];
                 target.Status = (target.Status === 'Inactive') ? 'Active' : 'Inactive';
                 saveAndRefreshMgmt();
@@ -434,32 +471,24 @@
                         </div>
                     `;
                 });
-                
                 if (action === 'create') {
-                    formHtml += `<div style="margin-bottom:10px;"><label>Target Route</label><select name="_targetRoute" style="width:100%;padding:8px;">`;
-                    window.logiflowRouteCache.routes.forEach(r => {
-                        formHtml += `<option value="${r.id}">${r.name}</option>`;
-                    });
+                    formHtml += `<div style="margin-bottom:10px;"><label>Route</label><select name="_targetRoute" style="width:100%;padding:8px;">`;
+                    window.logiflowRouteCache.routes.forEach(r => formHtml += `<option value="${r.id}">${r.name}</option>`);
                     formHtml += `</select></div>`;
                 }
-
-                formHtml += `
-                    <div style="margin-top:20px;">
-                        <button type="button" class="btn-top btn-success" onclick="window.saveMgmtForm('${action}', ${index})">Save</button>
-                        <button type="button" class="btn-top" onclick="window.openCustomerManagement()">Cancel</button>
-                    </div>
-                </form></div>`;
+                formHtml += `<div style="margin-top:20px;"><button type="button" class="btn-top btn-success" onclick="window.saveMgmtForm('${action}', ${globalIdx})">Save</button>
+                    <button type="button" class="btn-top" onclick="window.openCustomerManagement()">Cancel</button></div></form></div>`;
                 document.getElementById('sidebarContent').innerHTML = formHtml;
             }
         };
 
-        window.saveMgmtForm = function(action, index) {
+        window.saveMgmtForm = function(action, globalIdx) {
             const formData = new FormData(document.getElementById('mgmtForm'));
             const data = {};
-            formData.forEach((value, key) => { data[key] = value; });
+            formData.forEach((v, k) => { data[k] = v; });
 
             if (action === 'update') {
-                const stopRef = window._allStopsReference[index];
+                const stopRef = window._allStopsReference[globalIdx];
                 const route = window.logiflowRouteCache.routes.find(r => r.id === stopRef._routeId);
                 Object.assign(route.stops[stopRef._localIndex], data);
             } else {
@@ -473,7 +502,7 @@
         function saveAndRefreshMgmt() {
             localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(window.logiflowRouteCache));
             window.openCustomerManagement();
-            alert("Changes saved locally.");
+            alert("Updated successfully.");
         }
 
         // --- NEW ADDITIONS END ---
