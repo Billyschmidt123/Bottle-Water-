@@ -5,28 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LogiFlow Delivery System</title>
     
-    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    
     <link rel="stylesheet" href="CSS/main.css">
-    <link rel="stylesheet" href="CSS/theme.css">
-    <link rel="stylesheet" href="CSS/map.css">
     
     <style>
         .app-container { display: flex; flex-direction: row; width: 100%; height: calc(100vh - 60px); overflow: hidden; }
         #mapPanel { flex: 0 0 70%; height: 100%; position: relative; }
-        #map { width: 100%; height: 100%; background-color: #ddd; }
+        #map { width: 100%; height: 100%; }
         #sidebar { flex: 0 0 30%; height: 100%; border-left: 1px solid #ccc; overflow-y: auto; background: #f9f9f9; }
         
         .order-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; justify-content: center; align-items: center; background: rgba(0,0,0,0.7); }
         .order-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 900px; max-height: 90vh; overflow-y: auto; }
 
-        .topbar { background: #fff; padding: 10px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center; height: 60px; box-sizing: border-box; }
-        .btn-top { padding: 8px 15px; margin-left: 5px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
+        .topbar { background: #fff; padding: 10px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center; height: 60px; }
+        .btn-top { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
         
         .stop-card { background: white; margin: 10px; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); cursor: pointer; border-left: 5px solid #007bff; }
-        .basket-item { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px; }
+        .basket-item { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px; border: 1px solid #dee2e6; }
+        
+        .product-section { margin-top: 15px; padding: 10px; border: 1px solid #eee; border-radius: 8px; }
+        .water-header { color: #007bff; font-weight: bold; }
+        .coffee-header { color: #6f42c1; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -34,10 +34,8 @@
         <div>
             <b style="font-size: 1.2rem; margin-right: 20px;">LogiFlow</b>
             <select id="routeDropdownMap"><option value="">-- Select Route --</option></select>
-            <button class="btn-top" style="background:#28a745">START ROUTE</button>
         </div>
         <div>
-            <button class="btn-top" style="background:#495057">MANAGER MENU</button>
             <button class="btn-top" style="background:#6c757d" onclick="window.location.reload()">REFRESH</button>
         </div>
     </header>
@@ -46,22 +44,20 @@
         <div class="order-content">
             <h2 id="orderCompanyName">Stop Details</h2>
             <hr>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                <div>
-                    <p><strong>Address:</strong> <span id="orderFullAddress"></span></p>
-                    <p><strong>Phone:</strong> <span id="orderPhone"></span></p>
-                    <p><strong>Instructions:</strong> <span id="orderInstructions"></span></p>
-                </div>
-                <div>
-                    <p><strong>Delivery Slip:</strong> <span id="orderPO"></span></p>
-                    <p><strong>Fee:</strong> <span id="orderFee"></span></p>
-                    <p><strong>Travel:</strong> <span id="orderTravel"></span></p>
-                </div>
-            </div>
             
-            <h3>Shopping Basket</h3>
-            <div id="basketItems"></div>
-            <button id="addItemBtn" style="background: #007bff; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer;">+ Add Item</button>
+            <!-- Water Section -->
+            <div class="product-section">
+                <div class="water-header"><i class="fas fa-tint"></i> Water Products</div>
+                <div id="waterBasketItems"></div>
+                <button id="addWaterBtn" style="background: #007bff; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; margin-top: 5px;">+ Add Water</button>
+            </div>
+
+            <!-- Coffee Section -->
+            <div class="product-section">
+                <div class="coffee-header"><i class="fas fa-coffee"></i> Coffee Products</div>
+                <div id="coffeeBasketItems"></div>
+                <button id="addCoffeeBtn" style="background: #6f42c1; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; margin-top: 5px;">+ Add Coffee</button>
+            </div>
 
             <div style="text-align: right; margin-top: 20px;">
                 <button id="saveOrderBtn" style="background: #28a745; color: white; border: none; padding: 12px 25px; border-radius: 4px; cursor: pointer;">Save Order</button>
@@ -82,7 +78,9 @@
         const _s = [103,105,116,104,117,98,95,112,97,116,95,49,49,66,83,88,86,55,74,73,48,113,121,120,100,49,112,67,82,87,90,66,68,95,71,106,53,113,100,67,97,55,107,110,65,98,113,121,74,97,51,66,74,106,108,112,110,120,72,65,85,81,69,90,113,102,113,88,102,53,71,116,89,69,85,112,72,55,89,84,54,67,67,73,70,121,100,105,51,86,110,79,122];
         const KEY = _s.map(c => String.fromCharCode(c)).join('');
         const REPO = 'Billyschmidt123/Bottle-Water-';
-        let masterProductData = [];
+        
+        let waterProducts = [];
+        let coffeeProducts = [];
 
         async function ghFetch(path) {
             const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
@@ -91,48 +89,46 @@
             return await res.json();
         }
 
-        async function fetchProducts() {
+        async function loadProductData() {
             try {
                 const files = await ghFetch('Products');
-                const csvFiles = files.filter(f => f.name.toLowerCase().endsWith('.csv'));
-                
-                for (const file of csvFiles) {
+                for (const file of files) {
+                    if (!file.name.endsWith('.csv')) continue;
                     const res = await fetch(file.download_url);
                     const text = await res.text();
-                    const lines = text.split('\n').filter(l => l.trim());
-                    if (lines.length < 2) continue;
-
-                    const headers = lines[0].split(',').map(h => h.trim());
+                    const data = parseCSV(text);
                     
-                    const fileData = lines.slice(1).map(line => {
-                        const vals = line.split(',');
-                        let obj = {};
-                        headers.forEach((h, i) => obj[h] = vals[i] ? vals[i].trim() : "");
-                        return obj;
-                    });
-                    masterProductData = masterProductData.concat(fileData);
+                    if (file.name.toLowerCase().includes('water')) {
+                        waterProducts = data;
+                    } else if (file.name.toLowerCase().includes('coffee')) {
+                        coffeeProducts = data;
+                    }
                 }
-            } catch (e) { console.error("Error loading products", e); }
+            } catch (e) { console.error("Error loading CSVs", e); }
         }
 
-        document.getElementById('addItemBtn').onclick = () => {
-            const container = document.getElementById('basketItems');
-            if (masterProductData.length === 0) return alert("Still loading product files...");
+        function parseCSV(text) {
+            const lines = text.split('\n').filter(l => l.trim());
+            if (lines.length < 2) return [];
+            const headers = lines[0].split(',').map(h => h.trim());
+            return lines.slice(1).map(line => {
+                const vals = line.split(',');
+                let obj = {};
+                headers.forEach((h, i) => obj[h] = vals[i] ? vals[i].trim() : "");
+                return obj;
+            });
+        }
 
+        function createItemRow(containerId, productList, unitTypes) {
+            const container = document.getElementById(containerId);
             const itemDiv = document.createElement('div');
             itemDiv.className = 'basket-item';
             
-            // Priority column is "Item" from your screenshots
-            const firstEntryHeaders = Object.keys(masterProductData[0]);
-            const itemKey = firstEntryHeaders.find(h => h.toLowerCase() === "item") || "Item";
-            
-            let options = masterProductData.map(p => {
-                const val = p[itemKey] || "Unknown Item";
-                return `<option value="${val}">${val}</option>`;
-            }).join('');
+            // "Item" is the standard column name from your files
+            let options = productList.map(p => `<option value="${p.Item}">${p.Item}</option>`).join('');
             
             itemDiv.innerHTML = `
-                <select class="p-sel" style="flex:2"><option value="">Select Item...</option>${options}</select>
+                <select class="p-sel" style="flex:2"><option value="">Select Product...</option>${options}</select>
                 <select class="u-sel" style="flex:1"><option value="">Unit</option></select>
                 <input type="number" class="q-inp" placeholder="Qty" style="width:50px;">
                 <button onclick="this.parentElement.remove()" style="color:red; background:none; border:none; cursor:pointer;"><i class="fas fa-trash"></i></button>
@@ -142,23 +138,25 @@
             const uSel = itemDiv.querySelector('.u-sel');
             
             pSel.onchange = (e) => {
-                const found = masterProductData.find(p => p[itemKey] === e.target.value);
+                const found = productList.find(p => p.Item === e.target.value);
                 uSel.innerHTML = '<option value="">Unit</option>';
-                
-                // Match unit columns exactly as they appear in Water.csv and Coffee.csv
-                const unitChecklist = ['Case', 'Box', 'Sleeve', 'Slieve', 'bottle'];
-                
-                unitChecklist.forEach(unitName => {
-                    // Find header case-insensitively
-                    const header = Object.keys(found).find(h => h.toLowerCase() === unitName.toLowerCase());
-                    if (header && found[header] && found[header].trim() !== "" && found[header].toLowerCase() !== "na") {
-                        // Display the unit as listed in the column or the header name
-                        uSel.innerHTML += `<option value="${unitName}">${unitName}</option>`;
+                if (!found) return;
+
+                unitTypes.forEach(u => {
+                    const header = Object.keys(found).find(h => h.toLowerCase() === u.toLowerCase());
+                    if (header && found[header] && found[header].toLowerCase() !== "na" && found[header] !== "") {
+                        uSel.innerHTML += `<option value="${header}">${header}</option>`;
                     }
                 });
             };
             container.appendChild(itemDiv);
-        };
+        }
+
+        document.getElementById('addWaterBtn').onclick = () => 
+            createItemRow('waterBasketItems', waterProducts, ['bottle', 'Case', 'Sleive']);
+
+        document.getElementById('addCoffeeBtn').onclick = () => 
+            createItemRow('coffeeBasketItems', coffeeProducts, ['Box', 'Case']);
 
         function buildStopList(csvText) {
             const sidebar = document.getElementById('sidebarContent');
@@ -176,13 +174,8 @@
                 card.innerHTML = `<b>${data.company || 'Customer'}</b><br>${data.address || ''}`;
                 card.onclick = () => {
                     document.getElementById('orderCompanyName').innerText = data.company || "Details";
-                    document.getElementById('orderFullAddress').innerText = data.address || '';
-                    document.getElementById('orderPhone').innerText = data.phone || "--";
-                    document.getElementById('orderInstructions').innerText = data.special_instructions || "None";
-                    document.getElementById('orderPO').innerText = data['delivery slip'] || "--";
-                    document.getElementById('orderFee').innerText = data.delivery_fee || "$0.00";
-                    document.getElementById('orderTravel').innerText = data.travel || "0";
-                    document.getElementById('basketItems').innerHTML = "";
+                    document.getElementById('waterBasketItems').innerHTML = "";
+                    document.getElementById('coffeeBasketItems').innerHTML = "";
                     document.getElementById('orderModal').style.display = 'flex';
                 };
                 sidebar.appendChild(card);
@@ -192,7 +185,8 @@
         async function start() {
             const dropdown = document.getElementById('routeDropdownMap');
             const files = await ghFetch('routes');
-            files.filter(f => f.name.toLowerCase().endsWith('.csv')).forEach(file => {
+            files.forEach(file => {
+                if (!file.name.endsWith('.csv')) return;
                 const opt = document.createElement('option');
                 opt.value = file.download_url;
                 opt.textContent = file.name.replace('.csv', '');
@@ -204,7 +198,7 @@
                 buildStopList(csv);
                 if (window.processCSV) window.processCSV(csv);
             };
-            await fetchProducts();
+            await loadProductData();
         }
         start();
     })();
