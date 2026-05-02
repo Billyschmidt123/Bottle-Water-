@@ -2,7 +2,7 @@ let map;
 let markers = [];
 
 function initMap() {
-    // Standard view for Grande Prairie area
+    // Centers the map on the Grande Prairie region
     map = L.map('map').setView([55.1707, -118.7947], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
