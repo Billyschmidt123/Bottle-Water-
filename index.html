@@ -126,7 +126,6 @@
         .maint-table th { background: #f8f9fa; position: sticky; top: 0; }
         .edit-row-btn { background: #ffc107; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
 
-        /* ADDITION: WIDER MODAL & SCHEDULING STYLES */
         .crud-modal {
             display: none;
             position: fixed;
@@ -140,7 +139,7 @@
             background: white;
             padding: 25px;
             border-radius: 8px;
-            width: 800px; /* Wider for Professional Look */
+            width: 800px; 
             max-width: 90%;
             max-height: 90vh;
             overflow-y: auto;
@@ -175,6 +174,18 @@
             cursor: pointer;
             font-weight: bold;
         }
+        /* FIX ADDITION: TOGGLE BUTTON STYLE */
+        .toggle-view-btn {
+            margin-left: 10px;
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: 1px solid #ccc;
+            background: #fff;
+            cursor: pointer;
+        }
+        .toggle-active { color: #28a745; border-color: #28a745; }
+        .toggle-inactive { color: #dc3545; border-color: #dc3545; }
     </style>
 </head>
 <body>
@@ -235,13 +246,11 @@
         </div>
     </div>
 
-    <!-- ENHANCED CRUD MODAL -->
     <div id="crudModal" class="crud-modal">
         <div class="crud-content">
             <h3 id="modalTitle">Customer File Maintenance</h3>
             <div id="modalFields" class="form-grid"></div>
             
-            <!-- ADDITION: PURCHASE ORDER & STATUS -->
             <div class="form-grid" style="margin-top:10px;">
                 <div class="form-group">
                     <label>Purchase Order (PO)</label>
@@ -256,7 +265,6 @@
                 </div>
             </div>
 
-            <!-- ADDITION: SCHEDULING SECTION -->
             <div class="scheduling-section">
                 <h4>Scheduling & Route Assignments</h4>
                 <div id="currentRoutesList" style="margin-bottom: 10px;"></div>
@@ -358,6 +366,17 @@
             `).join('');
         }
 
+        // FIX ADDITION: TOGGLE LOGIC
+        window.toggleRouteView = function(btn) {
+            if (btn.innerText === "Deactivate") {
+                btn.innerText = "Activate";
+                btn.className = "toggle-view-btn toggle-inactive";
+            } else {
+                btn.innerText = "Deactivate";
+                btn.className = "toggle-view-btn toggle-active";
+            }
+        };
+
         window.openCrudModal = function(index) {
             currentEditIndex = index;
             const data = masterCustomerData[index];
@@ -372,13 +391,17 @@
                 </div>
             `).join('');
             
-            // Render Route Chips with Delete Key
-            routeList.innerHTML = `<div class="route-chip">${data._route} <span class="remove-route" onclick="removeRouteFromCust('${data._route}')">×</span></div>`;
+            // FIX ADDITION: RENDER WITH DEACTIVATE BUTTON
+            routeList.innerHTML = `
+                <div class="route-chip">
+                    ${data._route} 
+                    <button class="toggle-view-btn toggle-active" onclick="toggleRouteView(this)">Deactivate</button>
+                    <span class="remove-route" onclick="removeRouteFromCust('${data._route}')">×</span>
+                </div>`;
             
             modal.style.display = 'flex';
         };
 
-        // ADDITION: SAVE TO GITHUB LOGIC
         document.getElementById('saveCrudBtn').addEventListener('click', async () => {
             if (currentEditIndex === null) return;
             const btn = document.getElementById('saveCrudBtn');
@@ -388,13 +411,11 @@
             const originalData = masterCustomerData[currentEditIndex];
             const fileName = originalData._route;
             
-            // Get updated values from fields
             const updatedEntry = { ...originalData };
             document.querySelectorAll('#modalFields input').forEach(input => {
                 updatedEntry[input.getAttribute('data-key')] = input.value;
             });
 
-            // Rebuild CSV content for that specific file
             const fileData = masterCustomerData.filter(c => c._route === fileName);
             const entryIndexInFile = fileData.findIndex(c => JSON.stringify(c) === JSON.stringify(originalData));
             if (entryIndexInFile !== -1) fileData[entryIndexInFile] = updatedEntry;
