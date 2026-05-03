@@ -957,7 +957,29 @@
             loadGitHubRoutes();
             loadAllCustomers(); 
         }
-
+async function managerCallInOrder() { 
+    const container = document.getElementById('moduleContainer');
+    try {
+        // Fetching the file using the exact path from your GitHub
+        const response = await fetch('https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/MODULES/callin-modal.html?t=' + Date.now());
+        
+        if (response.ok) {
+            const html = await response.text();
+            container.innerHTML = html;
+            
+            // This targets the CSS class ".modal" inside your callin-modal.html
+            const modal = container.querySelector('.modal');
+            if (modal) {
+                modal.style.display = 'block';
+            }
+        } else {
+            console.error("Fetch failed. Status:", response.status);
+            alert("File not found. Please verify the folder name is 'MODULES'.");
+        }
+    } catch (err) {
+        console.error("Error loading module:", err);
+    }
+}
         async function loadGitHubRoutes() {
             const files = await ghGet('routes');
             const dropdown = document.getElementById('routeDropdown');
