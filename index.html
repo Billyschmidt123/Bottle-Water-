@@ -140,7 +140,7 @@
             </div>
 
             <div id="tableContainer" style="margin-top: 15px;">
-                <!-- START OF ADDED CUSTOMER MAINTENANCE VIEW -->
+                <!-- Customer Maintenance View -->
                 <div id="custView" style="display: block; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
                     <div style="display:flex; justify-content:space-between; align-items:center">
                         <h3>Customer List</h3>
@@ -153,9 +153,8 @@
                         </table>
                     </div>
                 </div>
-                <!-- END OF ADDED CUSTOMER MAINTENANCE VIEW -->
 
-                <!-- START OF ADDED PRODUCT MAINTENANCE VIEW -->
+                <!-- Product Maintenance View -->
                 <div id="prodView" style="display: none; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
                     <div style="display:flex; justify-content:space-between; align-items:center">
                         <h3>Product Inventory</h3>
@@ -168,7 +167,6 @@
                         </table>
                     </div>
                 </div>
-                <!-- END OF ADDED PRODUCT MAINTENANCE VIEW -->
             </div>
         </div>
     </div>
@@ -218,7 +216,6 @@
                         const name = p[1] || p[0];
                         if (type === 'Water') waterItems.push({name}); else coffeeItems.push({name});
                         
-                        // START ADDED PRODUCT TABLE ROW LOGIC
                         prodTable.innerHTML += `<tr>
                             <td>${name}</td>
                             <td>${type}</td>
@@ -229,7 +226,6 @@
                                 <button class="btn-top" style="padding:2px 5px; background:#dc3545;"><i class="fas fa-trash"></i></button>
                             </td>
                         </tr>`;
-                        // END ADDED PRODUCT TABLE ROW LOGIC
                     });
                 } catch (e) {}
             }
@@ -263,20 +259,21 @@
                     document.getElementById('mgrModal').style.display = 'flex';
                 };
                 
-                // START ADDED NAVIGATION CLICK HANDLERS
+                // START ADDED CUSTOMER MAINTENANCE CLICK HANDLER
                 document.getElementById('btnShowCust').onclick = () => {
                     document.getElementById('custView').style.display = 'block';
                     document.getElementById('prodView').style.display = 'none';
                     document.getElementById('btnShowCust').classList.add('active');
                     document.getElementById('btnShowProd').classList.remove('active');
                 };
+                // END ADDED CUSTOMER MAINTENANCE CLICK HANDLER
+
                 document.getElementById('btnShowProd').onclick = () => {
                     document.getElementById('custView').style.display = 'none';
                     document.getElementById('prodView').style.display = 'block';
                     document.getElementById('btnShowProd').classList.add('active');
                     document.getElementById('btnShowCust').classList.remove('active');
                 };
-                // END ADDED NAVIGATION CLICK HANDLERS
 
                 await loadData();
             } catch (e) {
@@ -298,7 +295,6 @@
                 const v = line.split(',');
                 let d = {}; headers.forEach((h, i) => d[h] = v[i] || "");
 
-                // START ADDED CUSTOMER TABLE ROW LOGIC
                 custTable.innerHTML += `<tr>
                     <td>${d.company || 'Unknown'}</td>
                     <td>${d.address || '--'}</td>
@@ -309,7 +305,6 @@
                         <button class="btn-top" style="padding:2px 5px; background:#dc3545;"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>`;
-                // END ADDED CUSTOMER TABLE ROW LOGIC
 
                 const card = document.createElement('div');
                 card.style = "background:white; padding:10px; margin-bottom:10px; border-radius:5px; border-left:5px solid #007bff; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.1);";
