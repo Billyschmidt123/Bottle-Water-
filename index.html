@@ -97,8 +97,6 @@
         .form-group input, .form-group select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
         
         .section-header { background: #f0f0f0; padding: 8px; font-weight: bold; margin-top: 20px; border-radius: 4px; border-left: 4px solid #007bff; }
-        
-        /* Stop Card Hover Styling */
         .stop-card:hover { background: #f0f7ff !important; border-left: 5px solid #28a745 !important; }
     </style>
 </head>
@@ -118,7 +116,6 @@
         </div>
 
         <div class="topbar-right">
-            <!-- ADDED: Force Refresh Button -->
             <button id="btnForceRefresh" class="btn-top" style="background: #17a2b8; margin-right: 10px;"><i class="fas fa-sync-alt"></i> FORCE REFRESH</button>
             <button id="btnManager" class="btn-top" style="background: #495057;">MANAGER MENU</button>
         </div>
@@ -256,6 +253,7 @@
             });
         }
 
+        /* RESTORED: Robust customer loading with cross-route synchronization */
         async function loadAllCustomers() {
             const files = await ghGet('routes');
             const tbody = document.getElementById('custTableBody');
@@ -317,6 +315,7 @@
             });
         }
 
+        /* RESTORED: Dynamic Edit Modal field mapping */
         window.openCustEdit = function(idx) {
             const cust = idx === -1 ? {} : globalCustomers[idx];
             const container = document.getElementById('custFormFields');
@@ -324,7 +323,7 @@
             const statusDiv = document.getElementById('saveStatus');
             
             statusDiv.innerText = '';
-            document.getElementById('custModalTitle').textContent = idx === -1 ? "New Customer" : "Edit: " + cust.company;
+            document.getElementById('custModalTitle').textContent = idx === -1 ? "New Customer" : "Edit: " + (cust.company || "Details");
             container.innerHTML = '';
 
             csvHeaders.forEach(h => {
@@ -417,7 +416,6 @@
                     } catch (err) { console.error("Route load error", err); }
                 };
 
-                // ADDED: Force Refresh Logic
                 document.getElementById('btnForceRefresh').onclick = async () => {
                     const btn = document.getElementById('btnForceRefresh');
                     btn.disabled = true;
