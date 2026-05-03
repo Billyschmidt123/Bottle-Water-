@@ -1,6 +1,6 @@
 <!-- 
   PROJECT: LogiFlow Delivery System
-  VERSION: Stop Detail Modal - Editable Metadata (Fee, Travel, Notes, PO)
+  VERSION: Stop Detail Modal - Editable Metadata + Product Selection Cart
   STATUS: Stable - Non-Destructive Addition
 -->
 <!DOCTYPE html>
@@ -43,9 +43,13 @@
         .cart-table th { background: #eee; text-align: left; padding: 5px; }
         .cart-table td { border-bottom: 1px solid #eee; padding: 5px; }
 
-        /* ADDITION: Inline Edit Styling for Metadata */
+        /* Metadata Styling */
         .meta-edit-input { border: 1px solid #ccc; padding: 4px; border-radius: 3px; font-size: 0.8rem; width: 80%; }
         .meta-edit-textarea { border: 1px solid #ccc; padding: 4px; border-radius: 3px; font-size: 0.8rem; width: 95%; height: 40px; font-family: inherit; }
+
+        /* ADDITION: Add-to-Cart Controls Styling */
+        .cart-add-row { display: flex; gap: 5px; align-items: center; margin-top: 5px; }
+        .qty-input { width: 50px; padding: 7px; border: 1px solid #ddd; border-radius: 4px; text-align: center; }
     </style>
 </head>
 <body>
@@ -85,21 +89,18 @@
             </div>
             <hr>
             
-            <!-- ADDITION: Metadata Section with Editable Fields -->
             <div id="stopMetadata" style="font-size: 0.85rem; background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div><strong>Address:</strong> <span id="metaAddress">--</span></div>
                 <div><strong>Phone:</strong> <span id="metaPhone">--</span></div>
                 <div><strong>Email:</strong> <span id="metaEmail">--</span></div>
                 <div><strong>Special Order:</strong> <span id="metaSpecOrder">--</span></div>
                 
-                <!-- Editable Fields -->
                 <div><strong>Deliv Fee:</strong> <input type="text" id="editMetaDelivFee" class="meta-edit-input"></div>
                 <div><strong>Travel:</strong> <input type="text" id="editMetaTravel" class="meta-edit-input"></div>
                 <div><strong>PO #:</strong> <input type="text" id="editMetaPO" class="meta-edit-input"></div>
                 
                 <div style="grid-column: span 2;"><strong>Special Instructions:</strong> <span id="metaSpecInst">--</span></div>
                 
-                <!-- Editable Notes -->
                 <div style="grid-column: span 2;">
                     <strong>Notes:</strong><br>
                     <textarea id="editMetaNotes" class="meta-edit-textarea"></textarea>
@@ -109,15 +110,23 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label>Water Product</label>
-                    <select id="stopProductDropdown">
-                        <option value="">Choose water product...</option>
-                    </select>
+                    <div class="cart-add-row">
+                        <select id="stopProductDropdown" style="flex-grow:1;">
+                            <option value="">Choose water product...</option>
+                        </select>
+                        <input type="number" id="qtyWater" class="qty-input" value="1" min="1">
+                        <button class="btn-top" onclick="addProductToCart('stopProductDropdown', 'qtyWater')" style="background:#28a745;">ADD</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Coffee Product</label>
-                    <select id="stopCoffeeDropdown">
-                        <option value="">Choose coffee product...</option>
-                    </select>
+                    <div class="cart-add-row">
+                        <select id="stopCoffeeDropdown" style="flex-grow:1;">
+                            <option value="">Choose coffee product...</option>
+                        </select>
+                        <input type="number" id="qtyCoffee" class="qty-input" value="1" min="1">
+                        <button class="btn-top" onclick="addProductToCart('stopCoffeeDropdown', 'qtyCoffee')" style="background:#6f4e37;">ADD</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Received By</label>
@@ -130,13 +139,13 @@
             </div>
 
             <div style="margin-top: 20px; border-top: 2px solid #eee; padding-top: 10px;">
-                <h4 style="margin: 0;"><i class="fas fa-shopping-cart"></i> Pre-Ordered Items</h4>
+                <h4 style="margin: 0;"><i class="fas fa-shopping-cart"></i> Delivery Items</h4>
                 <table class="cart-table">
                     <thead>
-                        <tr><th>Item</th><th>Units</th><th>Qty</th></tr>
+                        <tr><th>Item</th><th>Qty</th><th style="width:50px;">Action</th></tr>
                     </thead>
                     <tbody id="cartItemsBody">
-                        <tr><td colspan="3" style="color:#999; text-align:center;">No pre-ordered items.</td></tr>
+                        <tr><td colspan="3" style="color:#999; text-align:center;">No items added.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -211,6 +220,9 @@
         let editingIndex = -1;
         let currentProductFile = '';
         let currentProductSHA = '';
+
+        /* ADDITION: Cart Storage Logic */
+        let deliveryCart = [];
 
         async function ghGet(path) {
             const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
@@ -428,7 +440,6 @@
             document.getElementById('metaSpecOrder').textContent = customerData['Special Order'] || '--';
             document.getElementById('metaSpecInst').textContent = customerData['Special instructiosn'] || '--';
 
-            /* FIX ADDED: Map customer data to editable input fields */
             document.getElementById('editMetaDelivFee').value = customerData['Delivery charge'] || '$0';
             document.getElementById('editMetaTravel').value = customerData.Travel || '$0';
             document.getElementById('editMetaPO').value = customerData['Purchase order'] || '';
@@ -436,9 +447,9 @@
 
             document.getElementById('receivedBy').value = '';
             
-            const cartBody = document.getElementById('cartItemsBody');
-            cartBody.innerHTML = '<tr><td colspan="3" style="color:#999; text-align:center;">Checking for orders...</td></tr>';
-            setTimeout(() => { cartBody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No pending orders found.</td></tr>'; }, 500);
+            /* RESET CART ON MODAL OPEN */
+            deliveryCart = [];
+            renderDeliveryCart();
 
             const waterDropdown = document.getElementById('stopProductDropdown');
             waterDropdown.innerHTML = '<option value="">Loading...</option>';
@@ -458,7 +469,8 @@
                         lines.slice(1).forEach(l => {
                             const v = l.split(',');
                             const o = document.createElement('option');
-                            o.value = v[0]; o.textContent = v[dIdx] || v[0];
+                            o.value = v[dIdx] || v[0]; 
+                            o.textContent = v[dIdx] || v[0];
                             target.appendChild(o);
                         });
                     }
@@ -482,6 +494,47 @@
                 ctx.stroke();
             };
         };
+
+        /* ADDITION: Helper functions for the Delivery Cart */
+        window.addProductToCart = function(dropdownId, qtyId) {
+            const dropdown = document.getElementById(dropdownId);
+            const qtyInput = document.getElementById(qtyId);
+            const itemName = dropdown.value;
+            const qty = parseInt(qtyInput.value);
+
+            if (!itemName) return;
+
+            const existing = deliveryCart.find(i => i.name === itemName);
+            if (existing) {
+                existing.qty += qty;
+            } else {
+                deliveryCart.push({ name: itemName, qty: qty });
+            }
+
+            qtyInput.value = 1;
+            dropdown.selectedIndex = 0;
+            renderDeliveryCart();
+        };
+
+        window.removeFromCart = function(index) {
+            deliveryCart.splice(index, 1);
+            renderDeliveryCart();
+        };
+
+        function renderDeliveryCart() {
+            const body = document.getElementById('cartItemsBody');
+            if (deliveryCart.length === 0) {
+                body.innerHTML = '<tr><td colspan="3" style="color:#999; text-align:center;">No items added.</td></tr>';
+                return;
+            }
+            body.innerHTML = deliveryCart.map((item, idx) => `
+                <tr>
+                    <td>${item.name}</td>
+                    <td>${item.qty}</td>
+                    <td><button onclick="removeFromCart(${idx})" style="background:none; border:none; color:red; cursor:pointer;"><i class="fas fa-trash"></i></button></td>
+                </tr>
+            `).join('');
+        }
 
         async function init() {
             const map = L.map('map').setView([55.17, -118.79], 12);
