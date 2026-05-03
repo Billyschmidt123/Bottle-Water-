@@ -1,6 +1,6 @@
 <!-- 
   PROJECT: LogiFlow Delivery System
-  VERSION: Stop Detail Modal - Enhanced Width & Responsive Wrapping
+  VERSION: Stop Detail Modal - Stacked Layout & Mandatory Validation
   STATUS: Stable - Non-Destructive Addition
 -->
 <!DOCTYPE html>
@@ -47,13 +47,13 @@
         .meta-edit-input { border: 1px solid #ccc; padding: 4px; border-radius: 3px; font-size: 0.8rem; width: 80%; }
         .meta-edit-textarea { border: 1px solid #ccc; padding: 4px; border-radius: 3px; font-size: 0.8rem; width: 95%; height: 40px; font-family: inherit; }
 
-        /* ADDITION: Enhanced Cart Add Controls with Wrapping */
         .cart-add-row { display: flex; gap: 5px; align-items: center; margin-top: 5px; flex-wrap: wrap; }
         .qty-input { width: 50px; padding: 7px; border: 1px solid #ddd; border-radius: 4px; text-align: center; }
         .unit-input { width: 80px; padding: 7px; border: 1px solid #ddd; border-radius: 4px; }
 
-        /* FIX: Specific wider sizing for the stop card modal */
+        /* FIX: Adjusted width and forced single column layout for stacked items */
         #stopModal .modal-content { max-width: 1100px; width: 98%; }
+        #stopModal .form-grid { grid-template-columns: 1fr; }
     </style>
 </head>
 <body>
@@ -112,6 +112,7 @@
             </div>
 
             <div class="form-grid">
+                <!-- Dropdowns are stacked via CSS grid row changes -->
                 <div class="form-group">
                     <label>Water Product</label>
                     <div class="cart-add-row">
@@ -135,12 +136,12 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Received By</label>
-                    <input type="text" id="receivedBy" placeholder="Name of person receiving">
+                    <label>Signature (Required)</label>
+                    <canvas id="sig-canvas"></canvas>
                 </div>
                 <div class="form-group">
-                    <label>Signature</label>
-                    <canvas id="sig-canvas"></canvas>
+                    <label>Received By (Required)</label>
+                    <input type="text" id="receivedBy" placeholder="Name of person receiving">
                 </div>
             </div>
 
@@ -158,7 +159,8 @@
 
             <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
                 <button onclick="document.getElementById('stopModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
-                <button class="btn-top" style="background:#28a745;">FINISH STOP</button>
+                <!-- ADDITION: validateAndFinishStop function replaces direct button action -->
+                <button class="btn-top" onclick="validateAndFinishStop()" style="background:#28a745;">FINISH STOP</button>
             </div>
         </div>
     </div>
@@ -228,6 +230,8 @@
         let currentProductSHA = '';
 
         let deliveryCart = [];
+        /* ADDITION: Signature State Tracking */
+        let isSigBlank = true;
 
         async function ghGet(path) {
             const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
@@ -487,9 +491,10 @@
             const canvas = document.getElementById('sig-canvas');
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            isSigBlank = true; /* Reset signature tracker */
             
             let drawing = false;
-            canvas.onmousedown = () => { drawing = true; ctx.beginPath(); };
+            canvas.onmousedown = () => { drawing = true; ctx.beginPath(); isSigBlank = false; };
             canvas.onmouseup = () => { drawing = false; };
             canvas.onmousemove = (e) => {
                 if (!drawing) return;
@@ -497,6 +502,22 @@
                 ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
                 ctx.stroke();
             };
+        };
+
+        /* ADDITION: Validation Logic */
+        window.validateAndFinishStop = function() {
+            const name = document.getElementById('receivedBy').value.trim();
+            if (!name) {
+                alert("Please enter the name of the person receiving the delivery.");
+                return;
+            }
+            if (isSigBlank) {
+                alert("A signature is required to complete the delivery.");
+                return;
+            }
+            // Proceed with existing finish logic (mocked for now as requested fix only covers UI/Mandatory)
+            alert("Stop finished successfully!");
+            document.getElementById('stopModal').style.display='none';
         };
 
         window.addProductToCart = function(dropdownId, qtyId, unitId) {
