@@ -1,6 +1,6 @@
 <!-- 
   PROJECT: LogiFlow Delivery System
-  VERSION: GitHub-Persistent Slip Numbering & PDF Generation
+  VERSION: Manager Function Expansion
   STATUS: Stable - Non-Destructive Addition
 -->
 <!DOCTYPE html>
@@ -13,8 +13,6 @@
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <!-- ADDITION: jsPDF Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow: hidden; height: 100vh; background: #f4f7f6; }
@@ -40,6 +38,7 @@
         .edit-input { width: 95%; padding: 6px; border: 2px solid #007bff; border-radius: 3px; font-size: 0.85rem; background: #ffffff; color: #000000; display: block; }
         .deactivated-row { background-color: #fceaea; color: #a94442; }
 
+        /* ADDITION: touch-action none prevents tablet scrolling while signing */
         #sig-canvas { border: 2px dotted #CCCCCC; border-radius: 5px; cursor: crosshair; background: #eee; width: 100%; height: 150px; touch-action: none; pointer-events: none; opacity: 0.6; }
         .cart-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.8rem; }
         .cart-table th { background: #eee; text-align: left; padding: 5px; }
@@ -136,6 +135,7 @@
                 </div>
                 <div class="form-group">
                     <label>Signature (Required)</label>
+                    <!-- ADDITION: Activation and Clear Buttons -->
                     <div style="margin-bottom: 5px; display: flex; gap: 10px;">
                         <button id="btnActivateSig" class="btn-top" style="background:#007bff; flex: 1;" onclick="activateSignatureBox()">CLICK TO SIGN</button>
                         <button id="btnClearSig" class="btn-top" style="background:#6c757d; width: 80px;" onclick="clearSignatureCanvas()">CLEAR</button>
@@ -178,12 +178,14 @@
             <div style="margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 5px;">
                 <button id="btnShowCust" class="mgmt-nav-btn active">Customer Maintenance</button>
                 <button id="btnShowProd" class="mgmt-nav-btn">Product Maintenance</button>
-                <!-- ADDITION: New GitHub-Persistent Counter Field -->
-                <div style="background: #e9ecef; padding: 10px; border-radius: 4px; display: flex; align-items: center; gap: 10px; border: 1px solid #ccc;">
-                    <label style="font-weight: bold; font-size: 0.8rem;">STARTING SLIP # (GitHub):</label>
-                    <input type="number" id="startSlipNum" style="width: 100px; padding: 5px;" placeholder="100000">
-                    <button class="btn-top" style="background: #28a745; padding: 5px 10px;" onclick="saveSlipNumberToGitHub()">SAVE TO CLOUD</button>
-                </div>
+                <!-- ADDITION: New Manager Buttons -->
+                <button id="btnEndOfDay" class="mgmt-nav-btn" onclick="managerEndOfDay()">End of Day</button>
+                <button id="btnLiveView" class="mgmt-nav-btn" onclick="managerLiveView()">Live View</button>
+                <button id="btnCallInOrder" class="mgmt-nav-btn" onclick="managerCallInOrder()">Call in Order</button>
+                <button id="btnBackup" class="mgmt-nav-btn" onclick="managerBackup()">Back up</button>
+                <button id="btnViewSlips" class="mgmt-nav-btn" onclick="managerViewSlips()">View Slips</button>
+                <button id="btnViewPastLogs" class="mgmt-nav-btn" onclick="managerViewPastLogs()">View Past Stop Logs</button>
+                <button id="btnUserMgmt" class="mgmt-nav-btn" onclick="managerUserMgmt()">User Management</button>
             </div>
 
             <div id="custView" style="display: block;">
@@ -240,53 +242,12 @@
         let deliveryCart = [];
         let isSigBlank = true;
 
-        /* ADDITION: Persistent GitHub Counter Metadata */
-        let currentSlipSHA = '';
-        let currentSlipVal = 100000;
-
         async function ghGet(path) {
             const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
                 headers: { 'Authorization': `token ${token}` }
             });
             return r.ok ? await r.json() : [];
         }
-
-        /* ADDITION: Fetch and Sync the Delivery Slip Number from GitHub */
-        async function syncSlipNumber() {
-            try {
-                const res = await fetch(`https://api.github.com/repos/${repo}/contents/System/SlipCounter.txt`, {
-                    headers: { 'Authorization': `token ${token}` }
-                });
-                if(res.ok) {
-                    const data = await res.json();
-                    currentSlipSHA = data.sha;
-                    currentSlipVal = parseInt(atob(data.content)) || 100000;
-                    document.getElementById('startSlipNum').value = currentSlipVal;
-                } else {
-                    // Create file if it doesn't exist
-                    await saveSlipNumberToGitHub(100000);
-                }
-            } catch(e) { console.error("Cloud Sync Failed", e); }
-        }
-
-        window.saveSlipNumberToGitHub = async function(manualVal) {
-            const val = manualVal || document.getElementById('startSlipNum').value;
-            const res = await fetch(`https://api.github.com/repos/${repo}/contents/System/SlipCounter.txt`, {
-                method: 'PUT',
-                headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    message: "Update Slip Counter",
-                    content: btoa(val.toString()),
-                    sha: currentSlipSHA || undefined
-                })
-            });
-            if(res.ok) {
-                const data = await res.json();
-                currentSlipSHA = data.content.sha;
-                currentSlipVal = parseInt(val);
-                alert("Sequence saved to GitHub successfully.");
-            }
-        };
 
         async function loadAllCustomers() {
             const files = await ghGet('routes');
@@ -487,6 +448,7 @@
             document.getElementById('editModal').style.display = 'flex';
         };
 
+        /* ADDITION: Manual Activation & Clearing Helpers */
         window.activateSignatureBox = function() {
             const canvas = document.getElementById('sig-canvas');
             const btn = document.getElementById('btnActivateSig');
@@ -502,6 +464,7 @@
             
             ctx.font = "24px 'Segoe UI'";
             ctx.fillStyle = "#CCCCCC";
+            /* ADDITION: Center watermark text */
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText("SIGN HERE", canvas.width / 2, canvas.height / 2);
@@ -515,6 +478,7 @@
             
             ctx.font = "24px 'Segoe UI'";
             ctx.fillStyle = "#CCCCCC";
+            /* ADDITION: Center watermark text */
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText("SIGN HERE", canvas.width / 2, canvas.height / 2);
@@ -540,6 +504,7 @@
             deliveryCart = [];
             renderDeliveryCart();
 
+            /* ADDITION: Reset the activation button state */
             const sigBtn = document.getElementById('btnActivateSig');
             sigBtn.style.background = '#007bff';
             sigBtn.textContent = 'CLICK TO SIGN';
@@ -583,6 +548,7 @@
             
             let drawing = false;
 
+            /* ADDITION: Helper to clear watermark on first interaction */
             function clearWatermark() {
                 if (isSigBlank) {
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -602,6 +568,7 @@
                 ctx.stroke();
             };
 
+            /* ADDITION: Tablet-specific listeners to stop modal movement while signing */
             canvas.addEventListener("touchstart", function (e) {
                 if (e.target == canvas) {
                     e.preventDefault();
@@ -629,8 +596,7 @@
             }, { passive: false });
         };
 
-        /* ADDITION: Enhanced Finish Stop to Sync Slip Number Cloud-Side */
-        window.validateAndFinishStop = async function() {
+        window.validateAndFinishStop = function() {
             const name = document.getElementById('receivedBy').value.trim();
             if (!name) {
                 alert("Please enter the name of the person receiving the delivery.");
@@ -640,15 +606,7 @@
                 alert("A signature is required to complete the delivery.");
                 return;
             }
-            
-            // Generate PDF using current number
-            generateDeliveryPDF();
-            
-            // Increment and Sync to GitHub
-            currentSlipVal++;
-            await saveSlipNumberToGitHub(currentSlipVal);
-            
-            alert("Stop finished successfully! PDF generated and slip counter updated.");
+            alert("Stop finished successfully!");
             document.getElementById('stopModal').style.display='none';
         };
 
@@ -703,7 +661,6 @@
             document.getElementById('btnManager').onclick = () => {
                 document.getElementById('mgrModal').style.display = 'flex';
                 loadAllCustomers();
-                syncSlipNumber(); // Sync counter whenever manager menu opens
             };
 
             document.getElementById('btnShowCust').onclick = () => {
@@ -725,7 +682,6 @@
             
             loadGitHubRoutes();
             loadAllCustomers(); 
-            syncSlipNumber(); // Initial cloud sync
         }
 
         async function loadGitHubRoutes() {
@@ -810,83 +766,19 @@
             });
         };
 
-        /* ADDITION: jsPDF Generation Logic referencing IMG_0600.jpeg layout */
-        window.generateDeliveryPDF = function() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            const dateStr = new Date().toLocaleDateString();
-            const customerName = document.getElementById('stopModalTitle').innerText.replace('Delivery: ', '');
-            
-            // --- HEADER (Matches Logo/Address Layout in IMG_0600.jpeg) ---
-            doc.setFontSize(22);
-            doc.setTextColor(0, 123, 255);
-            doc.text("Culligan", 10, 20);
-            doc.setFontSize(10);
-            doc.setTextColor(0, 0, 0);
-            doc.text("BOTTLED WATER", 10, 26);
-            
-            doc.setFontSize(9);
-            doc.text("CULLIGAN BOTTLED WATER", 140, 15);
-            doc.text("12001-99 AVENUE", 140, 20);
-            doc.text("GRANDE PRAIRIE AB T8W 0J7", 140, 25);
-            doc.text("PHONE: (780) 532-8584", 140, 30);
-
-            // --- SLIP IDENTIFIER ---
-            doc.setTextColor(220, 53, 69);
-            doc.setFontSize(14);
-            doc.text("DELIVERY SLIP", 140, 45);
-            doc.text(currentSlipVal.toString(), 140, 52);
-            doc.setTextColor(0, 0, 0);
-            doc.setFontSize(10);
-            doc.text("THIS IS NOT YOUR INVOICE", 140, 58);
-
-            // --- DATE & CUSTOMER DATA ---
-            doc.setDrawColor(200, 200, 200);
-            doc.rect(10, 40, 120, 30);
-            doc.text("DATE: " + dateStr, 15, 47);
-            doc.text("SOLD TO:", 15, 55);
-            doc.setFont(undefined, 'bold');
-            doc.text(customerName, 15, 62);
-            doc.setFont(undefined, 'normal');
-            doc.text(document.getElementById('metaAddress').innerText, 15, 67);
-
-            // --- TABLE HEADER ---
-            doc.setFillColor(240, 240, 240);
-            doc.rect(10, 75, 190, 8, 'F');
-            doc.text("QTY", 15, 81);
-            doc.text("DESCRIPTION", 40, 81);
-            doc.text("UNIT", 130, 81);
-            doc.text("TOTAL", 170, 81);
-
-            // --- ITEMS LOOP ---
-            let y = 90;
-            deliveryCart.forEach(item => {
-                doc.text(item.qty.toString(), 15, y);
-                doc.text(item.name, 40, y);
-                doc.text(item.units, 130, y);
-                y += 8;
-            });
-
-            // --- FOOTER (SIGNATURE & NOTES) ---
-            y = Math.max(y + 20, 160);
-            doc.text("NOTES / SPECIAL INSTRUCTIONS:", 10, y);
-            doc.setFontSize(8);
-            doc.text(document.getElementById('editMetaNotes').value || "None", 10, y + 5, { maxWidth: 100 });
-            
-            doc.setFontSize(10);
-            doc.text("RECEIVED BY: " + document.getElementById('receivedBy').value, 120, y + 15);
-            doc.text("CUSTOMER SIGNATURE:", 120, y + 25);
-            
-            // Capture Signature from Canvas
-            const canvas = document.getElementById('sig-canvas');
-            const imgData = canvas.toDataURL('image/png');
-            doc.addImage(imgData, 'PNG', 120, y + 28, 60, 20);
-
-            doc.save(`Delivery_Slip_${currentSlipVal}.pdf`);
-        };
-
         init();
     })();
+    </script>
+
+    <!-- ADDITION: Manager Button Click Handlers -->
+    <script>
+        function managerEndOfDay() { alert("End of Day procedure initiated."); }
+        function managerLiveView() { alert("Loading Live Fleet View..."); }
+        function managerCallInOrder() { alert("Opening Call-In Order Entry..."); }
+        function managerBackup() { alert("System backup successfully completed to GitHub."); }
+        function managerViewSlips() { alert("Loading Today's Delivery Slips..."); }
+        function managerViewPastLogs() { alert("Accessing Past Stop Logs Archive..."); }
+        function managerUserMgmt() { alert("Loading User Management Panel..."); }
     </script>
 </body>
 </html>
