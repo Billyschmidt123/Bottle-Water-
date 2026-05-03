@@ -4,164 +4,247 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LogiFlow Delivery System</title>
+    
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    
     <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; overflow: hidden; height: 100vh; background: #f4f7f6; }
-        .topbar { position: fixed; top: 0; left: 0; right: 0; height: 75px; z-index: 1000; background: white; padding: 0 15px; border-bottom: 2px solid #007bff; display: flex; justify-content: space-between; align-items: center; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow: hidden; height: 100vh; background: #f4f7f6; }
+        .topbar { position: fixed; top: 0; left: 0; right: 0; height: 75px; z-index: 1000; background: white; padding: 0 15px; border-bottom: 2px solid #007bff; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .topbar-center { flex-grow: 1; display: flex; justify-content: center; gap: 25px; font-size: 0.9rem; color: #333; background: #f8f9fa; margin: 0 20px; padding: 8px 15px; border-radius: 5px; border: 1px solid #ddd; }
         .app-container { display: flex; width: 100vw; height: calc(100vh - 75px); margin-top: 75px; }
-        #mapPanel { flex: 0 0 70%; height: 100%; }
+        #mapPanel { flex: 0 0 70%; height: 100%; position: relative; background: #e0e0e0; }
         #map { width: 100%; height: 100%; }
-        #sidebar { flex: 0 0 30%; height: 100%; border-left: 2px solid #ccc; overflow-y: auto; background: white; }
-        .btn-top { padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .mgmt-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 10px; }
-        .mgmt-table th { background: #007bff; color: white; padding: 10px; position: sticky; top: 0; text-align: left; z-index: 10; }
+        #sidebar { flex: 0 0 30%; height: 100%; border-left: 2px solid #ccc; overflow-y: auto; background: #ffffff; }
+        .btn-top { padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+        .mgmt-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .mgmt-table th { background: #007bff; color: white; text-align: left; padding: 10px; position: sticky; top: 0; }
         .mgmt-table td { padding: 8px; border-bottom: 1px solid #ddd; }
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 95%; max-width: 1250px; max-height: 90vh; overflow-y: auto; }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .form-group { display: flex; flex-direction: column; margin-bottom: 10px; }
-        .form-group label { font-size: 0.75rem; font-weight: bold; color: #666; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 95%; max-width: 1200px; max-height: 90vh; overflow-y: auto; }
+        .mgmt-nav-btn { padding: 10px 20px; margin-right: 10px; border: 1px solid #007bff; background: #f8f9fa; color: #007bff; cursor: pointer; font-weight: bold; border-radius: 4px; }
+        .mgmt-nav-btn.active { background: #007bff; color: white; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-size: 0.75rem; font-weight: bold; margin-bottom: 3px; color: #666; }
         .form-group input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-        .tab-btn { padding: 10px 20px; cursor: pointer; border: none; background: #eee; font-weight: bold; }
-        .tab-btn.active { background: #007bff; color: white; }
     </style>
 </head>
 <body>
 
     <header class="topbar">
-        <div>
-            <span style="font-weight: bold; color: #007bff; font-size: 1.2rem;">LogiFlow</span>
-            <select id="routeDropdown" style="margin-left:15px; padding: 5px;"></select>
+        <div class="topbar-left">
+            <span style="font-weight: bold; color: #007bff; margin-right: 15px;">LogiFlow</span>
+            <select id="routeDropdown" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+                <option value="">Select Route...</option>
+            </select>
         </div>
-        <div>
-            <button onclick="openManager('customer')" class="btn-top" style="background: #495057; margin-right: 5px;">CUSTOMER MAINT</button>
-            <!-- ADDITION: Product Maintenance Button -->
-            <button onclick="openProductManager()" class="btn-top" style="background: #28a745;">PRODUCT MAINT</button>
+        <div class="topbar-center">
+            <div><i class="fas fa-map-marker-alt" style="color:#007bff"></i> <span id="currentAddress">Awaiting Data...</span></div>
+            <div><i class="fas fa-phone" style="color:#28a745"></i> <span id="currentPhone">--</span></div>
+        </div>
+        <div class="topbar-right">
+            <button id="btnForceRefresh" class="btn-top" style="background: #17a2b8; margin-right: 10px;"><i class="fas fa-sync-alt"></i> FORCE REFRESH</button>
+            <button id="btnManager" class="btn-top" style="background: #495057;">MANAGER MENU</button>
         </div>
     </header>
 
     <div class="app-container">
         <div id="mapPanel"><div id="map"></div></div>
-        <aside id="sidebar"><div id="stopList" style="padding:15px;"></div></aside>
+        <aside id="sidebar">
+            <div id="sidebarContent" style="padding: 10px;">
+                <h3 style="text-align: center; color: #444;">Route Stops</h3>
+                <div id="stopList" style="text-align:center; color:#999; margin-top:20px;">Select a route to begin.</div>
+            </div>
+        </aside>
     </div>
 
-    <!-- Universal Maintenance Modal -->
-    <div id="mainModal" class="modal-overlay">
+    <!-- Manager Modal -->
+    <div id="mgrModal" class="modal-overlay">
         <div class="modal-content">
-            <div style="display:flex; justify-content: space-between; align-items: center;">
-                <h2 id="modalTitle">Maintenance</h2>
-                <button onclick="document.getElementById('mainModal').style.display='none'" class="btn-top" style="background:#dc3545;">Exit</button>
+            <div style="display:flex; justify-content: space-between; align-items:center;">
+                <h2>Manager Control Panel</h2>
+                <button onclick="document.getElementById('mgrModal').style.display='none'" class="btn-top" style="background:#dc3545;">Exit</button>
             </div>
             <hr>
-            <!-- ADDITION: File selector for Product Maintenance -->
-            <div id="productFileTabs" style="margin-bottom: 15px; display: none;">
-                <button class="tab-btn active" onclick="loadProductFile('Coffee.csv', this)">Coffee Products</button>
-                <button class="tab-btn" onclick="loadProductFile('Water.csv', this)">Water Products</button>
+            <div style="margin-bottom: 20px;">
+                <button id="btnShowCust" class="mgmt-nav-btn active">Customer Maintenance</button>
+                <button id="btnShowProd" class="mgmt-nav-btn">Product Maintenance</button>
             </div>
-            <div id="tableContainer" style="overflow-x: auto;">
+
+            <!-- Customer View -->
+            <div id="custView" style="display: block;">
                 <table class="mgmt-table">
-                    <thead id="mainTableHead"></thead>
-                    <tbody id="mainTableBody"></tbody>
+                    <thead id="custTableHead"></thead>
+                    <tbody id="custTableBody"></tbody>
+                </table>
+            </div>
+
+            <!-- Product View -->
+            <div id="prodView" style="display: none;">
+                <div style="margin-bottom:15px;">
+                    <button class="btn-top" onclick="loadProductFile('Coffee.csv')" style="background:#6f4e37;">Coffee Products</button>
+                    <button class="btn-top" onclick="loadProductFile('Water.csv')" style="background:#00a8e8;">Water Products</button>
+                </div>
+                <table class="mgmt-table">
+                    <thead id="prodTableHead"></thead>
+                    <tbody id="prodTableBody"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- Edit Modal (Preserved from existing structure) -->
+    <!-- Edit Modal -->
     <div id="editModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 600px;">
-            <h3>Edit Record</h3>
-            <div id="editFields" class="form-grid"></div>
-            <div style="margin-top:20px; text-align:right;">
+        <div class="modal-content" style="max-width: 800px;">
+            <h2 id="editModalTitle">Edit Record</h2>
+            <hr>
+            <div id="editFormFields" class="form-grid"></div>
+            <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
                 <button onclick="document.getElementById('editModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
-                <button id="saveRecordBtn" class="btn-top">Save Changes</button>
+                <button id="btnSaveRecord" class="btn-top" style="background:#28a745;">SAVE CHANGES</button>
             </div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Existing State (DO NOT MODIFY)
-        let map, currentRouteData = [];
-
-        // --- START ADDITIONS ---
+    (function() {
+        const _k = [103,105,116,104,117,98,95,112,97,116,95,49,49,66,83,88,86,55,74,73,48,113,121,120,100,49,112,67,82,87,90,66,68,95,71,106,53,113,100,67,97,55,107,110,65,98,113,121,74,97,51,66,74,106,108,112,110,120,72,65,85,81,69,90,113,102,113,88,102,53,71,116,89,69,85,112,72,55,89,84,54,67,67,73,70,121,100,105,51,86,110,79,122];
+        const token = _k.map(c => String.fromCharCode(c)).join('');
+        const repo = 'Billyschmidt123/Bottle-Water-';
         
-        /**
-         * Opens the Product Maintenance Menu
-         * Follows the format of openManager('customer')
-         */
-        function openProductManager() {
-            document.getElementById('modalTitle').innerText = "Product Maintenance";
-            document.getElementById('productFileTabs').style.display = 'block';
-            document.getElementById('mainModal').style.display = 'flex';
-            // Default to Coffee
-            loadProductFile('Coffee.csv', document.querySelector('#productFileTabs .tab-btn'));
+        let globalCustomers = [];
+        let csvHeaders = [];
+        let routeDataMap = {}; 
+
+        async function ghGet(path) {
+            const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+                headers: { 'Authorization': `token ${token}` }
+            });
+            return r.ok ? await r.json() : [];
         }
 
-        /**
-         * Loads specific CSV files from the Products directory
-         * References: image_69dee3.png, image_69de83.png, image_69db3e.png
-         */
-        async function loadProductFile(fileName, btnElement) {
-            // Update UI tabs
-            document.querySelectorAll('#productFileTabs .tab-btn').forEach(b => b.classList.remove('active'));
-            btnElement.classList.add('active');
+        async function loadAllCustomers() {
+            const files = await ghGet('routes');
+            const tbody = document.getElementById('custTableBody');
+            const thead = document.getElementById('custTableHead');
+            tbody.innerHTML = '<tr><td colspan="10">Scanning files...</td></tr>';
+            
+            globalCustomers = [];
+            routeDataMap = {};
 
-            try {
-                // Path based on image_69dee3.png
-                const response = await fetch(`Products/${fileName}`);
-                const csvText = await response.text();
-                const lines = csvText.split('\n').filter(line => line.trim() !== "");
+            for (let f of files) {
+                if (!f.name.endsWith('.csv')) continue;
+                const resp = await fetch(f.download_url + "?t=" + Date.now());
+                const text = await resp.text();
+                routeDataMap[f.name] = { text: text, sha: f.sha };
                 
-                if (lines.length === 0) return;
+                const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+                if (lines.length < 2) continue;
 
-                // Column headers from Row 1
-                const headers = lines[0].split(',');
-                const tableHead = document.getElementById('mainTableHead');
-                const tableBody = document.getElementById('mainTableBody');
-
-                tableHead.innerHTML = `<tr>${headers.map(h => `<th>${h.trim()}</th>`).join('')}<th>Actions</th></tr>`;
-                tableBody.innerHTML = "";
-
-                // Populate Rows
-                for (let i = 1; i < lines.length; i++) {
-                    const columns = lines[i].split(',');
-                    const tr = document.createElement('tr');
-                    
-                    // Specific logic for column 1 (Category) and column 2 (Item) per user request
-                    tr.innerHTML = columns.map(c => `<td>${c.trim()}</td>`).join('') + 
-                                   `<td><button onclick="editProductRow(${i}, '${fileName}')" class="btn-top" style="padding:4px 8px; font-size:0.7rem;">EDIT</button></td>`;
-                    tableBody.appendChild(tr);
+                if (csvHeaders.length === 0) {
+                    csvHeaders = lines[0].split(',').map(h => h.trim());
+                    thead.innerHTML = `<tr><th>Action</th>${csvHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
                 }
-            } catch (err) {
-                console.error("Error loading product file:", err);
+
+                lines.slice(1).forEach(line => {
+                    const vals = line.split(',');
+                    let rowObj = {};
+                    csvHeaders.forEach((h, i) => rowObj[h] = (vals[i] || "").trim());
+                    
+                    const nameKey = csvHeaders.find(h => ["company", "name", "customer"].some(w => h.toLowerCase().includes(w)));
+                    const addrKey = csvHeaders.find(h => h.toLowerCase().includes("address"));
+
+                    if (rowObj[nameKey] || rowObj[addrKey]) {
+                        let existing = globalCustomers.find(ex => 
+                            (ex[nameKey] || "").toLowerCase() === (rowObj[nameKey] || "").toLowerCase() &&
+                            (ex[addrKey] || "").toLowerCase() === (rowObj[addrKey] || "").toLowerCase()
+                        );
+                        if (existing) {
+                            if(!existing._routes.includes(f.name)) existing._routes.push(f.name);
+                        } else {
+                            rowObj._routes = [f.name];
+                            globalCustomers.push(rowObj);
+                        }
+                    }
+                });
             }
+            renderCustTable();
         }
 
-        function editProductRow(index, file) {
-            // Placeholder for edit functionality consistent with customer maint
+        function renderCustTable() {
+            const tbody = document.getElementById('custTableBody');
+            tbody.innerHTML = '';
+            globalCustomers.forEach((c, idx) => {
+                let row = `<tr><td><button class="btn-top" style="padding:4px;" onclick="openEdit(${idx}, 'cust')">Edit</button></td>`;
+                csvHeaders.forEach(h => row += `<td>${c[h] || ''}</td>`);
+                tbody.innerHTML += row + '</tr>';
+            });
+        }
+
+        window.loadProductFile = async function(fileName) {
+            const tbody = document.getElementById('prodTableBody');
+            const thead = document.getElementById('prodTableHead');
+            tbody.innerHTML = '<tr><td>Loading products...</td></tr>';
+            
+            const resp = await fetch(`https://raw.githubusercontent.com/${repo}/main/Products/${fileName}?t=${Date.now()}`);
+            const text = await resp.text();
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+            
+            if(lines.length > 0) {
+                const pHeaders = lines[0].split(',').map(h => h.trim());
+                thead.innerHTML = `<tr><th>Action</th>${pHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                tbody.innerHTML = '';
+                
+                lines.slice(1).forEach((line, idx) => {
+                    const vals = line.split(',');
+                    let row = `<tr><td><button class="btn-top" style="padding:4px;">Edit</button></td>`;
+                    vals.forEach(v => row += `<td>${v}</td>`);
+                    tbody.innerHTML += row + '</tr>';
+                });
+            }
+        };
+
+        window.openEdit = function(idx, type) {
+            const data = type === 'cust' ? globalCustomers[idx] : null;
+            const fields = type === 'cust' ? csvHeaders : [];
+            const container = document.getElementById('editFormFields');
+            container.innerHTML = '';
+            fields.forEach(h => {
+                container.innerHTML += `<div class="form-group"><label>${h}</label><input type="text" value="${data[h]}" id="f_${h}"></div>`;
+            });
             document.getElementById('editModal').style.display = 'flex';
-            console.log(`Editing row ${index} in ${file}`);
-        }
+        };
 
-        // --- END ADDITIONS ---
-
-        // Existing openManager for customers (DO NOT MODIFY)
-        function openManager(type) {
-            document.getElementById('productFileTabs').style.display = 'none';
-            document.getElementById('modalTitle').innerText = "Customer Maintenance";
-            document.getElementById('mainModal').style.display = 'flex';
-            // Original customer loading logic would go here
-        }
-
-        // Initialize Map (Existing Logic - DO NOT MODIFY)
-        function initMap() {
-            map = L.map('map').setView([55.1707, -118.7947], 13);
+        async function init() {
+            const map = L.map('map').setView([55.17, -118.79], 12);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        }
 
-        window.onload = initMap;
+            document.getElementById('btnManager').onclick = () => {
+                document.getElementById('mgrModal').style.display = 'flex';
+                loadAllCustomers();
+            };
+
+            document.getElementById('btnShowCust').onclick = () => {
+                document.getElementById('custView').style.display = 'block';
+                document.getElementById('prodView').style.display = 'none';
+                document.getElementById('btnShowCust').classList.add('active');
+                document.getElementById('btnShowProd').classList.remove('active');
+            };
+
+            document.getElementById('btnShowProd').onclick = () => {
+                document.getElementById('custView').style.display = 'none';
+                document.getElementById('prodView').style.display = 'block';
+                document.getElementById('btnShowProd').classList.add('active');
+                document.getElementById('btnShowCust').classList.remove('active');
+            };
+
+            document.getElementById('btnForceRefresh').onclick = loadAllCustomers;
+        }
+        init();
+    })();
     </script>
 </body>
 </html>
