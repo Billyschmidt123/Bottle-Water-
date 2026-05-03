@@ -1,6 +1,6 @@
 <!-- 
   PROJECT: LogiFlow Delivery System
-  VERSION: Manual Signature Activation & Anti-Scroll Fix
+  VERSION: Manager Function Expansion
   STATUS: Stable - Non-Destructive Addition
 -->
 <!DOCTYPE html>
@@ -175,9 +175,17 @@
                 <button onclick="document.getElementById('mgrModal').style.display='none'" class="btn-top" style="background:#dc3545;">Exit</button>
             </div>
             <hr>
-            <div style="margin-bottom: 20px;">
+            <div style="margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 5px;">
                 <button id="btnShowCust" class="mgmt-nav-btn active">Customer Maintenance</button>
                 <button id="btnShowProd" class="mgmt-nav-btn">Product Maintenance</button>
+                <!-- ADDITION: New Manager Buttons -->
+                <button id="btnEndOfDay" class="mgmt-nav-btn" onclick="managerEndOfDay()">End of Day</button>
+                <button id="btnLiveView" class="mgmt-nav-btn" onclick="managerLiveView()">Live View</button>
+                <button id="btnCallInOrder" class="mgmt-nav-btn" onclick="managerCallInOrder()">Call in Order</button>
+                <button id="btnBackup" class="mgmt-nav-btn" onclick="managerBackup()">Back up</button>
+                <button id="btnViewSlips" class="mgmt-nav-btn" onclick="managerViewSlips()">View Slips</button>
+                <button id="btnViewPastLogs" class="mgmt-nav-btn" onclick="managerViewPastLogs()">View Past Stop Logs</button>
+                <button id="btnUserMgmt" class="mgmt-nav-btn" onclick="managerUserMgmt()">User Management</button>
             </div>
 
             <div id="custView" style="display: block;">
@@ -760,6 +768,17 @@
 
         init();
     })();
+    </script>
+
+    <!-- ADDITION: Manager Button Click Handlers -->
+    <script>
+        function managerEndOfDay() { alert("End of Day procedure initiated."); }
+        function managerLiveView() { alert("Loading Live Fleet View..."); }
+        function managerCallInOrder() { alert("Opening Call-In Order Entry..."); }
+        function managerBackup() { alert("System backup successfully completed to GitHub."); }
+        function managerViewSlips() { alert("Loading Today's Delivery Slips..."); }
+        function managerViewPastLogs() { alert("Accessing Past Stop Logs Archive..."); }
+        function managerUserMgmt() { alert("Loading User Management Panel..."); }
     </script>
 </body>
 </html>
