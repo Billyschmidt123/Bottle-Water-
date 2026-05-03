@@ -235,30 +235,20 @@
             }
         };
 
-        /* ADDED: New function to specifically handle Product Maintenance Modal separately from Customer Modal */
         window.openProdMaintenanceEdit = function(idx) {
             const data = currentProdList[idx];
             const container = document.getElementById('prodFormFields');
             const deactivateBtn = document.getElementById('btnDeactivateProd');
             const saveBtn = document.getElementById('btnSaveProdRecord');
             
-            let formHtml = '';
+            container.innerHTML = '';
             currentProdHeaders.forEach(h => {
                 const val = data[h] || '';
                 const isStatus = h === 'Status';
-                formHtml += `<div class="form-group">
+                container.innerHTML += `<div class="form-group">
                     <label>${h}</label>
-                    <input type="text" id="pmf_${h}" ${isStatus ? 'readonly style="background:#eee;"' : ''}>
+                    <input type="text" id="pmf_${h}" value="${val}" ${isStatus ? 'readonly style="background:#eee;"' : ''}>
                 </div>`;
-            });
-            container.innerHTML = formHtml;
-
-            // Load and mirror row data into the product modal fields
-            currentProdHeaders.forEach(h => {
-                const input = document.getElementById(`pmf_${h}`);
-                if (input) {
-                    input.value = data[h] || '';
-                }
             });
 
             deactivateBtn.innerText = data.Status === "Active" ? "DEACTIVATE" : "RE-ACTIVATE";
@@ -271,28 +261,11 @@
             };
 
             saveBtn.onclick = () => {
-                let updatedData = {};
                 currentProdHeaders.forEach(h => {
                     if (h !== 'Status') {
-                        updatedData[h] = document.getElementById(`pmf_${h}`).value;
-                    } else {
-                        updatedData[h] = data[h];
+                        data[h] = document.getElementById(`pmf_${h}`).value;
                     }
                 });
-
-                // Find and replace the line in the local array
-                const matchIndex = currentProdList.findIndex(p => 
-                    Object.keys(updatedData).every(key => 
-                        key === 'Status' || p[key] === data[key]
-                    )
-                );
-
-                if (matchIndex !== -1) {
-                    currentProdList[matchIndex] = { ...currentProdList[matchIndex], ...updatedData };
-                } else {
-                    currentProdList.push(updatedData);
-                }
-
                 document.getElementById('prodEditModal').style.display = 'none';
                 renderProdTable();
             };
@@ -306,7 +279,7 @@
             currentProdList.forEach((pObj, idx) => {
                 const isDeactivated = pObj.Status === "Deactivated";
                 let row = `<tr class="${isDeactivated ? 'deactivated-row' : ''}">
-                    <td><button class="btn-top" style="padding:4px;" onclick="openProdMaintenanceEdit(${idx})">Manage</button></td>`;
+                    <td><button class="btn-top" style="padding:4px;" onclick="openProdMaintenanceEdit(${idx})">Edit</button></td>`;
                 currentProdHeaders.forEach(h => row += `<td>${pObj[h] || ''}</td>`);
                 tbody.innerHTML += row + '</tr>';
             });
