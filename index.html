@@ -241,7 +241,6 @@
             const deactivateBtn = document.getElementById('btnDeactivateProd');
             const saveBtn = document.getElementById('btnSaveProdRecord');
             
-            /* ADDED: Smallest possible addition to ensure data mirroring */
             let formHtml = '';
             currentProdHeaders.forEach(h => {
                 const val = data[h] || '';
@@ -253,7 +252,6 @@
             });
             container.innerHTML = formHtml;
 
-            // Direct assignment to ensure the modal shows the current row's data
             currentProdHeaders.forEach(h => {
                 const input = document.getElementById(`pf_${h}`);
                 if (input) input.value = data[h] || '';
@@ -268,12 +266,30 @@
                 renderProdTable();
             };
 
+            /* REPLACED: Updated save logic to perform find-and-replace on CSV line or append if not found */
             saveBtn.onclick = () => {
+                let updatedData = {};
                 currentProdHeaders.forEach(h => {
                     if (h !== 'Status') {
-                        data[h] = document.getElementById(`pf_${h}`).value;
+                        updatedData[h] = document.getElementById(`pf_${h}`).value;
+                    } else {
+                        updatedData[h] = data[h];
                     }
                 });
+
+                // Check for existing product to find-and-replace
+                const matchIndex = currentProdList.findIndex(p => 
+                    Object.keys(updatedData).every(key => 
+                        key === 'Status' || p[key] === data[key]
+                    )
+                );
+
+                if (matchIndex !== -1) {
+                    currentProdList[matchIndex] = { ...currentProdList[matchIndex], ...updatedData };
+                } else {
+                    currentProdList.push(updatedData);
+                }
+
                 document.getElementById('prodEditModal').style.display = 'none';
                 renderProdTable();
             };
