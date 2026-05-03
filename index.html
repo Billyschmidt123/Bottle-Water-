@@ -12,7 +12,6 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow: hidden; height: 100vh; background: #f4f7f6; }
         .topbar { position: fixed; top: 0; left: 0; right: 0; height: 75px; z-index: 1000; background: white; padding: 0 15px; border-bottom: 2px solid #007bff; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .topbar-center { flex-grow: 1; display: flex; justify-content: center; gap: 25px; font-size: 0.9rem; color: #333; background: #f8f9fa; margin: 0 20px; padding: 8px 15px; border-radius: 5px; border: 1px solid #ddd; }
         .app-container { display: flex; width: 100vw; height: calc(100vh - 75px); margin-top: 75px; }
         #mapPanel { flex: 0 0 70%; height: 100%; position: relative; background: #e0e0e0; }
         #map { width: 100%; height: 100%; }
@@ -25,10 +24,7 @@
         .modal-content { background: white; padding: 25px; border-radius: 8px; width: 98%; max-width: 1600px; max-height: 90vh; overflow-y: auto; overflow-x: auto; }
         .mgmt-nav-btn { padding: 10px 20px; margin-right: 10px; border: 1px solid #007bff; background: #f8f9fa; color: #007bff; cursor: pointer; font-weight: bold; border-radius: 4px; }
         .mgmt-nav-btn.active { background: #007bff; color: white; }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
-        .form-group { display: flex; flex-direction: column; }
-        .form-group label { font-size: 0.75rem; font-weight: bold; margin-bottom: 3px; color: #666; }
-        .form-group input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        .edit-input { width: 90%; padding: 4px; border: 1px solid #007bff; border-radius: 3px; font-size: 0.85rem; }
         .deactivated-row { background-color: #fceaea; color: #a94442; }
     </style>
 </head>
@@ -37,9 +33,6 @@
     <header class="topbar">
         <div class="topbar-left">
             <span style="font-weight: bold; color: #007bff; margin-right: 15px;">LogiFlow</span>
-        </div>
-        <div class="topbar-center">
-            <div><i class="fas fa-map-marker-alt" style="color:#007bff"></i> <span id="currentAddress">Awaiting Data...</span></div>
         </div>
         <div class="topbar-right">
             <button id="btnManager" class="btn-top" style="background: #495057;">MANAGER MENU</button>
@@ -60,53 +53,20 @@
             </div>
             <hr>
             <div style="margin-bottom: 20px;">
-                <button id="btnShowCust" class="mgmt-nav-btn active">Customer Maintenance</button>
-                <button id="btnShowProd" class="mgmt-nav-btn">Product Maintenance</button>
+                <button id="btnShowCust" class="mgmt-nav-btn">Customer Maintenance</button>
+                <button id="btnShowProd" class="mgmt-nav-btn active">Product Maintenance</button>
             </div>
 
-            <div id="custView" style="display: block;">
-                <table class="mgmt-table">
-                    <thead id="custTableHead"></thead>
-                    <tbody id="custTableBody"></tbody>
-                </table>
-            </div>
-
-            <div id="prodView" style="display: none;">
+            <div id="prodView" style="display: block;">
                 <div style="margin-bottom:15px;">
                     <button class="btn-top" onclick="loadProductFile('Coffee.csv')" style="background:#6f4e37;">Coffee Products</button>
                     <button class="btn-top" onclick="loadProductFile('Water.csv')" style="background:#00a8e8;">Water Products</button>
                 </div>
-                <table class="mgmt-table">
-                    <thead id="prodTableHead"></thead>
-                    <tbody id="prodTableBody"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit Modals (Customer & Product) -->
-    <div id="editModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 800px;">
-            <h2 id="editModalTitle">Edit Record</h2>
-            <hr>
-            <div id="editFormFields" class="form-grid"></div>
-            <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-                <button onclick="document.getElementById('editModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
-                <button id="btnSaveRecord" class="btn-top" style="background:#28a745;">SAVE CHANGES</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="prodEditModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 800px;">
-            <h2>Manage Product</h2>
-            <hr>
-            <div id="prodFormFields" class="form-grid"></div>
-            <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
-                <button id="btnDeactivateProd" class="btn-top" style="background:#dc3545;">DEACTIVATE</button>
-                <div style="display:flex; gap:10px;">
-                    <button onclick="document.getElementById('prodEditModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
-                    <button id="btnSaveProdRecord" class="btn-top" style="background:#28a745;">SAVE PRODUCT</button>
+                <div style="overflow-x: auto;">
+                    <table class="mgmt-table">
+                        <thead id="prodTableHead"></thead>
+                        <tbody id="prodTableBody"></tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -118,6 +78,7 @@
         const repo = 'Billyschmidt123/Bottle-Water-';
         let currentProdList = [];
         let currentProdHeaders = [];
+        let editingIndex = -1;
 
         window.loadProductFile = async function(fileName) {
             const tbody = document.getElementById('prodTableBody');
@@ -145,53 +106,37 @@
                     pObj.Status = pObj.Status || "Active";
                     currentProdList.push(pObj);
                 });
+                editingIndex = -1;
                 renderProdTable();
             }
         };
 
-        window.openProdMaintenanceEdit = function(idx) {
+        window.enterEditMode = function(idx) {
+            editingIndex = idx;
+            renderProdTable();
+        };
+
+        window.cancelEdit = function() {
+            editingIndex = -1;
+            renderProdTable();
+        };
+
+        window.updateRow = function(idx) {
             const data = currentProdList[idx];
-            const container = document.getElementById('prodFormFields');
-            const deactivateBtn = document.getElementById('btnDeactivateProd');
-            const saveBtn = document.getElementById('btnSaveProdRecord');
-            
-            // Clear and build fields using the working Customer logic pattern
-            container.innerHTML = '';
             currentProdHeaders.forEach(h => {
-                const val = data[h] || '';
-                const isStatus = h === 'Status';
-                const fieldWrapper = document.createElement('div');
-                fieldWrapper.className = 'form-group';
-                fieldWrapper.innerHTML = `
-                    <label>${h}</label>
-                    <input type="text" id="pmf_${h}" ${isStatus ? 'readonly style="background:#eee;"' : ''}>
-                `;
-                container.appendChild(fieldWrapper);
-                // Explicitly set the value after the element is in the DOM
-                document.getElementById(`pmf_${h}`).value = val;
+                if (h !== 'Status') {
+                    const input = document.getElementById(`edit_${h}_${idx}`);
+                    if (input) data[h] = input.value;
+                }
             });
+            editingIndex = -1;
+            renderProdTable();
+        };
 
-            deactivateBtn.innerText = data.Status === "Active" ? "DEACTIVATE" : "RE-ACTIVATE";
-            deactivateBtn.style.background = data.Status === "Active" ? "#dc3545" : "#28a745";
-            
-            deactivateBtn.onclick = () => {
-                data.Status = data.Status === "Active" ? "Deactivated" : "Active";
-                document.getElementById('prodEditModal').style.display = 'none';
-                renderProdTable();
-            };
-
-            saveBtn.onclick = () => {
-                currentProdHeaders.forEach(h => {
-                    if (h !== 'Status') {
-                        const input = document.getElementById(`pmf_${h}`);
-                        if (input) data[h] = input.value;
-                    }
-                });
-                document.getElementById('prodEditModal').style.display = 'none';
-                renderProdTable();
-            };
-
-            document.getElementById('prodEditModal').style.display = 'flex';
+        window.toggleStatus = function(idx) {
+            const data = currentProdList[idx];
+            data.Status = data.Status === "Active" ? "Deactivated" : "Active";
+            renderProdTable();
         };
 
         function renderProdTable() {
@@ -199,9 +144,27 @@
             tbody.innerHTML = '';
             currentProdList.forEach((pObj, idx) => {
                 const isDeactivated = pObj.Status === "Deactivated";
-                let row = `<tr class="${isDeactivated ? 'deactivated-row' : ''}">
-                    <td><button class="btn-top" style="padding:4px;" onclick="openProdMaintenanceEdit(${idx})">Edit</button></td>`;
-                currentProdHeaders.forEach(h => row += `<td>${pObj[h] || ''}</td>`);
+                const isEditing = editingIndex === idx;
+                
+                let row = `<tr class="${isDeactivated ? 'deactivated-row' : ''}">`;
+                
+                if (isEditing) {
+                    row += `<td>
+                        <button class="btn-top" style="padding:4px; background:#28a745;" onclick="updateRow(${idx})">Update</button>
+                        <button class="btn-top" style="padding:4px; background:#6c757d;" onclick="cancelEdit()">Cancel</button>
+                    </td>`;
+                    currentProdHeaders.forEach(h => {
+                        if (h === 'Status') {
+                            row += `<td><button class="btn-top" style="padding:2px; font-size:0.7rem; background:#17a2b8;" onclick="toggleStatus(${idx})">${pObj[h]}</button></td>`;
+                        } else {
+                            row += `<td><input type="text" class="edit-input" id="edit_${h}_${idx}" value="${pObj[h]}"></td>`;
+                        }
+                    });
+                } else {
+                    row += `<td><button class="btn-top" style="padding:4px;" onclick="enterEditMode(${idx})">Edit</button></td>`;
+                    currentProdHeaders.forEach(h => row += `<td>${pObj[h] || ''}</td>`);
+                }
+                
                 tbody.innerHTML += row + '</tr>';
             });
         }
@@ -212,11 +175,6 @@
 
             document.getElementById('btnManager').onclick = () => {
                 document.getElementById('mgrModal').style.display = 'flex';
-            };
-
-            document.getElementById('btnShowProd').onclick = () => {
-                document.getElementById('custView').style.display = 'none';
-                document.getElementById('prodView').style.display = 'block';
                 loadProductFile('Coffee.csv');
             };
         }
