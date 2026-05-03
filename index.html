@@ -118,6 +118,8 @@
         </div>
 
         <div class="topbar-right">
+            <!-- ADDED: Force Refresh Button -->
+            <button id="btnForceRefresh" class="btn-top" style="background: #17a2b8; margin-right: 10px;"><i class="fas fa-sync-alt"></i> FORCE REFRESH</button>
             <button id="btnManager" class="btn-top" style="background: #495057;">MANAGER MENU</button>
         </div>
     </header>
@@ -288,8 +290,6 @@
 
                     lines.slice(1).forEach(line => {
                         const vals = line.split(',');
-                        
-                        /* FIX 1: Use let to scope tempCust correctly for every line */
                         let tempCust = {};
                         csvHeaders.forEach((h, i) => tempCust[h] = (vals[i] || "").trim());
                         
@@ -417,12 +417,21 @@
                     } catch (err) { console.error("Route load error", err); }
                 };
 
+                // ADDED: Force Refresh Logic
+                document.getElementById('btnForceRefresh').onclick = async () => {
+                    const btn = document.getElementById('btnForceRefresh');
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> REFRESHING...';
+                    await loadAllCustomers();
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-sync-alt"></i> FORCE REFRESH';
+                };
+
                 document.getElementById('btnManager').onclick = () => {
                     document.getElementById('mgrModal').style.display = 'flex';
                     loadAllCustomers();
                 };
                 
-                /* FIX 2: Restored active state toggles for visibility fixes */
                 document.getElementById('btnShowCust').onclick = () => {
                     document.getElementById('custView').style.display = 'block';
                     document.getElementById('prodView').style.display = 'none';
@@ -454,7 +463,6 @@
                 let d = {}; 
                 headers.forEach((h, i) => d[h] = v[i] || "");
                 
-                /* FIX 3: Restored stop card styling and click handling */
                 const card = document.createElement('div');
                 card.className = "stop-card";
                 card.style = "background:white; padding:10px; margin-bottom:10px; border-radius:5px; border-left:5px solid #007bff; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.1); text-align: left; color: #333;";
