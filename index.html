@@ -1,7 +1,7 @@
 <!-- 
   PROJECT: LogiFlow Delivery System
-  VERSION: Restored Route/Customer Logic + Stop Detail Modal Fix
-  STATUS: Stable - Non-Destructive Addition
+  VERSION: Stop Detail Modal Expansion (Coffee + Customer Metadata + Cart)
+  STATUS: Stable - Additive Changes Only
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -40,6 +40,10 @@
 
         /* FIX ADDED: Signature Pad Styling */
         #sig-canvas { border: 2px dotted #CCCCCC; border-radius: 5px; cursor: crosshair; background: #fff; width: 100%; height: 150px; }
+        /* ADDITION: Shopping Cart Styling */
+        .cart-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.8rem; }
+        .cart-table th { background: #eee; text-align: left; padding: 5px; }
+        .cart-table td { border-bottom: 1px solid #eee; padding: 5px; }
     </style>
 </head>
 <body>
@@ -73,17 +77,37 @@
 
     <!-- FIX ADDED: Stop Detail Modal -->
     <div id="stopModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content" style="max-width: 800px;">
             <div style="display:flex; justify-content: space-between; align-items:center;">
                 <h2 id="stopModalTitle">Complete Delivery</h2>
                 <button onclick="document.getElementById('stopModal').style.display='none'" class="btn-top" style="background:#dc3545;">Close</button>
             </div>
             <hr>
-            <div class="form-grid" style="grid-template-columns: 1fr;">
+            
+            <!-- ADDITION: Customer Metadata Section -->
+            <div id="stopMetadata" style="font-size: 0.85rem; background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div><strong>Address:</strong> <span id="metaAddress">--</span></div>
+                <div><strong>Phone:</strong> <span id="metaPhone">--</span></div>
+                <div><strong>Email:</strong> <span id="metaEmail">--</span></div>
+                <div><strong>Travel/Delivery:</strong> <span id="metaCharges">--</span></div>
+                <div><strong>PO:</strong> <span id="metaPO">--</span></div>
+                <div><strong>Special Order:</strong> <span id="metaSpecOrder">--</span></div>
+                <div style="grid-column: span 2;"><strong>Special Instructions:</strong> <span id="metaSpecInst">--</span></div>
+                <div style="grid-column: span 2;"><strong>Notes:</strong> <span id="metaNotes">--</span></div>
+            </div>
+
+            <div class="form-grid">
                 <div class="form-group">
-                    <label>Select Product</label>
+                    <label>Water Product</label>
                     <select id="stopProductDropdown">
-                        <option value="">Choose a product...</option>
+                        <option value="">Choose water product...</option>
+                    </select>
+                </div>
+                <!-- ADDITION: Coffee Dropdown -->
+                <div class="form-group">
+                    <label>Coffee Product</label>
+                    <select id="stopCoffeeDropdown">
+                        <option value="">Choose coffee product...</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -95,6 +119,20 @@
                     <canvas id="sig-canvas"></canvas>
                 </div>
             </div>
+
+            <!-- ADDITION: Shopping Cart Section -->
+            <div style="margin-top: 20px; border-top: 2px solid #eee; padding-top: 10px;">
+                <h4 style="margin: 0;"><i class="fas fa-shopping-cart"></i> Pre-Ordered Items</h4>
+                <table class="cart-table">
+                    <thead>
+                        <tr><th>Item</th><th>Units</th><th>Qty</th></tr>
+                    </thead>
+                    <tbody id="cartItemsBody">
+                        <tr><td colspan="3" style="color:#999; text-align:center;">No pre-ordered items.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
             <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
                 <button onclick="document.getElementById('stopModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
                 <button class="btn-top" style="background:#28a745;">FINISH STOP</button>
@@ -373,35 +411,58 @@
         };
 
         /* FIX ADDED: Expose openStopModal to window scope for dynamic list clicks */
-        window.openStopModal = async function(companyName) {
+        window.openStopModal = async function(companyName, customerData = {}) {
             document.getElementById('stopModalTitle').textContent = `Delivery: ${companyName}`;
             document.getElementById('stopModal').style.display = 'flex';
             
-            document.getElementById('receivedBy').value = '';
-            const dropdown = document.getElementById('stopProductDropdown');
-            dropdown.innerHTML = '<option value="">Loading Products...</option>';
+            // ADDITION: Populate Metadata from customerData
+            document.getElementById('metaAddress').textContent = `${customerData.Address || '--'}, ${customerData.City || ''} ${customerData.PostalCode || ''}`;
+            document.getElementById('metaPhone').textContent = customerData.Phone || '--';
+            document.getElementById('metaEmail').textContent = customerData.Email || '--';
+            document.getElementById('metaCharges').textContent = `Deliv: ${customerData['Delivery charge'] || '$0'} | Travel: ${customerData.Travel || '$0'}`;
+            document.getElementById('metaPO').textContent = customerData['Purchase order'] || '--';
+            document.getElementById('metaSpecOrder').textContent = customerData['Special Order'] || '--';
+            document.getElementById('metaSpecInst').textContent = customerData['Special instructiosn'] || '--';
+            document.getElementById('metaNotes').textContent = customerData.Notes || '--';
 
-            try {
-                const resp = await fetch(`https://raw.githubusercontent.com/${repo}/main/Products/Water.csv?t=${Date.now()}`);
-                const text = await resp.text();
-                const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-                
-                if (lines.length > 1) {
-                    const headers = lines[0].split(',');
-                    const descIdx = headers.findIndex(h => h.toLowerCase().includes('description') || h.toLowerCase().includes('item'));
-                    
-                    dropdown.innerHTML = '<option value="">Choose a product...</option>';
-                    lines.slice(1).forEach(line => {
-                        const vals = line.split(',');
-                        const opt = document.createElement('option');
-                        opt.value = vals[0];
-                        opt.textContent = vals[descIdx] || vals[0];
-                        dropdown.appendChild(opt);
-                    });
-                }
-            } catch (e) {
-                dropdown.innerHTML = '<option value="">Error loading products</option>';
+            document.getElementById('receivedBy').value = '';
+            
+            // ADDITION: Populate Cart (Mock data logic)
+            const cartBody = document.getElementById('cartItemsBody');
+            cartBody.innerHTML = '<tr><td colspan="3" style="color:#999; text-align:center;">Checking for orders...</td></tr>';
+            // Placeholder logic for pre-ordered items (could be extended via GitHub fetch)
+            setTimeout(() => { cartBody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No pending orders found.</td></tr>'; }, 500);
+
+            // Populate Water Products
+            const waterDropdown = document.getElementById('stopProductDropdown');
+            waterDropdown.innerHTML = '<option value="">Loading...</option>';
+
+            // Populate Coffee Products
+            const coffeeDropdown = document.getElementById('stopCoffeeDropdown');
+            coffeeDropdown.innerHTML = '<option value="">Loading...</option>';
+
+            async function populateProd(fileName, targetId) {
+                try {
+                    const resp = await fetch(`https://raw.githubusercontent.com/${repo}/main/Products/${fileName}?t=${Date.now()}`);
+                    const text = await resp.text();
+                    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+                    const target = document.getElementById(targetId);
+                    if (lines.length > 1) {
+                        const h = lines[0].split(',');
+                        const dIdx = h.findIndex(col => col.toLowerCase().includes('desc') || col.toLowerCase().includes('item'));
+                        target.innerHTML = `<option value="">Choose ${fileName.replace('.csv','')} product...</option>`;
+                        lines.slice(1).forEach(l => {
+                            const v = l.split(',');
+                            const o = document.createElement('option');
+                            o.value = v[0]; o.textContent = v[dIdx] || v[0];
+                            target.appendChild(o);
+                        });
+                    }
+                } catch(e) { document.getElementById(targetId).innerHTML = '<option>Error</option>'; }
             }
+
+            populateProd('Water.csv', 'stopProductDropdown');
+            populateProd('Coffee.csv', 'stopCoffeeDropdown');
 
             const canvas = document.getElementById('sig-canvas');
             const ctx = canvas.getContext('2d');
@@ -514,15 +575,18 @@
                 const displayName = (vals[compIdx] || vals[nameIdx] || 'Unknown').trim();
                 const addr = vals[addrIdx] || 'No Address';
                 
+                const rowData = {};
+                headers.forEach((h, idx) => rowData[h] = (vals[idx] || '').trim());
+
                 const div = document.createElement('div');
                 div.style = "padding:10px; border-bottom:1px solid #eee; cursor:pointer; text-align:left;";
                 div.innerHTML = `<strong>${i+1}. ${displayName}</strong><br><small>${addr}</small>`;
                 
                 div.onclick = () => {
                     document.getElementById('currentAddress').textContent = addr;
-                    document.getElementById('currentPhone').textContent = vals[headers.findIndex(h => h.toLowerCase().includes("phone"))] || '--';
-                    /* FIX ADDED: Calls globally exposed window function */
-                    window.openStopModal(displayName);
+                    document.getElementById('currentPhone').textContent = rowData.Phone || '--';
+                    /* FIX ADDED: Calls globally exposed window function with full customer data row */
+                    window.openStopModal(displayName, rowData);
                 };
                 stopList.appendChild(div);
             });
