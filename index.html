@@ -588,7 +588,7 @@
         };
 
         /* ------------------------------------------------------------
-           FIX START: Refined Layout Formatting for PDF
+           PDF Generation Logic
            ------------------------------------------------------------ */
         window.validateAndFinishStop = async function() {
             const receiverName = document.getElementById('receivedBy').value.trim();
@@ -611,10 +611,10 @@
             const slipNum = Math.floor(100000 + Math.random() * 900000);
             const fileName = `${customerName}_Slip_${slipNum}.pdf`.replace(/\s+/g, '_');
 
-            // Construct PDF Template precisely matching IMG_0600_3.jpeg
+            // Construct PDF Template precisely matching image_fe9757.png
             const pdfContainer = document.createElement('div');
-            pdfContainer.style.width = "8.5in";
-            pdfContainer.style.padding = "0.3in 0.5in";
+            pdfContainer.style.width = "8in";
+            pdfContainer.style.padding = "0.2in";
             pdfContainer.style.fontFamily = "'Courier New', Courier, monospace";
             pdfContainer.style.fontSize = "11px";
             pdfContainer.style.color = "#000";
@@ -751,7 +751,14 @@
                 margin: 0,
                 filename: fileName,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 3, useCORS: true },
+                /* --- FIX ADDED HERE --- */
+                html2canvas: { 
+                    scale: 2, 
+                    useCORS: true, 
+                    windowWidth: 800, // Explicitly define the render width to prevent cutoff
+                    scrollX: 0 
+                },
+                /* --- END OF FIX --- */
                 jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
             };
 
@@ -777,9 +784,6 @@
                 };
             } catch (err) { alert("Critical error generating PDF: " + err); }
         };
-        /* ------------------------------------------------------------
-           FIX END
-           ------------------------------------------------------------ */
 
         window.addProductToCart = function(dropdownId, qtyId, unitId) {
             const dropdown = document.getElementById(dropdownId);
