@@ -372,6 +372,52 @@
             document.getElementById('editModal').style.display = 'flex';
         };
 
+        /* FIX ADDED: Expose openStopModal to window scope for dynamic list clicks */
+        window.openStopModal = async function(companyName) {
+            document.getElementById('stopModalTitle').textContent = `Delivery: ${companyName}`;
+            document.getElementById('stopModal').style.display = 'flex';
+            
+            document.getElementById('receivedBy').value = '';
+            const dropdown = document.getElementById('stopProductDropdown');
+            dropdown.innerHTML = '<option value="">Loading Products...</option>';
+
+            try {
+                const resp = await fetch(`https://raw.githubusercontent.com/${repo}/main/Products/Water.csv?t=${Date.now()}`);
+                const text = await resp.text();
+                const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+                
+                if (lines.length > 1) {
+                    const headers = lines[0].split(',');
+                    const descIdx = headers.findIndex(h => h.toLowerCase().includes('description') || h.toLowerCase().includes('item'));
+                    
+                    dropdown.innerHTML = '<option value="">Choose a product...</option>';
+                    lines.slice(1).forEach(line => {
+                        const vals = line.split(',');
+                        const opt = document.createElement('option');
+                        opt.value = vals[0];
+                        opt.textContent = vals[descIdx] || vals[0];
+                        dropdown.appendChild(opt);
+                    });
+                }
+            } catch (e) {
+                dropdown.innerHTML = '<option value="">Error loading products</option>';
+            }
+
+            const canvas = document.getElementById('sig-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            let drawing = false;
+            canvas.onmousedown = () => { drawing = true; ctx.beginPath(); };
+            canvas.onmouseup = () => { drawing = false; };
+            canvas.onmousemove = (e) => {
+                if (!drawing) return;
+                const rect = canvas.getBoundingClientRect();
+                ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+                ctx.stroke();
+            };
+        };
+
         async function init() {
             const map = L.map('map').setView([55.17, -118.79], 12);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -472,64 +518,15 @@
                 div.style = "padding:10px; border-bottom:1px solid #eee; cursor:pointer; text-align:left;";
                 div.innerHTML = `<strong>${i+1}. ${displayName}</strong><br><small>${addr}</small>`;
                 
-                /* FIX ADDED: Open Stop Modal on click and pass company name */
                 div.onclick = () => {
                     document.getElementById('currentAddress').textContent = addr;
                     document.getElementById('currentPhone').textContent = vals[headers.findIndex(h => h.toLowerCase().includes("phone"))] || '--';
-                    openStopModal(displayName);
+                    /* FIX ADDED: Calls globally exposed window function */
+                    window.openStopModal(displayName);
                 };
                 stopList.appendChild(div);
             });
         };
-
-        /* FIX ADDED: Function to handle Stop Modal interactions */
-        async function openStopModal(companyName) {
-            document.getElementById('stopModalTitle').textContent = `Delivery: ${companyName}`;
-            document.getElementById('stopModal').style.display = 'flex';
-            
-            // Clear inputs
-            document.getElementById('receivedBy').value = '';
-            const dropdown = document.getElementById('stopProductDropdown');
-            dropdown.innerHTML = '<option value="">Loading Products...</option>';
-
-            // Load products from Water.csv by default for the dropdown
-            try {
-                const resp = await fetch(`https://raw.githubusercontent.com/${repo}/main/Products/Water.csv?t=${Date.now()}`);
-                const text = await resp.text();
-                const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-                
-                if (lines.length > 1) {
-                    const headers = lines[0].split(',');
-                    const descIdx = headers.findIndex(h => h.toLowerCase().includes('description') || h.toLowerCase().includes('item'));
-                    
-                    dropdown.innerHTML = '<option value="">Choose a product...</option>';
-                    lines.slice(1).forEach(line => {
-                        const vals = line.split(',');
-                        const opt = document.createElement('option');
-                        opt.value = vals[0];
-                        opt.textContent = vals[descIdx] || vals[0];
-                        dropdown.appendChild(opt);
-                    });
-                }
-            } catch (e) {
-                dropdown.innerHTML = '<option value="">Error loading products</option>';
-            }
-
-            // Initialize simple signature pad
-            const canvas = document.getElementById('sig-canvas');
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            let drawing = false;
-            canvas.onmousedown = () => { drawing = true; ctx.beginPath(); };
-            canvas.onmouseup = () => { drawing = false; };
-            canvas.onmousemove = (e) => {
-                if (!drawing) return;
-                const rect = canvas.getBoundingClientRect();
-                ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
-                ctx.stroke();
-            };
-        }
 
         init();
     })();
