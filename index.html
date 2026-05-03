@@ -186,7 +186,6 @@
                 });
             }
             renderCustTable();
-            /* RESTORATION ADDITION: Re-trigger the dropdown update when manager loads */
             populateRouteDropdown();
         }
 
@@ -365,14 +364,11 @@
 
             document.getElementById('btnForceRefresh').onclick = loadAllCustomers;
             
-            /* RESTORATION ADDITION: Initialize the routes from GitHub on startup */
             loadGitHubRoutes();
+            /* FIX ADDED: Ensure dropdown is populated on initial load without manager intervention */
+            loadAllCustomers(); 
         }
 
-        /* ---------------------------------------------------------
-           RESTORATION BLOCKS (RESTORING ORIGINAL GITHUB LOGIC)
-           --------------------------------------------------------- */
-        
         async function loadGitHubRoutes() {
             const files = await ghGet('routes');
             const dropdown = document.getElementById('routeDropdown');
