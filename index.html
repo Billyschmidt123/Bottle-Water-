@@ -18,12 +18,10 @@
         #map { width: 100%; height: 100%; }
         #sidebar { flex: 0 0 30%; height: 100%; border-left: 2px solid #ccc; overflow-y: auto; background: #ffffff; }
         .btn-top { padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
-        /* ADDED: Increased min-width for better visibility on wide screens */
         .mgmt-table { width: 100%; min-width: 1200px; border-collapse: collapse; font-size: 0.85rem; }
         .mgmt-table th { background: #007bff; color: white; text-align: left; padding: 10px; position: sticky; top: 0; }
         .mgmt-table td { padding: 8px; border-bottom: 1px solid #ddd; }
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
-        /* ADDED: Increased width to show more table data at once */
         .modal-content { background: white; padding: 25px; border-radius: 8px; width: 98%; max-width: 1600px; max-height: 90vh; overflow-y: auto; overflow-x: auto; }
         .mgmt-nav-btn { padding: 10px 20px; margin-right: 10px; border: 1px solid #007bff; background: #f8f9fa; color: #007bff; cursor: pointer; font-weight: bold; border-radius: 4px; }
         .mgmt-nav-btn.active { background: #007bff; color: white; }
@@ -244,6 +242,7 @@
             const saveBtn = document.getElementById('btnSaveProdRecord');
             container.innerHTML = '';
             
+            // FIX: Explicitly setting the value attribute during creation to ensure data mirroring
             currentProdHeaders.forEach(h => {
                 const val = data[h] || '';
                 if (h === 'Status') {
@@ -253,13 +252,15 @@
                 }
             });
 
-            /* ADDED: Explicit population after HTML is added to ensure values are set */
+            // FIX: Secondary population check to ensure data from table is mirrored
             setTimeout(() => {
                 currentProdHeaders.forEach(h => {
                     const field = document.getElementById(`pf_${h}`);
-                    if (field) field.value = data[h] || '';
+                    if (field) {
+                        field.value = data[h] || '';
+                    }
                 });
-            }, 10);
+            }, 50);
 
             deactivateBtn.innerText = data.Status === "Active" ? "DEACTIVATE" : "RE-ACTIVATE";
             deactivateBtn.style.background = data.Status === "Active" ? "#dc3545" : "#28a745";
