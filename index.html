@@ -134,7 +134,11 @@
             const lines = text.split('\n').map(l => l.trim()).filter(l => l);
             
             if(lines.length > 0) {
-                currentProdHeaders = lines[0].split(',').map(h => h.trim());
+                // Filter out empty headers created by extra commas
+                currentProdHeaders = lines[0].split(',')
+                    .map(h => h.trim())
+                    .filter(h => h !== "");
+                
                 if (!currentProdHeaders.includes('Status')) currentProdHeaders.push('Status');
                 
                 thead.innerHTML = `<tr><th>Action</th>${currentProdHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
@@ -144,7 +148,11 @@
                 lines.slice(1).forEach((line) => {
                     const vals = line.split(',');
                     let pObj = {};
-                    currentProdHeaders.forEach((h, i) => pObj[h] = (vals[i] || "").trim());
+                    currentProdHeaders.forEach((h, i) => {
+                        if (h !== 'Status') {
+                            pObj[h] = (vals[i] || "").trim();
+                        }
+                    });
                     if (!pObj.Status) pObj.Status = "Active";
                     currentProdList.push(pObj);
                 });
@@ -158,7 +166,6 @@
             const deactivateBtn = document.getElementById('btnDeactivateProd');
             const saveBtn = document.getElementById('btnSaveProdRecord');
             
-            // Generate form and load data simultaneously to ensure it displays correctly
             let formHtml = '';
             currentProdHeaders.forEach(h => {
                 const val = data[h] || '';
