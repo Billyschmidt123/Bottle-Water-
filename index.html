@@ -94,7 +94,6 @@
             color: white;
         }
 
-        /* ADDED: Modal Styling for Customer Edit */
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
         .form-group { display: flex; flex-direction: column; }
         .form-group label { font-size: 0.8rem; font-weight: bold; margin-bottom: 5px; color: #555; }
@@ -178,7 +177,7 @@
         </div>
     </div>
 
-    <!-- ADDED: Customer Edit/Add Modal -->
+    <!-- Customer Edit/Add Modal -->
     <div id="custEditModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 800px;">
             <h2 id="custModalTitle">Edit Customer</h2>
@@ -241,7 +240,6 @@
             } catch (e) { return []; }
         }
 
-        // ADDED: Logic to aggregate customers from all route CSVs
         async function loadAllCustomers() {
             const files = await ghGet('routes');
             const tbody = document.getElementById('custTableBody');
@@ -255,7 +253,6 @@
             for (let f of files) {
                 if (!f.name.endsWith('.csv')) continue;
                 
-                // Populate Route Dropdowns
                 const opt = document.createElement('option');
                 opt.value = f.name; opt.textContent = f.name.replace('.csv', '');
                 routeSel.appendChild(opt);
@@ -307,7 +304,6 @@
                 </div>`;
             });
 
-            // Route list for customer
             const routeBody = document.getElementById('custRouteListBody');
             routeBody.innerHTML = idx === -1 ? '' : `<tr><td>${cust._routeName}</td><td>Active</td><td><button class="btn-top" style="background:#dc3545; padding:2px 5px;">Deactivate</button></td></tr>`;
 
@@ -378,6 +374,8 @@
                     document.getElementById('prodView').style.display = 'none';
                     document.getElementById('btnShowCust').classList.add('active');
                     document.getElementById('btnShowProd').classList.remove('active');
+                    /* ADDED FIX: Trigger customer data load when view is switched */
+                    loadAllCustomers();
                 };
 
                 document.getElementById('btnShowProd').onclick = () => {
