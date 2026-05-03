@@ -456,8 +456,10 @@
             
             ctx.font = "24px 'Segoe UI'";
             ctx.fillStyle = "#CCCCCC";
+            /* ADDITION: Center watermark text */
             ctx.textAlign = "center";
-            ctx.fillText("SIGN HERE", canvas.width / 2, canvas.height / 2 + 10);
+            ctx.textBaseline = "middle";
+            ctx.fillText("SIGN HERE", canvas.width / 2, canvas.height / 2);
         };
 
         window.clearSignatureCanvas = function() {
@@ -468,8 +470,10 @@
             
             ctx.font = "24px 'Segoe UI'";
             ctx.fillStyle = "#CCCCCC";
+            /* ADDITION: Center watermark text */
             ctx.textAlign = "center";
-            ctx.fillText("SIGN HERE", canvas.width / 2, canvas.height / 2 + 10);
+            ctx.textBaseline = "middle";
+            ctx.fillText("SIGN HERE", canvas.width / 2, canvas.height / 2);
         };
 
         window.openStopModal = async function(companyName, customerData = {}) {
