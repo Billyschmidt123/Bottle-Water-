@@ -95,6 +95,9 @@
         .form-group { display: flex; flex-direction: column; }
         .form-group label { font-size: 0.8rem; font-weight: bold; margin-bottom: 5px; color: #555; }
         .form-group input, .form-group select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        
+        /* ADDED STYLE FOR SCHEDULE SECTION */
+        .section-header { background: #f0f0f0; padding: 8px; font-weight: bold; margin-top: 20px; border-radius: 4px; border-left: 4px solid #007bff; }
     </style>
 </head>
 <body>
@@ -173,13 +176,37 @@
 
     <!-- Customer Edit Modal -->
     <div id="custEditModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-content" style="max-width: 900px;">
             <div style="display:flex; justify-content: space-between; align-items:center;">
                 <h2 id="custModalTitle">Edit Customer Information</h2>
                 <button onclick="document.getElementById('custEditModal').style.display='none'" class="btn-top" style="background:#dc3545;">Close</button>
             </div>
             <hr>
+            
+            <!-- Field Container -->
             <div id="custFormFields" class="form-grid"></div>
+
+            <!-- START OF FIX: ADDED SCHEDULE DATA SECTION -->
+            <div id="scheduleSection">
+                <div class="section-header">Scheduling & Route Management</div>
+                <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <label style="font-size: 0.8rem; font-weight: bold;">Current Route Assignments</label>
+                        <div id="currentRouteList" style="border: 1px solid #ddd; padding: 10px; min-height: 50px; border-radius: 4px; background: #fafafa; margin-top:5px;">
+                            <!-- Populated by script -->
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size: 0.8rem; font-weight: bold;">Assign to Additional Route</label>
+                        <div style="display:flex; gap:5px; margin-top:5px;">
+                            <select id="addRouteDropdown" style="flex-grow:1; padding:8px; border-radius:4px; border:1px solid #ddd;"></select>
+                            <button id="btnAddRoute" class="btn-top" style="background:#28a745;">Add</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- END OF FIX -->
+
             <div id="saveStatus" style="margin-top:10px; font-weight:bold; text-align:right;"></div>
             <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
                 <button onclick="document.getElementById('custEditModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
@@ -197,7 +224,7 @@
         
         let globalCustomers = [];
         let csvHeaders = [];
-        let routeDataMap = {}; // Tracks raw text of each route file
+        let routeDataMap = {}; 
         let map;
 
         function initMap() {
@@ -217,7 +244,6 @@
             } catch (e) { return []; }
         }
 
-        // Logic to push updates to GitHub
         async function ghPut(path, content, sha) {
             return fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
                 method: 'PUT',
@@ -234,14 +260,22 @@
             const files = await ghGet('routes');
             const tbody = document.getElementById('custTableBody');
             const thead = document.getElementById('custTableHead');
+            const addRouteDrop = document.getElementById('addRouteDropdown');
             
             tbody.innerHTML = '<tr><td colspan="10">Syncing route data...</td></tr>';
+            addRouteDrop.innerHTML = '<option value="">Choose Route...</option>';
             globalCustomers = [];
             routeDataMap = {};
 
             for (let f of files) {
                 if (!f.name.endsWith('.csv')) continue;
                 
+                // Populate Add Route Dropdown
+                const opt = document.createElement('option');
+                opt.value = f.name;
+                opt.textContent = f.name.replace('.csv', '');
+                addRouteDrop.appendChild(opt);
+
                 try {
                     const resp = await fetch(f.download_url);
                     const text = await resp.text();
@@ -260,7 +294,6 @@
                         let cust = { _routes: [f.name] };
                         csvHeaders.forEach((h, i) => cust[h] = vals[i] || "");
                         
-                        // Link duplicates across routes
                         let existing = globalCustomers.find(ex => ex.company === cust.company && ex.address === cust.address);
                         if (existing) {
                             if(!existing._routes.includes(f.name)) existing._routes.push(f.name);
@@ -287,11 +320,14 @@
         window.openCustEdit = function(idx) {
             const cust = idx === -1 ? {} : globalCustomers[idx];
             const container = document.getElementById('custFormFields');
+            const routeList = document.getElementById('currentRouteList');
             const statusDiv = document.getElementById('saveStatus');
+            
             statusDiv.innerText = '';
             document.getElementById('custModalTitle').textContent = idx === -1 ? "New Customer" : "Edit: " + cust.company;
             container.innerHTML = '';
 
+            // Render Form Fields
             csvHeaders.forEach(h => {
                 container.innerHTML += `
                     <div class="form-group">
@@ -299,6 +335,18 @@
                         <input type="text" value="${cust[h] || ''}" id="edit_field_${h}">
                     </div>`;
             });
+
+            // START OF FIX: POPULATE SCHEDULE DATA
+            routeList.innerHTML = '';
+            if (cust._routes) {
+                cust._routes.forEach(rName => {
+                    const rDiv = document.createElement('div');
+                    rDiv.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:5px; border:1px solid #eee; margin-bottom:5px; border-radius:3px; font-size:0.85rem;";
+                    rDiv.innerHTML = `<span>${rName.replace('.csv', '')}</span> <button class="btn-top" style="padding:2px 5px; background:#dc3545; font-size:0.7rem;">Remove</button>`;
+                    routeList.appendChild(rDiv);
+                });
+            }
+            // END OF FIX
 
             document.getElementById('custEditModal').style.display = 'flex';
             
@@ -308,23 +356,20 @@
                 statusDiv.innerText = "Processing batch update...";
                 statusDiv.style.color = "orange";
 
-                // 1. Capture new data from modal
                 let updatedData = {};
                 csvHeaders.forEach(h => {
                     updatedData[h] = document.getElementById(`edit_field_${h}`).value;
                 });
 
-                // 2. Prepare the update for every route the customer is in
                 try {
                     for (let routeFile of cust._routes) {
                         let routeInfo = routeDataMap[routeFile];
                         let lines = routeInfo.text.split('\n');
-                        let newLines = [lines[0]]; // Header
+                        let newLines = [lines[0]]; 
 
                         lines.slice(1).forEach(line => {
                             if (!line.trim()) return;
                             let vals = line.split(',');
-                            // Match specific customer by unique company/address combo
                             if (vals[csvHeaders.indexOf('company')] === cust['company'] && 
                                 vals[csvHeaders.indexOf('address')] === cust['address']) {
                                 let newLine = csvHeaders.map(h => updatedData[h]).join(',');
@@ -342,7 +387,7 @@
                     statusDiv.style.color = "green";
                     setTimeout(() => {
                         document.getElementById('custEditModal').style.display = 'none';
-                        loadAllCustomers(); // Refresh master list
+                        loadAllCustomers(); 
                     }, 1000);
 
                 } catch (err) {
@@ -389,7 +434,6 @@
                     document.getElementById('prodView').style.display = 'block';
                 };
 
-                initMap();
             } catch (e) {}
         }
 
