@@ -957,29 +957,41 @@
             loadGitHubRoutes();
             loadAllCustomers(); 
         }
-async function managerCallInOrder() { 
-    const container = document.getElementById('moduleContainer');
-    try {
-        // Fetching the file using the exact path from your GitHub
-        const response = await fetch('https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/MODULES/callin-modal.html?t=' + Date.now());
-        
-        if (response.ok) {
-            const html = await response.text();
-            container.innerHTML = html;
-            
-            // This targets the CSS class ".modal" inside your callin-modal.html
-            const modal = container.querySelector('.modal');
-            if (modal) {
-                modal.style.display = 'block';
+
+        // --- CONSOLIDATED MANAGER FUNCTIONS ---
+        function managerEndOfDay() { alert("End of Day procedure initiated."); }
+        function managerLiveView() { alert("Loading Live Fleet View..."); }
+        function managerBackup() { alert("System backup successfully completed to GitHub."); }
+        function managerViewSlips() { alert("Loading Today's Delivery Slips..."); }
+        function managerViewPastLogs() { alert("Accessing Past Stop Logs Archive..."); }
+        function managerUserMgmt() { alert("Loading User Management Panel..."); }
+
+        // THE CORRECT FETCH VERSION
+        async function managerCallInOrder() { 
+            const container = document.getElementById('moduleContainer');
+            try {
+                const response = await fetch('https://raw.githubusercontent.com/Billyschmidt123/Bottle-Water-/main/MODULES/callin-modal.html?t=' + Date.now());
+                
+                if (response.ok) {
+                    const html = await response.text();
+                    container.innerHTML = html;
+                    
+                    const modal = container.querySelector('.modal');
+                    if (modal) {
+                        modal.style.display = 'block';
+                        // Show the overlay if you use one
+                        const overlay = document.getElementById('stopModal');
+                        if(overlay) overlay.style.display = 'flex';
+                    }
+                } else {
+                    alert("File not found on GitHub. Verify folder name is MODULES.");
+                }
+            } catch (err) {
+                console.error("Error loading module:", err);
             }
-        } else {
-            console.error("Fetch failed. Status:", response.status);
-            alert("File not found. Please verify the folder name is 'MODULES'.");
         }
-    } catch (err) {
-        console.error("Error loading module:", err);
-    }
-}
+        // --- END MANAGER FUNCTIONS ---
+
         async function loadGitHubRoutes() {
             const files = await ghGet('routes');
             const dropdown = document.getElementById('routeDropdown');
@@ -992,20 +1004,6 @@ async function managerCallInOrder() {
                     opt.textContent = f.name.replace('.csv', '');
                     dropdown.appendChild(opt);
                 }
-            });
-        }
-
-        function populateRouteDropdown() {
-            const dropdown = document.getElementById('routeDropdown');
-            const currentVal = dropdown.value;
-            dropdown.innerHTML = '<option value="">Select Route...</option>';
-            
-            Object.keys(routeDataMap).forEach(fileName => {
-                const opt = document.createElement('option');
-                opt.value = fileName;
-                opt.textContent = fileName.replace('.csv', '');
-                if(fileName === currentVal) opt.selected = true;
-                dropdown.appendChild(opt);
             });
         }
 
@@ -1061,12 +1059,10 @@ async function managerCallInOrder() {
                 div.innerHTML = `<strong>${i+1}. ${displayName}</strong><br><small>${addr}</small>`;
                 
                 div.onclick = () => {
-                    /* ADDITIVE FIX: Mandatory Start Route Check */
                     if (!driverName) {
                         alert("You must click 'START ROUTE' and enter your name before opening stops.");
                         return;
                     }
-                    /* END ADDITIVE FIX */
                     currentStopIndex = i;
                     document.getElementById('currentAddress').textContent = addr;
                     document.getElementById('currentPhone').textContent = rowData.Phone || '--';
@@ -1080,16 +1076,6 @@ async function managerCallInOrder() {
 
         init();
     })();
-    </script>
-
-    <script>
-        function managerEndOfDay() { alert("End of Day procedure initiated."); }
-        function managerLiveView() { alert("Loading Live Fleet View..."); }
-        function managerCallInOrder() { alert("Opening Call-In Order Entry..."); }
-        function managerBackup() { alert("System backup successfully completed to GitHub."); }
-        function managerViewSlips() { alert("Loading Today's Delivery Slips..."); }
-        function managerViewPastLogs() { alert("Accessing Past Stop Logs Archive..."); }
-        function managerUserMgmt() { alert("Loading User Management Panel..."); }
     </script>
 </body>
 </html>
