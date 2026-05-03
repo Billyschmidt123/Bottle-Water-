@@ -1,6 +1,6 @@
 <!-- 
   PROJECT: LogiFlow Delivery System
-  VERSION: Restored Route/Customer Logic + Rev 2 Product Maintenance
+  VERSION: Restored Route/Customer Logic + Stop Detail Modal Fix
   STATUS: Stable - Non-Destructive Addition
 -->
 <!DOCTYPE html>
@@ -33,10 +33,13 @@
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
         .form-group { display: flex; flex-direction: column; }
         .form-group label { font-size: 0.75rem; font-weight: bold; margin-bottom: 3px; color: #666; }
-        .form-group input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        .form-group input, .form-group select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
 
         .edit-input { width: 95%; padding: 6px; border: 2px solid #007bff; border-radius: 3px; font-size: 0.85rem; background: #ffffff; color: #000000; display: block; }
         .deactivated-row { background-color: #fceaea; color: #a94442; }
+
+        /* FIX ADDED: Signature Pad Styling */
+        #sig-canvas { border: 2px dotted #CCCCCC; border-radius: 5px; cursor: crosshair; background: #fff; width: 100%; height: 150px; }
     </style>
 </head>
 <body>
@@ -66,6 +69,37 @@
                 <div id="stopList" style="text-align:center; color:#999; margin-top:20px;">Select a route to begin.</div>
             </div>
         </aside>
+    </div>
+
+    <!-- FIX ADDED: Stop Detail Modal -->
+    <div id="stopModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px;">
+            <div style="display:flex; justify-content: space-between; align-items:center;">
+                <h2 id="stopModalTitle">Complete Delivery</h2>
+                <button onclick="document.getElementById('stopModal').style.display='none'" class="btn-top" style="background:#dc3545;">Close</button>
+            </div>
+            <hr>
+            <div class="form-grid" style="grid-template-columns: 1fr;">
+                <div class="form-group">
+                    <label>Select Product</label>
+                    <select id="stopProductDropdown">
+                        <option value="">Choose a product...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Received By</label>
+                    <input type="text" id="receivedBy" placeholder="Name of person receiving">
+                </div>
+                <div class="form-group">
+                    <label>Signature</label>
+                    <canvas id="sig-canvas"></canvas>
+                </div>
+            </div>
+            <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
+                <button onclick="document.getElementById('stopModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
+                <button class="btn-top" style="background:#28a745;">FINISH STOP</button>
+            </div>
+        </div>
     </div>
 
     <!-- Manager Modal -->
@@ -424,7 +458,6 @@
             }
 
             const headers = lines[0].split(',').map(h => h.trim());
-            /* FIX ADDED: Specifically locate 'Company' and 'Customer' to ensure display accuracy */
             const compIdx = headers.findIndex(h => h.toLowerCase() === "company");
             const nameIdx = headers.findIndex(h => ["name", "customer"].some(w => h.toLowerCase().includes(w)));
             const addrIdx = headers.findIndex(h => h.toLowerCase().includes("address"));
@@ -432,20 +465,71 @@
             stopList.innerHTML = '';
             lines.slice(1).forEach((line, i) => {
                 const vals = line.split(',');
-                /* FIX ADDED: prioritize Company name, fall back to Customer/Name if company is missing */
                 const displayName = (vals[compIdx] || vals[nameIdx] || 'Unknown').trim();
                 const addr = vals[addrIdx] || 'No Address';
                 
                 const div = document.createElement('div');
                 div.style = "padding:10px; border-bottom:1px solid #eee; cursor:pointer; text-align:left;";
                 div.innerHTML = `<strong>${i+1}. ${displayName}</strong><br><small>${addr}</small>`;
+                
+                /* FIX ADDED: Open Stop Modal on click and pass company name */
                 div.onclick = () => {
                     document.getElementById('currentAddress').textContent = addr;
                     document.getElementById('currentPhone').textContent = vals[headers.findIndex(h => h.toLowerCase().includes("phone"))] || '--';
+                    openStopModal(displayName);
                 };
                 stopList.appendChild(div);
             });
         };
+
+        /* FIX ADDED: Function to handle Stop Modal interactions */
+        async function openStopModal(companyName) {
+            document.getElementById('stopModalTitle').textContent = `Delivery: ${companyName}`;
+            document.getElementById('stopModal').style.display = 'flex';
+            
+            // Clear inputs
+            document.getElementById('receivedBy').value = '';
+            const dropdown = document.getElementById('stopProductDropdown');
+            dropdown.innerHTML = '<option value="">Loading Products...</option>';
+
+            // Load products from Water.csv by default for the dropdown
+            try {
+                const resp = await fetch(`https://raw.githubusercontent.com/${repo}/main/Products/Water.csv?t=${Date.now()}`);
+                const text = await resp.text();
+                const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+                
+                if (lines.length > 1) {
+                    const headers = lines[0].split(',');
+                    const descIdx = headers.findIndex(h => h.toLowerCase().includes('description') || h.toLowerCase().includes('item'));
+                    
+                    dropdown.innerHTML = '<option value="">Choose a product...</option>';
+                    lines.slice(1).forEach(line => {
+                        const vals = line.split(',');
+                        const opt = document.createElement('option');
+                        opt.value = vals[0];
+                        opt.textContent = vals[descIdx] || vals[0];
+                        dropdown.appendChild(opt);
+                    });
+                }
+            } catch (e) {
+                dropdown.innerHTML = '<option value="">Error loading products</option>';
+            }
+
+            // Initialize simple signature pad
+            const canvas = document.getElementById('sig-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            let drawing = false;
+            canvas.onmousedown = () => { drawing = true; ctx.beginPath(); };
+            canvas.onmouseup = () => { drawing = false; };
+            canvas.onmousemove = (e) => {
+                if (!drawing) return;
+                const rect = canvas.getBoundingClientRect();
+                ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+                ctx.stroke();
+            };
+        }
 
         init();
     })();
