@@ -98,19 +98,6 @@
         </div>
     </div>
 
-    <!-- Customer Edit Modal -->
-    <div id="editModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 800px;">
-            <h2 id="editModalTitle">Edit Record</h2>
-            <hr>
-            <div id="editFormFields" class="form-grid"></div>
-            <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-                <button onclick="document.getElementById('editModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
-                <button id="btnSaveRecord" class="btn-top" style="background:#28a745;">SAVE CHANGES</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Product Edit Modal -->
     <div id="prodEditModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 800px;">
@@ -134,78 +121,8 @@
         const token = _k.map(c => String.fromCharCode(c)).join('');
         const repo = 'Billyschmidt123/Bottle-Water-';
         
-        let globalCustomers = [];
-        let csvHeaders = [];
-        let routeDataMap = {}; 
-        
         let currentProdList = [];
         let currentProdHeaders = [];
-
-        async function ghGet(path) {
-            const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
-                headers: { 'Authorization': `token ${token}` }
-            });
-            return r.ok ? await r.json() : [];
-        }
-
-        async function loadAllCustomers() {
-            const files = await ghGet('routes');
-            const tbody = document.getElementById('custTableBody');
-            const thead = document.getElementById('custTableHead');
-            tbody.innerHTML = '<tr><td colspan="10">Scanning files...</td></tr>';
-            
-            globalCustomers = [];
-            routeDataMap = {};
-            csvHeaders = [];
-
-            for (let f of files) {
-                if (!f.name.endsWith('.csv')) continue;
-                const resp = await fetch(f.download_url + "?t=" + Date.now());
-                const text = await resp.text();
-                routeDataMap[f.name] = { text: text, sha: f.sha };
-                
-                const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-                if (lines.length < 2) continue;
-
-                if (csvHeaders.length === 0) {
-                    csvHeaders = lines[0].split(',').map(h => h.trim());
-                    thead.innerHTML = `<tr><th>Action</th>${csvHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
-                }
-
-                lines.slice(1).forEach(line => {
-                    const vals = line.split(',');
-                    let rowObj = {};
-                    csvHeaders.forEach((h, i) => rowObj[h] = (vals[i] || "").trim());
-                    
-                    const nameKey = csvHeaders.find(h => ["company", "name", "customer"].some(w => h.toLowerCase().includes(w)));
-                    const addrKey = csvHeaders.find(h => h.toLowerCase().includes("address"));
-
-                    if (rowObj[nameKey] || rowObj[addrKey]) {
-                        let existing = globalCustomers.find(ex => 
-                            (ex[nameKey] || "").toLowerCase() === (rowObj[nameKey] || "").toLowerCase() &&
-                            (ex[addrKey] || "").toLowerCase() === (rowObj[addrKey] || "").toLowerCase()
-                        );
-                        if (existing) {
-                            if(!existing._routes.includes(f.name)) existing._routes.push(f.name);
-                        } else {
-                            rowObj._routes = [f.name];
-                            globalCustomers.push(rowObj);
-                        }
-                    }
-                });
-            }
-            renderCustTable();
-        }
-
-        function renderCustTable() {
-            const tbody = document.getElementById('custTableBody');
-            tbody.innerHTML = '';
-            globalCustomers.forEach((c, idx) => {
-                let row = `<tr><td><button class="btn-top" style="padding:4px;" onclick="openEdit(${idx}, 'cust')">Edit</button></td>`;
-                csvHeaders.forEach(h => row += `<td>${c[h] || ''}</td>`);
-                tbody.innerHTML += row + '</tr>';
-            });
-        }
 
         window.loadProductFile = async function(fileName) {
             const tbody = document.getElementById('prodTableBody');
@@ -241,15 +158,17 @@
             const deactivateBtn = document.getElementById('btnDeactivateProd');
             const saveBtn = document.getElementById('btnSaveProdRecord');
             
-            container.innerHTML = '';
+            // Generate form and load data simultaneously to ensure it displays correctly
+            let formHtml = '';
             currentProdHeaders.forEach(h => {
                 const val = data[h] || '';
                 const isStatus = h === 'Status';
-                container.innerHTML += `<div class="form-group">
+                formHtml += `<div class="form-group">
                     <label>${h}</label>
                     <input type="text" id="pmf_${h}" value="${val}" ${isStatus ? 'readonly style="background:#eee;"' : ''}>
                 </div>`;
             });
+            container.innerHTML = formHtml;
 
             deactivateBtn.innerText = data.Status === "Active" ? "DEACTIVATE" : "RE-ACTIVATE";
             deactivateBtn.style.background = data.Status === "Active" ? "#dc3545" : "#28a745";
@@ -263,7 +182,8 @@
             saveBtn.onclick = () => {
                 currentProdHeaders.forEach(h => {
                     if (h !== 'Status') {
-                        data[h] = document.getElementById(`pmf_${h}`).value;
+                        const input = document.getElementById(`pmf_${h}`);
+                        if (input) data[h] = input.value;
                     }
                 });
                 document.getElementById('prodEditModal').style.display = 'none';
@@ -285,42 +205,19 @@
             });
         }
 
-        window.openEdit = function(idx, type) {
-            const data = type === 'cust' ? globalCustomers[idx] : null;
-            const fields = type === 'cust' ? csvHeaders : [];
-            const container = document.getElementById('editFormFields');
-            container.innerHTML = '';
-            fields.forEach(h => {
-                container.innerHTML += `<div class="form-group"><label>${h}</label><input type="text" value="${data[h]}" id="f_${h}"></div>`;
-            });
-            document.getElementById('editModal').style.display = 'flex';
-        };
-
         async function init() {
             const map = L.map('map').setView([55.17, -118.79], 12);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
             document.getElementById('btnManager').onclick = () => {
                 document.getElementById('mgrModal').style.display = 'flex';
-                loadAllCustomers();
-            };
-
-            document.getElementById('btnShowCust').onclick = () => {
-                document.getElementById('custView').style.display = 'block';
-                document.getElementById('prodView').style.display = 'none';
-                document.getElementById('btnShowCust').classList.add('active');
-                document.getElementById('btnShowProd').classList.remove('active');
             };
 
             document.getElementById('btnShowProd').onclick = () => {
                 document.getElementById('custView').style.display = 'none';
                 document.getElementById('prodView').style.display = 'block';
-                document.getElementById('btnShowProd').classList.add('active');
-                document.getElementById('btnShowCust').classList.remove('active');
                 loadProductFile('Coffee.csv');
             };
-
-            document.getElementById('btnForceRefresh').onclick = loadAllCustomers;
         }
         init();
     })();
