@@ -611,10 +611,12 @@
             const slipNum = Math.floor(100000 + Math.random() * 900000);
             const fileName = `${customerName}_Slip_${slipNum}.pdf`.replace(/\s+/g, '_');
 
-            // Construct PDF Template precisely matching image_fe9757.png
+            // Construct PDF Template precisely matching image_fe365c.png
             const pdfContainer = document.createElement('div');
-            pdfContainer.style.width = "8in";
-            pdfContainer.style.padding = "0.2in";
+            /* Optimized width for 8.5x11 capturing */
+            pdfContainer.style.width = "816px"; // 8.5 inches at 96 DPI
+            pdfContainer.style.padding = "20px";
+            pdfContainer.style.background = "#ffffff";
             pdfContainer.style.fontFamily = "'Courier New', Courier, monospace";
             pdfContainer.style.fontSize = "11px";
             pdfContainer.style.color = "#000";
@@ -751,14 +753,14 @@
                 margin: 0,
                 filename: fileName,
                 image: { type: 'jpeg', quality: 0.98 },
-                /* --- FIX ADDED HERE --- */
+                /* --- UPDATED FIX FOR 8.5x11 CAPTURE --- */
                 html2canvas: { 
                     scale: 2, 
                     useCORS: true, 
-                    windowWidth: 800, // Explicitly define the render width to prevent cutoff
+                    windowWidth: 816, // Force exactly 8.5 inches of horizontal data capture
                     scrollX: 0 
                 },
-                /* --- END OF FIX --- */
+                /* --- END OF UPDATED FIX --- */
                 jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
             };
 
