@@ -241,20 +241,24 @@
             const deactivateBtn = document.getElementById('btnDeactivateProd');
             const saveBtn = document.getElementById('btnSaveProdRecord');
             
+            /* ADDED: Logic to map row data to modal input fields */
             let formHtml = '';
             currentProdHeaders.forEach(h => {
                 const val = data[h] || '';
                 const isStatus = h === 'Status';
                 formHtml += `<div class="form-group">
                     <label>${h}</label>
-                    <input type="text" value="${val}" id="pf_${h}" ${isStatus ? 'readonly style="background:#eee;"' : ''}>
+                    <input type="text" id="pf_${h}" ${isStatus ? 'readonly style="background:#eee;"' : ''}>
                 </div>`;
             });
             container.innerHTML = formHtml;
 
+            // Explicitly pass data from the row to the proper fields
             currentProdHeaders.forEach(h => {
                 const input = document.getElementById(`pf_${h}`);
-                if (input) input.value = data[h] || '';
+                if (input) {
+                    input.value = data[h] || '';
+                }
             });
 
             deactivateBtn.innerText = data.Status === "Active" ? "DEACTIVATE" : "RE-ACTIVATE";
@@ -266,7 +270,6 @@
                 renderProdTable();
             };
 
-            /* REPLACED: Updated save logic to perform find-and-replace on CSV line or append if not found */
             saveBtn.onclick = () => {
                 let updatedData = {};
                 currentProdHeaders.forEach(h => {
@@ -277,7 +280,6 @@
                     }
                 });
 
-                // Check for existing product to find-and-replace
                 const matchIndex = currentProdList.findIndex(p => 
                     Object.keys(updatedData).every(key => 
                         key === 'Status' || p[key] === data[key]
