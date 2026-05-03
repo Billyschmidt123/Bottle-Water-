@@ -37,28 +37,18 @@
     <header class="topbar">
         <div class="topbar-left">
             <span style="font-weight: bold; color: #007bff; margin-right: 15px;">LogiFlow</span>
-            <select id="routeDropdown" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
-                <option value="">Select Route...</option>
-            </select>
         </div>
         <div class="topbar-center">
             <div><i class="fas fa-map-marker-alt" style="color:#007bff"></i> <span id="currentAddress">Awaiting Data...</span></div>
-            <div><i class="fas fa-phone" style="color:#28a745"></i> <span id="currentPhone">--</span></div>
         </div>
         <div class="topbar-right">
-            <button id="btnForceRefresh" class="btn-top" style="background: #17a2b8; margin-right: 10px;"><i class="fas fa-sync-alt"></i> FORCE REFRESH</button>
             <button id="btnManager" class="btn-top" style="background: #495057;">MANAGER MENU</button>
         </div>
     </header>
 
     <div class="app-container">
         <div id="mapPanel"><div id="map"></div></div>
-        <aside id="sidebar">
-            <div id="sidebarContent" style="padding: 10px;">
-                <h3 style="text-align: center; color: #444;">Route Stops</h3>
-                <div id="stopList" style="text-align:center; color:#999; margin-top:20px;">Select a route to begin.</div>
-            </div>
-        </aside>
+        <aside id="sidebar"></aside>
     </div>
 
     <!-- Manager Modal -->
@@ -74,7 +64,6 @@
                 <button id="btnShowProd" class="mgmt-nav-btn">Product Maintenance</button>
             </div>
 
-            <!-- Customer View -->
             <div id="custView" style="display: block;">
                 <table class="mgmt-table">
                     <thead id="custTableHead"></thead>
@@ -82,26 +71,35 @@
                 </table>
             </div>
 
-            <!-- Product View -->
             <div id="prodView" style="display: none;">
                 <div style="margin-bottom:15px;">
                     <button class="btn-top" onclick="loadProductFile('Coffee.csv')" style="background:#6f4e37;">Coffee Products</button>
                     <button class="btn-top" onclick="loadProductFile('Water.csv')" style="background:#00a8e8;">Water Products</button>
                 </div>
-                <div style="overflow-x: auto;">
-                    <table class="mgmt-table">
-                        <thead id="prodTableHead"></thead>
-                        <tbody id="prodTableBody"></tbody>
-                    </table>
-                </div>
+                <table class="mgmt-table">
+                    <thead id="prodTableHead"></thead>
+                    <tbody id="prodTableBody"></tbody>
+                </table>
             </div>
         </div>
     </div>
 
-    <!-- Product Edit Modal -->
+    <!-- Edit Modals (Customer & Product) -->
+    <div id="editModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 800px;">
+            <h2 id="editModalTitle">Edit Record</h2>
+            <hr>
+            <div id="editFormFields" class="form-grid"></div>
+            <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
+                <button onclick="document.getElementById('editModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
+                <button id="btnSaveRecord" class="btn-top" style="background:#28a745;">SAVE CHANGES</button>
+            </div>
+        </div>
+    </div>
+
     <div id="prodEditModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 800px;">
-            <h2 id="prodEditTitle">Manage Product</h2>
+            <h2>Manage Product</h2>
             <hr>
             <div id="prodFormFields" class="form-grid"></div>
             <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
@@ -117,10 +115,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
     (function() {
-        const _k = [103,105,116,104,117,98,95,112,97,116,95,49,49,66,83,88,86,55,74,73,48,113,121,120,100,49,112,67,82,87,90,66,68,95,71,106,53,113,100,67,97,55,107,110,65,98,113,121,74,97,51,66,74,106,108,112,110,120,72,65,85,81,69,90,113,102,113,88,102,53,71,116,89,69,85,112,72,55,89,84,54,67,67,73,70,121,100,105,51,86,110,79,122];
-        const token = _k.map(c => String.fromCharCode(c)).join('');
         const repo = 'Billyschmidt123/Bottle-Water-';
-        
         let currentProdList = [];
         let currentProdHeaders = [];
 
@@ -134,11 +129,7 @@
             const lines = text.split('\n').map(l => l.trim()).filter(l => l);
             
             if(lines.length > 0) {
-                // Filter out empty headers created by extra commas
-                currentProdHeaders = lines[0].split(',')
-                    .map(h => h.trim())
-                    .filter(h => h !== "");
-                
+                currentProdHeaders = lines[0].split(',').map(h => h.trim()).filter(h => h);
                 if (!currentProdHeaders.includes('Status')) currentProdHeaders.push('Status');
                 
                 thead.innerHTML = `<tr><th>Action</th>${currentProdHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
@@ -149,11 +140,9 @@
                     const vals = line.split(',');
                     let pObj = {};
                     currentProdHeaders.forEach((h, i) => {
-                        if (h !== 'Status') {
-                            pObj[h] = (vals[i] || "").trim();
-                        }
+                        if (h !== 'Status') pObj[h] = (vals[i] || "").trim();
                     });
-                    if (!pObj.Status) pObj.Status = "Active";
+                    pObj.Status = pObj.Status || "Active";
                     currentProdList.push(pObj);
                 });
                 renderProdTable();
@@ -166,16 +155,21 @@
             const deactivateBtn = document.getElementById('btnDeactivateProd');
             const saveBtn = document.getElementById('btnSaveProdRecord');
             
-            let formHtml = '';
+            // Clear and build fields using the working Customer logic pattern
+            container.innerHTML = '';
             currentProdHeaders.forEach(h => {
                 const val = data[h] || '';
                 const isStatus = h === 'Status';
-                formHtml += `<div class="form-group">
+                const fieldWrapper = document.createElement('div');
+                fieldWrapper.className = 'form-group';
+                fieldWrapper.innerHTML = `
                     <label>${h}</label>
-                    <input type="text" id="pmf_${h}" value="${val}" ${isStatus ? 'readonly style="background:#eee;"' : ''}>
-                </div>`;
+                    <input type="text" id="pmf_${h}" ${isStatus ? 'readonly style="background:#eee;"' : ''}>
+                `;
+                container.appendChild(fieldWrapper);
+                // Explicitly set the value after the element is in the DOM
+                document.getElementById(`pmf_${h}`).value = val;
             });
-            container.innerHTML = formHtml;
 
             deactivateBtn.innerText = data.Status === "Active" ? "DEACTIVATE" : "RE-ACTIVATE";
             deactivateBtn.style.background = data.Status === "Active" ? "#dc3545" : "#28a745";
