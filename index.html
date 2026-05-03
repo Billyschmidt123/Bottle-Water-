@@ -240,23 +240,23 @@
             const container = document.getElementById('prodFormFields');
             const deactivateBtn = document.getElementById('btnDeactivateProd');
             const saveBtn = document.getElementById('btnSaveProdRecord');
-            container.innerHTML = '';
             
+            /* ADDED: Smallest possible addition to ensure data mirroring */
+            let formHtml = '';
             currentProdHeaders.forEach(h => {
                 const val = data[h] || '';
-                if (h === 'Status') {
-                    container.innerHTML += `<div class="form-group"><label>${h}</label><input type="text" value="${val}" id="pf_${h}" readonly style="background:#eee;"></div>`;
-                } else {
-                    container.innerHTML += `<div class="form-group"><label>${h}</label><input type="text" value="${val}" id="pf_${h}"></div>`;
-                }
+                const isStatus = h === 'Status';
+                formHtml += `<div class="form-group">
+                    <label>${h}</label>
+                    <input type="text" value="${val}" id="pf_${h}" ${isStatus ? 'readonly style="background:#eee;"' : ''}>
+                </div>`;
             });
+            container.innerHTML = formHtml;
 
-            // FIX: Explicitly populate the newly created input fields with the table row's data
+            // Direct assignment to ensure the modal shows the current row's data
             currentProdHeaders.forEach(h => {
-                const inputEl = document.getElementById(`pf_${h}`);
-                if (inputEl) {
-                    inputEl.value = data[h] || '';
-                }
+                const input = document.getElementById(`pf_${h}`);
+                if (input) input.value = data[h] || '';
             });
 
             deactivateBtn.innerText = data.Status === "Active" ? "DEACTIVATE" : "RE-ACTIVATE";
