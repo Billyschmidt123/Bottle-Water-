@@ -1,6 +1,6 @@
 <!-- 
   PROJECT: LogiFlow Delivery System
-  VERSION: Stop Detail Modal - Editable Metadata + Advanced Product Cart (Qty/Units)
+  VERSION: Stop Detail Modal - Enhanced Width & Responsive Wrapping
   STATUS: Stable - Non-Destructive Addition
 -->
 <!DOCTYPE html>
@@ -47,10 +47,13 @@
         .meta-edit-input { border: 1px solid #ccc; padding: 4px; border-radius: 3px; font-size: 0.8rem; width: 80%; }
         .meta-edit-textarea { border: 1px solid #ccc; padding: 4px; border-radius: 3px; font-size: 0.8rem; width: 95%; height: 40px; font-family: inherit; }
 
-        /* ADDITION: Enhanced Cart Add Controls */
-        .cart-add-row { display: flex; gap: 5px; align-items: center; margin-top: 5px; }
+        /* ADDITION: Enhanced Cart Add Controls with Wrapping */
+        .cart-add-row { display: flex; gap: 5px; align-items: center; margin-top: 5px; flex-wrap: wrap; }
         .qty-input { width: 50px; padding: 7px; border: 1px solid #ddd; border-radius: 4px; text-align: center; }
         .unit-input { width: 80px; padding: 7px; border: 1px solid #ddd; border-radius: 4px; }
+
+        /* FIX: Specific wider sizing for the stop card modal */
+        #stopModal .modal-content { max-width: 1100px; width: 98%; }
     </style>
 </head>
 <body>
@@ -83,7 +86,7 @@
     </div>
 
     <div id="stopModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-content">
             <div style="display:flex; justify-content: space-between; align-items:center;">
                 <h2 id="stopModalTitle">Complete Delivery</h2>
                 <button onclick="document.getElementById('stopModal').style.display='none'" class="btn-top" style="background:#dc3545;">Close</button>
@@ -111,9 +114,8 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label>Water Product</label>
-                    <!-- ADDITION: Water controls with Qty and Units -->
                     <div class="cart-add-row">
-                        <select id="stopProductDropdown" style="flex-grow:1;">
+                        <select id="stopProductDropdown" style="flex-grow:1; min-width: 150px;">
                             <option value="">Choose water product...</option>
                         </select>
                         <input type="number" id="qtyWater" class="qty-input" value="1" min="1">
@@ -123,9 +125,8 @@
                 </div>
                 <div class="form-group">
                     <label>Coffee Product</label>
-                    <!-- ADDITION: Coffee controls with Qty and Units -->
                     <div class="cart-add-row">
-                        <select id="stopCoffeeDropdown" style="flex-grow:1;">
+                        <select id="stopCoffeeDropdown" style="flex-grow:1; min-width: 150px;">
                             <option value="">Choose coffee product...</option>
                         </select>
                         <input type="number" id="qtyCoffee" class="qty-input" value="1" min="1">
@@ -226,7 +227,6 @@
         let currentProductFile = '';
         let currentProductSHA = '';
 
-        /* ADDITION: Cart Storage Logic */
         let deliveryCart = [];
 
         async function ghGet(path) {
@@ -452,7 +452,6 @@
 
             document.getElementById('receivedBy').value = '';
             
-            /* RESET CART ON MODAL OPEN */
             deliveryCart = [];
             renderDeliveryCart();
 
@@ -500,7 +499,6 @@
             };
         };
 
-        /* ADDITION: Helper functions for the Delivery Cart with Units */
         window.addProductToCart = function(dropdownId, qtyId, unitId) {
             const dropdown = document.getElementById(dropdownId);
             const qtyInput = document.getElementById(qtyId);
@@ -511,7 +509,6 @@
 
             if (!itemName) return;
 
-            // Group by item name AND unit type
             const existing = deliveryCart.find(i => i.name === itemName && i.units === units);
             if (existing) {
                 existing.qty += qty;
@@ -519,7 +516,6 @@
                 deliveryCart.push({ name: itemName, qty: qty, units: units });
             }
 
-            // Reset inputs
             qtyInput.value = 1;
             unitInput.value = '';
             dropdown.selectedIndex = 0;
