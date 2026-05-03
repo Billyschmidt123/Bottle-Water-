@@ -15,31 +15,59 @@
         .app-container { display: flex; width: 100vw; height: calc(100vh - 75px); margin-top: 75px; }
         #mapPanel { flex: 0 0 70%; height: 100%; position: relative; background: #e0e0e0; }
         #map { width: 100%; height: 100%; }
-        #sidebar { flex: 0 0 30%; height: 100%; border-left: 2px solid #ccc; overflow-y: auto; background: #ffffff; }
+        #sidebar { flex: 0 0 30%; height: 100%; border-left: 2px solid #ccc; overflow-y: auto; background: #ffffff; padding: 10px; }
+        
+        /* Map Controls Overlay */
+        .map-controls { position: absolute; bottom: 20px; left: 20px; z-index: 1000; display: flex; gap: 10px; }
+        .btn-map { padding: 12px 20px; border-radius: 5px; border: none; color: white; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        
         .btn-top { padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
         .mgmt-table { width: 100%; min-width: 1200px; border-collapse: collapse; font-size: 0.85rem; }
         .mgmt-table th { background: #007bff; color: white; text-align: left; padding: 10px; position: sticky; top: 0; }
         .mgmt-table td { padding: 8px; border-bottom: 1px solid #ddd; }
+        
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 98%; max-width: 1600px; max-height: 90vh; overflow-y: auto; overflow-x: auto; }
-        .edit-input { width: 95%; padding: 6px; border: 2px solid #007bff; border-radius: 3px; font-size: 0.85rem; background: #ffffff; color: #000000; display: block; }
-        .deactivated-row { background-color: #fceaea; color: #a94442; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 98%; max-width: 1600px; max-height: 90vh; overflow-y: auto; }
+        
+        .mgmt-nav-btn { padding: 10px 20px; margin-right: 10px; border: 1px solid #007bff; background: #f8f9fa; color: #007bff; cursor: pointer; font-weight: bold; border-radius: 4px; }
+        .mgmt-nav-btn.active { background: #007bff; color: white; }
+        
+        .edit-input { width: 95%; padding: 6px; border: 2px solid #007bff; border-radius: 3px; font-size: 0.85rem; background: #ffffff; color: #000; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
+        .stop-card { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px; background: #f9f9f9; }
     </style>
 </head>
 <body>
 
     <header class="topbar">
         <div class="topbar-left">
-            <span style="font-weight: bold; color: #007bff; margin-right: 15px;">LogiFlow</span>
+            <span style="font-weight: bold; color: #007bff; margin-right: 15px;">LogiFlow Delivery</span>
+            <select id="driverSelect" class="btn-top" style="background:#fff; color:#333; border:1px solid #ccc;">
+                <option>Select Driver</option>
+            </select>
+            <select id="routeSelect" class="btn-top" style="background:#fff; color:#333; border:1px solid #ccc;">
+                <option>Select Route</option>
+            </select>
         </div>
         <div class="topbar-right">
+            <button onclick="location.reload()" class="btn-top" style="background:#17a2b8; margin-right:5px;">FORCE REFRESH</button>
             <button id="btnManager" class="btn-top" style="background: #495057;">MANAGER MENU</button>
         </div>
     </header>
 
     <div class="app-container">
-        <div id="mapPanel"><div id="map"></div></div>
-        <aside id="sidebar"></aside>
+        <div id="mapPanel">
+            <div id="map"></div>
+            <div class="map-controls">
+                <button class="btn-map" style="background:#28a745;">START ROUTE</button>
+                <button class="btn-map" style="background:#007bff;">DIRECTIONS</button>
+                <button class="btn-map" style="background:#dc3545;">FINISH ROUTE</button>
+            </div>
+        </div>
+        <aside id="sidebar">
+            <h3 style="margin-top:0;">Stop List</h3>
+            <div id="stopListContainer"></div>
+        </aside>
     </div>
 
     <!-- Manager Modal -->
@@ -51,10 +79,18 @@
             </div>
             <hr>
             <div style="margin-bottom: 20px;">
-                <button id="btnShowProd" class="mgmt-nav-btn active">Product Maintenance</button>
+                <button id="btnShowCust" class="mgmt-nav-btn active">Customer Maintenance</button>
+                <button id="btnShowProd" class="mgmt-nav-btn">Product Maintenance</button>
             </div>
 
-            <div id="prodView" style="display: block;">
+            <div id="custView" style="display: block;">
+                <table class="mgmt-table">
+                    <thead id="custTableHead"></thead>
+                    <tbody id="custTableBody"></tbody>
+                </table>
+            </div>
+
+            <div id="prodView" style="display: none;">
                 <div style="margin-bottom:15px;">
                     <button class="btn-top" onclick="loadProductFile('Coffee.csv')" style="background:#6f4e37;">Coffee Products</button>
                     <button class="btn-top" onclick="loadProductFile('Water.csv')" style="background:#00a8e8;">Water Products</button>
@@ -69,129 +105,121 @@
         </div>
     </div>
 
+    <!-- Customer Edit Modal -->
+    <div id="custEditModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 900px;">
+            <h3>Edit Customer Details</h3>
+            <hr>
+            <div id="custFormFields" class="form-grid"></div>
+            <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
+                <button onclick="document.getElementById('custEditModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
+                <button id="btnSaveCust" class="btn-top" style="background:#28a745;">SAVE CUSTOMER</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
     (function() {
         const repo = 'Billyschmidt123/Bottle-Water-';
         let currentProdList = [];
         let currentProdHeaders = [];
+        let currentCustList = [];
+        let currentCustHeaders = [];
         let editingIndex = -1;
 
+        // --- PRODUCT MAINTENANCE ---
         window.loadProductFile = async function(fileName) {
             const tbody = document.getElementById('prodTableBody');
             const theadRow = document.getElementById('prodTableHead');
             tbody.innerHTML = '<tr><td colspan="10">Gathering items...</td></tr>';
-            
             try {
                 const resp = await fetch(`https://raw.githubusercontent.com/${repo}/main/Products/${fileName}?t=${Date.now()}`);
                 const text = await resp.text();
                 const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-                
                 if(lines.length > 0) {
-                    currentProdHeaders = lines[0].split(',').map(h => h.trim()).filter(h => h !== "");
+                    currentProdHeaders = lines[0].split(',').map(h => h.trim());
                     if (!currentProdHeaders.includes('Status')) currentProdHeaders.push('Status');
-                    
                     theadRow.innerHTML = `<th>Action</th>${currentProdHeaders.map(h => `<th>${h}</th>`).join('')}`;
-                    
                     currentProdList = lines.slice(1).map(line => {
                         const vals = line.split(',');
                         let pObj = {};
-                        currentProdHeaders.forEach((h, i) => {
-                            if (h !== 'Status') pObj[h] = (vals[i] || "").trim();
-                        });
+                        currentProdHeaders.forEach((h, i) => { if (h !== 'Status') pObj[h] = (vals[i] || "").trim(); });
                         pObj.Status = pObj.Status || "Active";
                         return pObj;
                     });
-                    
                     editingIndex = -1;
                     renderProdTable();
                 }
-            } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="10">Unable to reach the records.</td></tr>';
-            }
+            } catch (e) { tbody.innerHTML = '<tr><td colspan="10">Error loading file.</td></tr>'; }
         };
 
-        window.enterEditMode = function(idx) {
-            editingIndex = idx;
-            renderProdTable();
-        };
-
-        window.cancelEdit = function() {
-            editingIndex = -1;
-            renderProdTable();
-        };
-
-        window.updateRow = function(idx) {
-            const data = currentProdList[idx];
-            currentProdHeaders.forEach(h => {
-                if (h !== 'Status') {
-                    const input = document.getElementById(`edit_${h}_${idx}`);
-                    if (input) data[h] = input.value;
-                }
-            });
-            editingIndex = -1;
-            renderProdTable();
-        };
-
-        window.toggleStatus = function(idx) {
-            currentProdList[idx].Status = currentProdList[idx].Status === "Active" ? "Deactivated" : "Active";
-            renderProdTable();
-        };
-
-        function renderProdTable() {
+        window.renderProdTable = function() {
             const tbody = document.getElementById('prodTableBody');
             tbody.innerHTML = '';
-            
             currentProdList.forEach((pObj, idx) => {
-                const isDeactivated = pObj.Status === "Deactivated";
-                const isEditing = (editingIndex === idx);
                 const tr = document.createElement('tr');
-                if (isDeactivated) tr.className = 'deactivated-row';
+                const isEditing = (editingIndex === idx);
+                let rowHtml = `<td>${isEditing ? 
+                    `<button class="btn-top" style="background:#28a745;" onclick="updateRow(${idx})">Update</button>` : 
+                    `<button class="btn-top" onclick="window.enterEditMode(${idx})">Edit</button>`}</td>`;
                 
-                // Action Column
-                const tdAction = document.createElement('td');
-                if (isEditing) {
-                    tdAction.innerHTML = `
-                        <button class="btn-top" style="padding:4px; background:#28a745;" onclick="updateRow(${idx})">Update</button>
-                        <button class="btn-top" style="padding:4px; background:#6c757d;" onclick="cancelEdit()">Cancel</button>
-                    `;
-                } else {
-                    tdAction.innerHTML = `<button class="btn-top" style="padding:4px;" onclick="enterEditMode(${idx})">Edit</button>`;
-                }
-                tr.appendChild(tdAction);
-                
-                // Data Columns
                 currentProdHeaders.forEach(h => {
-                    const td = document.createElement('td');
                     const val = pObj[h] || '';
-                    
-                    if (isEditing) {
-                        if (h === 'Status') {
-                            td.innerHTML = `<button class="btn-top" style="padding:2px; font-size:0.7rem; background:#17a2b8;" onclick="toggleStatus(${idx})">${val}</button>`;
-                        } else {
-                            const input = document.createElement('input');
-                            input.type = 'text';
-                            input.className = 'edit-input';
-                            input.id = `edit_${h}_${idx}`;
-                            input.value = val; // Direct assignment
-                            td.appendChild(input);
-                        }
+                    if (isEditing && h !== 'Status') {
+                        rowHtml += `<td><input type="text" class="edit-input" id="edit_${h}_${idx}" value="${val}"></td>`;
                     } else {
-                        td.textContent = val;
+                        rowHtml += `<td>${val}</td>`;
                     }
-                    tr.appendChild(td);
                 });
-                
+                tr.innerHTML = rowHtml;
                 tbody.appendChild(tr);
             });
-        }
+        };
 
+        window.enterEditMode = (idx) => { editingIndex = idx; renderProdTable(); };
+        window.updateRow = (idx) => {
+            currentProdHeaders.forEach(h => {
+                if(h !== 'Status') {
+                    const inp = document.getElementById(`edit_${h}_${idx}`);
+                    if(inp) currentProdList[idx][h] = inp.value;
+                }
+            });
+            editingIndex = -1;
+            renderProdTable();
+        };
+
+        // --- CUSTOMER MAINTENANCE ---
+        window.openCustEdit = function(idx) {
+            const data = currentCustList[idx];
+            const container = document.getElementById('custFormFields');
+            container.innerHTML = '';
+            currentCustHeaders.forEach(h => {
+                container.innerHTML += `<div style="display:flex; flex-direction:column;">
+                    <label style="font-size:0.7rem; font-weight:bold;">${h}</label>
+                    <input type="text" id="ce_${h}" value="${data[h] || ''}" style="padding:5px; border:1px solid #ccc;">
+                </div>`;
+            });
+            document.getElementById('custEditModal').style.display = 'flex';
+        };
+
+        // --- INITIALIZATION ---
         async function init() {
             const map = L.map('map').setView([55.17, -118.79], 12);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-            document.getElementById('btnManager').onclick = () => {
-                document.getElementById('mgrModal').style.display = 'flex';
+            document.getElementById('btnManager').onclick = () => document.getElementById('mgrModal').style.display = 'flex';
+            document.getElementById('btnShowCust').onclick = () => {
+                document.getElementById('custView').style.display = 'block';
+                document.getElementById('prodView').style.display = 'none';
+                document.getElementById('btnShowCust').classList.add('active');
+                document.getElementById('btnShowProd').classList.remove('active');
+            };
+            document.getElementById('btnShowProd').onclick = () => {
+                document.getElementById('custView').style.display = 'none';
+                document.getElementById('prodView').style.display = 'block';
+                document.getElementById('btnShowProd').classList.add('active');
+                document.getElementById('btnShowCust').classList.remove('active');
                 loadProductFile('Coffee.csv');
             };
         }
