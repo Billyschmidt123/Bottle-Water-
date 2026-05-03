@@ -1057,7 +1057,10 @@
     <script>
         function managerEndOfDay() { alert("End of Day procedure initiated."); }
         function managerLiveView() { alert("Loading Live Fleet View..."); }
-        function managerCallInOrder() { alert("Opening Call-In Order Entry..."); }
+        function managerCallInOrder() { 
+            alert("Opening Call-In Order Entry..."); 
+            window.open('MODULES/callin-modal.html', '_blank');
+        }
         function managerBackup() { alert("System backup successfully completed to GitHub."); }
         function managerViewSlips() { alert("Loading Today's Delivery Slips..."); }
         function managerViewPastLogs() { alert("Accessing Past Stop Logs Archive..."); }
