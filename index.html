@@ -1039,6 +1039,12 @@
                 div.innerHTML = `<strong>${i+1}. ${displayName}</strong><br><small>${addr}</small>`;
                 
                 div.onclick = () => {
+                    /* ADDITIVE FIX: Mandatory Start Route Check */
+                    if (!driverName) {
+                        alert("You must click 'START ROUTE' and enter your name before opening stops.");
+                        return;
+                    }
+                    /* END ADDITIVE FIX */
                     currentStopIndex = i;
                     document.getElementById('currentAddress').textContent = addr;
                     document.getElementById('currentPhone').textContent = rowData.Phone || '--';
