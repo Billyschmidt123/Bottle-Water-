@@ -177,36 +177,49 @@
         </div>
     </div>
 
-    <!-- Customer Edit/Add Modal -->
+    <!-- Customer Edit/Add Modal (Added Fix) -->
     <div id="custEditModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 800px;">
-            <h2 id="custModalTitle">Edit Customer</h2>
+        <div class="modal-content" style="max-width: 900px;">
+            <div style="display:flex; justify-content: space-between; align-items:center;">
+                <h2 id="custModalTitle">Customer Details</h2>
+                <button onclick="document.getElementById('custEditModal').style.display='none'" class="btn-top" style="background:#dc3545;">Close</button>
+            </div>
             <hr>
+            
+            <!-- Dynamic Form Fields -->
             <div id="custFormFields" class="form-grid"></div>
             
-            <div class="section-header">Route Scheduling</div>
-            <div style="display:flex; gap:10px; margin-top:10px;">
-                <select id="scheduleRouteSelect" style="flex-grow:1; padding:8px;"></select>
-                <button class="btn-top" onclick="addRouteToCustomer()">Schedule to Route</button>
+            <!-- Route Scheduling Section -->
+            <div class="section-header">Route Schedule Management</div>
+            <div style="display:grid; grid-template-columns: 1fr 200px; gap:10px; margin-top:10px;">
+                <select id="scheduleRouteSelect" style="padding:8px; border-radius:4px; border:1px solid #ddd;"></select>
+                <button class="btn-top" id="btnAddRoute" style="background:#28a745">Schedule to Route</button>
             </div>
-            <div style="margin-top:10px;">
+            <div style="margin-top:15px;">
                 <table class="mgmt-table">
                     <thead><tr><th>Route Name</th><th>Status</th><th>Actions</th></tr></thead>
                     <tbody id="custRouteListBody"></tbody>
                 </table>
             </div>
 
+            <!-- Pre-Ordering Section -->
             <div class="section-header">Pre-Order Product <i class="fas fa-shopping-cart"></i></div>
-            <div style="display:flex; gap:10px; margin-top:10px;">
-                <select id="preOrderWater" style="flex-grow:1; padding:8px;"></select>
-                <select id="preOrderCoffee" style="flex-grow:1; padding:8px;"></select>
-                <input type="number" id="preOrderQty" value="1" style="width:60px; padding:8px;">
-                <button class="btn-top" style="background:#28a745">Add to Order</button>
+            <div style="display:grid; grid-template-columns: 1fr 120px 120px 100px; gap:10px; margin-top:10px;">
+                <select id="preOrderProduct" style="padding:8px;"></select>
+                <input type="number" id="preOrderQty" value="1" min="1" style="padding:8px;">
+                <select id="preOrderUnit" style="padding:8px;">
+                    <option value="Cases">Cases</option>
+                    <option value="Bottles">Bottles</option>
+                    <option value="Units">Units</option>
+                </select>
+                <button class="btn-top" id="btnAddPreOrder" style="background:#007bff">Add</button>
+            </div>
+            <div style="margin-top:10px; background:#f9f9f9; padding:10px; border-radius:4px; border:1px solid #eee;">
+                <div id="cartItems">No pre-orders pending.</div>
             </div>
 
             <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-                <button onclick="document.getElementById('custEditModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
-                <button class="btn-top" style="background:#007bff;">Save All Changes</button>
+                <button class="btn-top" id="btnSaveCustomer" style="background:#007bff; padding: 12px 25px;">SAVE CUSTOMER DATA</button>
             </div>
         </div>
     </div>
@@ -246,9 +259,9 @@
             const thead = document.getElementById('custTableHead');
             const routeSel = document.getElementById('scheduleRouteSelect');
             
-            tbody.innerHTML = '<tr><td colspan="5">Loading customers...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5">Syncing route data...</td></tr>';
             globalCustomers = [];
-            routeSel.innerHTML = '';
+            routeSel.innerHTML = '<option value="">Choose Route...</option>';
 
             for (let f of files) {
                 if (!f.name.endsWith('.csv')) continue;
@@ -270,9 +283,19 @@
 
                     lines.slice(1).forEach(line => {
                         const vals = line.split(',');
-                        let cust = { _routeName: f.name };
-                        csvHeaders.forEach((h, i) => cust[h] = vals[i] || "");
-                        globalCustomers.push(cust);
+                        let cust = { _routes: [f.name], _raw: {} };
+                        csvHeaders.forEach((h, i) => {
+                            cust[h] = vals[i] || "";
+                            cust._raw[h] = vals[i] || "";
+                        });
+                        
+                        // Deduplicate by company name/address
+                        let existing = globalCustomers.find(ex => ex.company === cust.company && ex.address === cust.address);
+                        if (existing) {
+                            if(!existing._routes.includes(f.name)) existing._routes.push(f.name);
+                        } else {
+                            globalCustomers.push(cust);
+                        }
                     });
                 } catch (e) {}
             }
@@ -282,11 +305,10 @@
         function renderCustomerTable() {
             const tbody = document.getElementById('custTableBody');
             tbody.innerHTML = '';
-            
             globalCustomers.forEach((c, idx) => {
                 let row = '<tr>';
                 csvHeaders.forEach(h => row += `<td>${c[h]}</td>`);
-                row += `<td><button class="btn-top" style="padding:2px 8px; background:#ffc107; color:black;" onclick="openCustEdit(${idx})">EDIT</button></td></tr>`;
+                row += `<td><button class="btn-top" style="padding:2px 8px; background:#ffc107; color:black;" onclick="openCustEdit(${idx})"><i class="fas fa-edit"></i></button></td></tr>`;
                 tbody.innerHTML += row;
             });
         }
@@ -294,18 +316,31 @@
         window.openCustEdit = function(idx) {
             const cust = idx === -1 ? {} : globalCustomers[idx];
             const container = document.getElementById('custFormFields');
-            document.getElementById('custModalTitle').textContent = idx === -1 ? "Add New Customer" : "Edit Customer";
+            document.getElementById('custModalTitle').textContent = idx === -1 ? "Add New Customer Record" : "Modify Customer: " + cust.company;
             container.innerHTML = '';
 
             csvHeaders.forEach(h => {
                 container.innerHTML += `<div class="form-group">
-                    <label>${h}</label>
-                    <input type="text" value="${cust[h] || ''}" id="edit_${h}">
+                    <label>${h.toUpperCase()}</label>
+                    <input type="text" value="${cust[h] || ''}" id="field_${h}" placeholder="Enter ${h}...">
                 </div>`;
             });
 
+            // Populate Routes List
             const routeBody = document.getElementById('custRouteListBody');
-            routeBody.innerHTML = idx === -1 ? '' : `<tr><td>${cust._routeName}</td><td>Active</td><td><button class="btn-top" style="background:#dc3545; padding:2px 5px;">Deactivate</button></td></tr>`;
+            routeBody.innerHTML = '';
+            if(cust._routes) {
+                cust._routes.forEach(r => {
+                    routeBody.innerHTML += `<tr>
+                        <td>${r.replace('.csv','')}</td>
+                        <td><span style="color:green; font-weight:bold;">Active</span></td>
+                        <td>
+                            <button class="btn-top" style="background:#dc3545; padding:2px 5px;"><i class="fas fa-trash"></i></button>
+                            <button class="btn-top" style="background:#ffc107; color:black; padding:2px 5px;">Deactivate</button>
+                        </td>
+                    </tr>`;
+                });
+            }
 
             document.getElementById('custEditModal').style.display = 'flex';
         };
@@ -313,12 +348,10 @@
         async function loadData() {
             const files = await ghGet('Products');
             const prodTable = document.getElementById('prodTableBody');
-            const waterSel = document.getElementById('preOrderWater');
-            const coffeeSel = document.getElementById('preOrderCoffee');
+            const preOrderProd = document.getElementById('preOrderProduct');
             
             prodTable.innerHTML = '';
-            waterSel.innerHTML = '<option>Select Water...</option>';
-            coffeeSel.innerHTML = '<option>Select Coffee...</option>';
+            preOrderProd.innerHTML = '<option value="">Select Item...</option>';
 
             for (let f of files) {
                 if (!f.name.endsWith('.csv')) continue;
@@ -333,8 +366,8 @@
                         const name = p[1] || p[0];
                         
                         const opt = document.createElement('option');
-                        opt.textContent = name;
-                        if (type === 'Water') waterSel.appendChild(opt); else coffeeSel.appendChild(opt);
+                        opt.textContent = `[${type}] ${name}`;
+                        preOrderProd.appendChild(opt);
 
                         prodTable.innerHTML += `<tr><td>${name}</td><td>${type}</td><td>$0.00</td><td>--</td><td><button class="btn-top" style="padding:2px 5px; background:#ffc107; color:black;"><i class="fas fa-edit"></i></button></td></tr>`;
                     });
@@ -374,7 +407,6 @@
                     document.getElementById('prodView').style.display = 'none';
                     document.getElementById('btnShowCust').classList.add('active');
                     document.getElementById('btnShowProd').classList.remove('active');
-                    /* ADDED FIX: Trigger customer data load when view is switched */
                     loadAllCustomers();
                 };
 
