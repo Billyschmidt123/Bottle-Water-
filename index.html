@@ -76,9 +76,6 @@
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 8px; width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto; }
         
-        .sig-wrapper { border: 2px solid #ccc; background: #fff; margin-top: 5px; }
-        canvas { display: block; width: 100%; height: 120px; cursor: crosshair; touch-action: none; }
-        
         .mgmt-nav-btn {
             padding: 10px 20px;
             margin-right: 10px;
@@ -98,7 +95,6 @@
         .form-group { display: flex; flex-direction: column; }
         .form-group label { font-size: 0.8rem; font-weight: bold; margin-bottom: 5px; color: #555; }
         .form-group input, .form-group select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-        .section-header { background: #f0f0f0; padding: 8px; font-weight: bold; margin-top: 20px; border-radius: 4px; border-left: 4px solid #007bff; }
     </style>
 </head>
 <body>
@@ -146,7 +142,6 @@
             </div>
 
             <div id="tableContainer" style="margin-top: 15px;">
-                <!-- Customer Maintenance View -->
                 <div id="custView" style="display: block; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
                     <div style="display:flex; justify-content:space-between; align-items:center">
                         <h3>Customer Master List</h3>
@@ -160,7 +155,6 @@
                     </div>
                 </div>
 
-                <!-- Product Maintenance View -->
                 <div id="prodView" style="display: none; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
                     <div style="display:flex; justify-content:space-between; align-items:center">
                         <h3>Product Inventory</h3>
@@ -177,7 +171,7 @@
         </div>
     </div>
 
-    <!-- START OF FIX: Customer Edit Modal -->
+    <!-- Customer Edit Modal -->
     <div id="custEditModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 800px;">
             <div style="display:flex; justify-content: space-between; align-items:center;">
@@ -185,16 +179,14 @@
                 <button onclick="document.getElementById('custEditModal').style.display='none'" class="btn-top" style="background:#dc3545;">Close</button>
             </div>
             <hr>
-            <div id="custFormFields" class="form-grid">
-                <!-- Fields are generated dynamically by script -->
-            </div>
+            <div id="custFormFields" class="form-grid"></div>
+            <div id="saveStatus" style="margin-top:10px; font-weight:bold; text-align:right;"></div>
             <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
                 <button onclick="document.getElementById('custEditModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
-                <button id="btnSaveCustData" class="btn-top" style="background:#28a745;">Save Changes</button>
+                <button id="btnSaveCustData" class="btn-top" style="background:#28a745;">SAVE TO ALL ROUTES</button>
             </div>
         </div>
     </div>
-    <!-- END OF FIX -->
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -203,9 +195,9 @@
         const token = _k.map(c => String.fromCharCode(c)).join('');
         const repo = 'Billyschmidt123/Bottle-Water-';
         
-        let waterItems = [], coffeeItems = [];
         let globalCustomers = [];
         let csvHeaders = [];
+        let routeDataMap = {}; // Tracks raw text of each route file
         let map;
 
         function initMap() {
@@ -225,13 +217,27 @@
             } catch (e) { return []; }
         }
 
+        // Logic to push updates to GitHub
+        async function ghPut(path, content, sha) {
+            return fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: `Update customer info across routes`,
+                    content: btoa(content),
+                    sha: sha
+                })
+            });
+        }
+
         async function loadAllCustomers() {
             const files = await ghGet('routes');
             const tbody = document.getElementById('custTableBody');
             const thead = document.getElementById('custTableHead');
             
-            tbody.innerHTML = '<tr><td colspan="5">Loading customers...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10">Syncing route data...</td></tr>';
             globalCustomers = [];
+            routeDataMap = {};
 
             for (let f of files) {
                 if (!f.name.endsWith('.csv')) continue;
@@ -239,21 +245,28 @@
                 try {
                     const resp = await fetch(f.download_url);
                     const text = await resp.text();
+                    routeDataMap[f.name] = { text: text, sha: f.sha };
+                    
                     const lines = text.split('\n').filter(l => l.trim());
                     if (lines.length < 1) continue;
 
                     if (csvHeaders.length === 0) {
                         csvHeaders = lines[0].split(',').map(h => h.trim());
-                        // START OF FIX: Add Edit column to header
                         thead.innerHTML = `<tr><th>Edit</th>${csvHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
-                        // END OF FIX
                     }
 
                     lines.slice(1).forEach(line => {
                         const vals = line.split(',');
-                        let cust = { _routeName: f.name };
+                        let cust = { _routes: [f.name] };
                         csvHeaders.forEach((h, i) => cust[h] = vals[i] || "");
-                        globalCustomers.push(cust);
+                        
+                        // Link duplicates across routes
+                        let existing = globalCustomers.find(ex => ex.company === cust.company && ex.address === cust.address);
+                        if (existing) {
+                            if(!existing._routes.includes(f.name)) existing._routes.push(f.name);
+                        } else {
+                            globalCustomers.push(cust);
+                        }
                     });
                 } catch (e) {}
             }
@@ -263,70 +276,81 @@
         function renderCustomerTable() {
             const tbody = document.getElementById('custTableBody');
             tbody.innerHTML = '';
-            
             globalCustomers.forEach((c, idx) => {
-                // START OF FIX: Add edit button on left side
-                let row = '<tr>';
-                row += `<td><button class="btn-top" style="padding:2px 8px; background:#ffc107; color:black;" onclick="openCustEdit(${idx})"><i class="fas fa-edit"></i></button></td>`;
+                let row = `<tr><td><button class="btn-top" style="padding:2px 8px; background:#ffc107; color:black;" onclick="openCustEdit(${idx})"><i class="fas fa-edit"></i></button></td>`;
                 csvHeaders.forEach(h => row += `<td>${c[h]}</td>`);
                 row += '</tr>';
                 tbody.innerHTML += row;
-                // END OF FIX
             });
         }
 
-        // START OF FIX: Open Modal and Populate Fields
         window.openCustEdit = function(idx) {
             const cust = idx === -1 ? {} : globalCustomers[idx];
             const container = document.getElementById('custFormFields');
-            document.getElementById('custModalTitle').textContent = idx === -1 ? "Add New Customer" : "Edit Customer: " + (cust.company || "New Record");
+            const statusDiv = document.getElementById('saveStatus');
+            statusDiv.innerText = '';
+            document.getElementById('custModalTitle').textContent = idx === -1 ? "New Customer" : "Edit: " + cust.company;
             container.innerHTML = '';
 
             csvHeaders.forEach(h => {
                 container.innerHTML += `
                     <div class="form-group">
                         <label>${h.toUpperCase()}</label>
-                        <input type="text" value="${cust[h] || ''}" id="edit_field_${h}" data-header="${h}">
+                        <input type="text" value="${cust[h] || ''}" id="edit_field_${h}">
                     </div>`;
             });
 
             document.getElementById('custEditModal').style.display = 'flex';
             
-            // Handle saving (placeholder logic to update global state)
-            document.getElementById('btnSaveCustData').onclick = () => {
-                if (idx !== -1) {
-                    csvHeaders.forEach(h => {
-                        globalCustomers[idx][h] = document.getElementById(`edit_field_${h}`).value;
-                    });
-                    renderCustomerTable();
+            document.getElementById('btnSaveCustData').onclick = async () => {
+                if (idx === -1) return;
+                
+                statusDiv.innerText = "Processing batch update...";
+                statusDiv.style.color = "orange";
+
+                // 1. Capture new data from modal
+                let updatedData = {};
+                csvHeaders.forEach(h => {
+                    updatedData[h] = document.getElementById(`edit_field_${h}`).value;
+                });
+
+                // 2. Prepare the update for every route the customer is in
+                try {
+                    for (let routeFile of cust._routes) {
+                        let routeInfo = routeDataMap[routeFile];
+                        let lines = routeInfo.text.split('\n');
+                        let newLines = [lines[0]]; // Header
+
+                        lines.slice(1).forEach(line => {
+                            if (!line.trim()) return;
+                            let vals = line.split(',');
+                            // Match specific customer by unique company/address combo
+                            if (vals[csvHeaders.indexOf('company')] === cust['company'] && 
+                                vals[csvHeaders.indexOf('address')] === cust['address']) {
+                                let newLine = csvHeaders.map(h => updatedData[h]).join(',');
+                                newLines.push(newLine);
+                            } else {
+                                newLines.push(line);
+                            }
+                        });
+
+                        const finalCSV = newLines.join('\n');
+                        await ghPut(`routes/${routeFile}`, finalCSV, routeInfo.sha);
+                    }
+
+                    statusDiv.innerText = "Saved to all routes successfully!";
+                    statusDiv.style.color = "green";
+                    setTimeout(() => {
+                        document.getElementById('custEditModal').style.display = 'none';
+                        loadAllCustomers(); // Refresh master list
+                    }, 1000);
+
+                } catch (err) {
+                    statusDiv.innerText = "Error saving. Check connection.";
+                    statusDiv.style.color = "red";
                 }
-                document.getElementById('custEditModal').style.display = 'none';
             };
         };
-        // END OF FIX
-
-        async function loadData() {
-            const files = await ghGet('Products');
-            const prodTable = document.getElementById('prodTableBody');
-            
-            prodTable.innerHTML = '';
-
-            for (let f of files) {
-                if (!f.name.endsWith('.csv')) continue;
-                try {
-                    const resp = await fetch(f.download_url);
-                    const text = await resp.text();
-                    const lines = text.split('\n').slice(1).filter(l => l.trim());
-                    const type = f.name.toLowerCase().includes('water') ? 'Water' : 'Coffee';
-                    
-                    lines.forEach(l => {
-                        const p = l.split(',');
-                        const name = p[1] || p[0];
-                        prodTable.innerHTML += `<tr><td>${name}</td><td>${type}</td><td>$0.00</td><td>--</td><td><button class="btn-top" style="padding:2px 5px; background:#ffc107; color:black;"><i class="fas fa-edit"></i></button></td></tr>`;
-                    });
-                } catch (e) {}
-            }
-        }
 
         async function init() {
             initMap();
@@ -344,7 +368,6 @@
 
                 dropdown.onchange = async (e) => {
                     if (!e.target.value) return;
-                    document.getElementById('stopList').innerHTML = 'Loading stops...';
                     const r = await fetch(e.target.value);
                     const txt = await r.text();
                     renderStops(txt);
@@ -358,24 +381,16 @@
                 document.getElementById('btnShowCust').onclick = () => {
                     document.getElementById('custView').style.display = 'block';
                     document.getElementById('prodView').style.display = 'none';
-                    document.getElementById('btnShowCust').classList.add('active');
-                    document.getElementById('btnShowProd').classList.remove('active');
                     loadAllCustomers();
                 };
 
                 document.getElementById('btnShowProd').onclick = () => {
                     document.getElementById('custView').style.display = 'none';
                     document.getElementById('prodView').style.display = 'block';
-                    document.getElementById('btnShowProd').classList.add('active');
-                    document.getElementById('btnShowCust').classList.remove('active');
                 };
 
-                document.getElementById('btnAddNewCust').onclick = () => openCustEdit(-1);
-
-                await loadData();
-            } catch (e) {
-                document.getElementById('currentAddress').innerText = "Connection Error";
-            }
+                initMap();
+            } catch (e) {}
         }
 
         function renderStops(csv) {
