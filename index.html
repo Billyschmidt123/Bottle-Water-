@@ -4,207 +4,66 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LogiFlow Delivery System</title>
-    
-    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow: hidden; height: 100vh; background: #f4f7f6; }
-        
-        .topbar {
-            position: fixed;
-            top: 0; left: 0; right: 0;
-            height: 75px;
-            z-index: 1000;
-            background: white;
-            padding: 0 15px;
-            border-bottom: 2px solid #007bff;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-
-        .topbar-center {
-            flex-grow: 1;
-            display: flex;
-            justify-content: center;
-            gap: 25px;
-            font-size: 0.9rem;
-            color: #333;
-            background: #f8f9fa;
-            margin: 0 20px;
-            padding: 8px 15px;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-        }
-
-        .app-container { 
-            display: flex; 
-            width: 100vw; 
-            height: calc(100vh - 75px); 
-            margin-top: 75px; 
-        }
-
-        #mapPanel { flex: 0 0 70%; height: 100%; position: relative; background: #e0e0e0; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; overflow: hidden; height: 100vh; background: #f4f7f6; }
+        .topbar { position: fixed; top: 0; left: 0; right: 0; height: 75px; z-index: 1000; background: white; padding: 0 15px; border-bottom: 2px solid #007bff; display: flex; justify-content: space-between; align-items: center; }
+        .app-container { display: flex; width: 100vw; height: calc(100vh - 75px); margin-top: 75px; }
+        #mapPanel { flex: 0 0 70%; height: 100%; }
         #map { width: 100%; height: 100%; }
-
-        #sidebar { 
-            flex: 0 0 30%; 
-            height: 100%; 
-            border-left: 2px solid #ccc; 
-            overflow-y: auto; 
-            background: #ffffff; 
-        }
-
-        .btn-top {
-            padding: 8px 12px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            font-weight: bold;
-        }
-
+        #sidebar { flex: 0 0 30%; height: 100%; border-left: 2px solid #ccc; overflow-y: auto; background: white; }
+        .btn-top { padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .mgmt-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .mgmt-table th { background: #007bff; color: white; text-align: left; padding: 10px; position: sticky; top: 0; }
+        .mgmt-table th { background: #007bff; color: white; padding: 10px; position: sticky; top: 0; text-align: left; }
         .mgmt-table td { padding: 8px; border-bottom: 1px solid #ddd; }
-
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto; }
-        
-        .mgmt-nav-btn {
-            padding: 10px 20px;
-            margin-right: 10px;
-            border: 1px solid #007bff;
-            background: #f8f9fa;
-            color: #007bff;
-            cursor: pointer;
-            font-weight: bold;
-            border-radius: 4px;
-        }
-        .mgmt-nav-btn.active {
-            background: #007bff;
-            color: white;
-        }
-
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
-        .form-group { display: flex; flex-direction: column; }
-        .form-group label { font-size: 0.8rem; font-weight: bold; margin-bottom: 5px; color: #555; }
-        .form-group input, .form-group select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-        
-        .section-header { background: #f0f0f0; padding: 8px; font-weight: bold; margin-top: 20px; border-radius: 4px; border-left: 4px solid #007bff; }
-        .stop-card:hover { background: #f0f7ff !important; border-left: 5px solid #28a745 !important; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 95%; max-width: 1200px; max-height: 90vh; overflow-y: auto; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-group { display: flex; flex-direction: column; margin-bottom: 10px; }
+        .form-group label { font-size: 0.75rem; font-weight: bold; color: #666; }
+        .form-group input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
     </style>
 </head>
 <body>
 
     <header class="topbar">
-        <div class="topbar-left">
-            <span style="font-weight: bold; color: #007bff; margin-right: 15px;">LogiFlow</span>
-            <select id="routeDropdown" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
-                <option value="">Select Route...</option>
-            </select>
+        <div>
+            <span style="font-weight: bold; color: #007bff;">LogiFlow</span>
+            <select id="routeDropdown" style="margin-left:15px; padding: 5px;"></select>
         </div>
-
-        <div class="topbar-center">
-            <div><i class="fas fa-map-marker-alt" style="color:#007bff"></i> <span id="currentAddress">Awaiting Data...</span></div>
-            <div><i class="fas fa-phone" style="color:#28a745"></i> <span id="currentPhone">--</span></div>
+        <div style="background:#f8f9fa; padding:8px 20px; border-radius:5px; border:1px solid #ddd;">
+            <i class="fas fa-map-marker-alt" style="color:#007bff"></i> <span id="currentAddress">Select a Stop</span>
         </div>
-
-        <div class="topbar-right">
-            <button id="btnForceRefresh" class="btn-top" style="background: #17a2b8; margin-right: 10px;"><i class="fas fa-sync-alt"></i> FORCE REFRESH</button>
+        <div>
+            <button id="btnForceRefresh" class="btn-top" style="background: #17a2b8; margin-right: 10px;">REFRESH DATA</button>
             <button id="btnManager" class="btn-top" style="background: #495057;">MANAGER MENU</button>
         </div>
     </header>
 
     <div class="app-container">
         <div id="mapPanel"><div id="map"></div></div>
-        <aside id="sidebar">
-            <div id="sidebarContent" style="padding: 10px;">
-                <h3 style="text-align: center; color: #444;">Route Stops</h3>
-                <div id="stopList" style="text-align:center; color:#999; margin-top:20px;">Select a route to begin.</div>
-            </div>
-        </aside>
+        <aside id="sidebar"><div id="stopList" style="padding:15px;"></div></aside>
     </div>
 
-    <!-- Management Modal -->
     <div id="mgrModal" class="modal-overlay">
         <div class="modal-content">
-            <div style="display:flex; justify-content: space-between; align-items:center;">
-                <h2>Manager Control Panel</h2>
+            <div style="display:flex; justify-content: space-between;">
+                <h2>Customer Maintenance</h2>
                 <button onclick="document.getElementById('mgrModal').style.display='none'" class="btn-top" style="background:#dc3545;">Exit</button>
             </div>
-            <hr>
-            
-            <div style="margin-bottom: 20px; margin-top: 10px;">
-                <button id="btnShowCust" class="mgmt-nav-btn active">Customer Maintenance</button>
-                <button id="btnShowProd" class="mgmt-nav-btn">Product Maintenance</button>
-            </div>
-
-            <div id="tableContainer" style="margin-top: 15px;">
-                <div id="custView" style="display: block; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center">
-                        <h3>Customer Master List</h3>
-                        <button id="btnAddNewCust" class="btn-top" style="background:#28a745">+ Add New Customer</button>
-                    </div>
-                    <div style="max-height: 550px; overflow-y: auto; margin-top:10px;">
-                        <table class="mgmt-table">
-                            <thead id="custTableHead"></thead>
-                            <tbody id="custTableBody"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div id="prodView" style="display: none; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center">
-                        <h3>Product Inventory</h3>
-                        <button class="btn-top" style="background:#28a745">+ Add New Product</button>
-                    </div>
-                    <div style="max-height: 550px; overflow-y: auto; margin-top:10px;">
-                        <table class="mgmt-table">
-                            <thead><tr><th>Item Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead>
-                            <tbody id="prodTableBody"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+            <div id="debugHeaders" style="font-size:0.7rem; color:#888; margin-bottom:10px;"></div>
+            <table class="mgmt-table">
+                <thead id="custTableHead"></thead>
+                <tbody id="custTableBody"></tbody>
+            </table>
         </div>
     </div>
 
-    <!-- Customer Edit Modal -->
     <div id="custEditModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 900px;">
-            <div style="display:flex; justify-content: space-between; align-items:center;">
-                <h2 id="custModalTitle">Edit Customer Information</h2>
-                <button onclick="document.getElementById('custEditModal').style.display='none'" class="btn-top" style="background:#dc3545;">Close</button>
-            </div>
-            <hr>
-            
+        <div class="modal-content" style="max-width: 800px;">
+            <h2>Update Customer Info</h2>
             <div id="custFormFields" class="form-grid"></div>
-
-            <div id="scheduleSection">
-                <div class="section-header">Scheduling & Route Management</div>
-                <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div>
-                        <label style="font-size: 0.8rem; font-weight: bold;">Current Route Assignments</label>
-                        <div id="currentRouteList" style="border: 1px solid #ddd; padding: 10px; min-height: 50px; border-radius: 4px; background: #fafafa; margin-top:5px;">
-                        </div>
-                    </div>
-                    <div>
-                        <label style="font-size: 0.8rem; font-weight: bold;">Assign to Additional Route</label>
-                        <div style="display:flex; gap:5px; margin-top:5px;">
-                            <select id="addRouteDropdown" style="flex-grow:1; padding:8px; border-radius:4px; border:1px solid #ddd;"></select>
-                            <button id="btnAddRoute" class="btn-top" style="background:#28a745;">Add</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="saveStatus" style="margin-top:10px; font-weight:bold; text-align:right;"></div>
             <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
                 <button onclick="document.getElementById('custEditModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
                 <button id="btnSaveCustData" class="btn-top" style="background:#28a745;">SAVE TO ALL ROUTES</button>
@@ -222,271 +81,139 @@
         let globalCustomers = [];
         let csvHeaders = [];
         let routeDataMap = {}; 
-        let map;
-
-        function initMap() {
-            map = L.map('map').setView([55.1708, -118.7947], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors'
-            }).addTo(map);
-        }
 
         async function ghGet(path) {
-            try {
-                const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
-                    headers: { 'Authorization': `token ${token}` }
-                });
-                if (!r.ok) return [];
-                return await r.json();
-            } catch (e) { return []; }
+            const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, { headers: { 'Authorization': `token ${token}` } });
+            return r.ok ? await r.json() : [];
         }
 
         async function ghPut(path, content, sha) {
             return fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
                 method: 'PUT',
                 headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    message: `Update customer info across routes`,
-                    content: btoa(content),
-                    sha: sha
-                })
+                body: JSON.stringify({ message: `Update`, content: btoa(content), sha: sha })
             });
         }
 
-        /* RESTORED: Deep scan of all GitHub route files */
         async function loadAllCustomers() {
             const files = await ghGet('routes');
             const tbody = document.getElementById('custTableBody');
-            const thead = document.getElementById('custTableHead');
-            const addRouteDrop = document.getElementById('addRouteDropdown');
+            tbody.innerHTML = '<tr><td colspan="10">Gathering database...</td></tr>';
             
-            tbody.innerHTML = '<tr><td colspan="10">Syncing all routes... Please wait.</td></tr>';
-            addRouteDrop.innerHTML = '<option value="">Choose Route...</option>';
             globalCustomers = [];
             routeDataMap = {};
             csvHeaders = [];
 
             for (let f of files) {
                 if (!f.name.endsWith('.csv')) continue;
+                const resp = await fetch(f.download_url + "?t=" + Date.now());
+                const text = await resp.text();
+                routeDataMap[f.name] = { text: text, sha: f.sha };
                 
-                const opt = document.createElement('option');
-                opt.value = f.name;
-                opt.textContent = f.name.replace('.csv', '');
-                addRouteDrop.appendChild(opt);
+                const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+                if (lines.length < 1) continue;
 
-                try {
-                    // Added timestamp to bypass cache and find all hundreds of customers
-                    const resp = await fetch(f.download_url + "?t=" + Date.now());
-                    const text = await resp.text();
-                    routeDataMap[f.name] = { text: text, sha: f.sha };
+                const currentHeaders = lines[0].split(',').map(h => h.trim());
+                if (csvHeaders.length === 0) {
+                    csvHeaders = currentHeaders;
+                    document.getElementById('custTableHead').innerHTML = `<tr><th>Edit</th>${csvHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                    document.getElementById('debugHeaders').innerText = "Headers Found: " + csvHeaders.join(' | ');
+                }
+
+                lines.slice(1).forEach(line => {
+                    const vals = line.split(',');
+                    let rowObj = {};
+                    csvHeaders.forEach((h, i) => rowObj[h] = (vals[i] || "").trim());
                     
-                    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-                    if (lines.length < 1) continue;
+                    // Identify key columns for matching (Company or Name, and Address)
+                    const nameCol = csvHeaders.find(h => ["company", "name", "customer", "cust"].some(word => h.toLowerCase().includes(word)));
+                    const addrCol = csvHeaders.find(h => h.toLowerCase().includes("address"));
 
-                    if (csvHeaders.length === 0) {
-                        csvHeaders = lines[0].split(',').map(h => h.trim());
-                        thead.innerHTML = `<tr><th>Edit</th>${csvHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                    if (rowObj[nameCol] || rowObj[addrCol]) {
+                        let match = globalCustomers.find(ex => 
+                            (ex[nameCol] || "").toLowerCase() === (rowObj[nameCol] || "").toLowerCase() &&
+                            (ex[addrCol] || "").toLowerCase() === (rowObj[addrCol] || "").toLowerCase()
+                        );
+                        if (match) {
+                            if (!match._routes.includes(f.name)) match._routes.push(f.name);
+                        } else {
+                            rowObj._routes = [f.name];
+                            globalCustomers.push(rowObj);
+                        }
                     }
+                });
+            }
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('custTableBody');
+            tbody.innerHTML = "";
+            if (globalCustomers.length === 0) {
+                tbody.innerHTML = "<tr><td colspan='10' style='text-align:center; color:red; padding:20px;'>Error: No customer data detected. Verify Row 1 headers.</td></tr>";
+                return;
+            }
+            globalCustomers.forEach((c, idx) => {
+                let row = `<tr><td><button class="btn-top" style="padding:4px;" onclick="openEdit(${idx})">Edit</button></td>`;
+                csvHeaders.forEach(h => row += `<td>${c[h] || ''}</td>`);
+                tbody.innerHTML += row + '</tr>';
+            });
+        }
+
+        window.openEdit = function(idx) {
+            const cust = globalCustomers[idx];
+            const container = document.getElementById('custFormFields');
+            container.innerHTML = '';
+            csvHeaders.forEach(h => {
+                container.innerHTML += `<div class="form-group"><label>${h}</label><input type="text" value="${cust[h] || ''}" id="f_${h}"></div>`;
+            });
+            document.getElementById('custEditModal').style.display = 'flex';
+
+            document.getElementById('btnSaveCustData').onclick = async () => {
+                let updated = {};
+                csvHeaders.forEach(h => updated[h] = document.getElementById(`f_${h}`).value);
+                
+                for (let rFile of cust._routes) {
+                    let info = routeDataMap[rFile];
+                    let lines = info.text.split('\n').filter(l => l.trim());
+                    let newLines = [lines[0]];
+                    const nameKey = csvHeaders.find(h => ["company", "name", "customer"].some(word => h.toLowerCase().includes(word)));
 
                     lines.slice(1).forEach(line => {
-                        const vals = line.split(',');
-                        let tempCust = {};
-                        csvHeaders.forEach((h, i) => tempCust[h] = (vals[i] || "").trim());
-                        
-                        if (tempCust.company || tempCust.address) {
-                            let existing = globalCustomers.find(ex => 
-                                ex.company.toLowerCase() === tempCust.company.toLowerCase() && 
-                                ex.address.toLowerCase() === tempCust.address.toLowerCase()
-                            );
-                            
-                            if (existing) {
-                                if(!existing._routes.includes(f.name)) existing._routes.push(f.name);
-                            } else {
-                                tempCust._routes = [f.name];
-                                globalCustomers.push(tempCust);
-                            }
+                        let v = line.split(',');
+                        if (v[csvHeaders.indexOf(nameKey)] === cust[nameKey]) {
+                            newLines.push(csvHeaders.map(h => updated[h]).join(','));
+                        } else {
+                            newLines.push(line);
                         }
                     });
-                } catch (e) { console.error("Load error on file: " + f.name); }
-            }
-            renderCustomerTable();
-        }
-
-        function renderCustomerTable() {
-            const tbody = document.getElementById('custTableBody');
-            tbody.innerHTML = '';
-            globalCustomers.forEach((c, idx) => {
-                let row = `<tr><td><button class="btn-top" style="padding:2px 8px; background:#ffc107; color:black;" onclick="openCustEdit(${idx})"><i class="fas fa-edit"></i></button></td>`;
-                csvHeaders.forEach(h => row += `<td>${c[h]}</td>`);
-                row += '</tr>';
-                tbody.innerHTML += row;
-            });
-        }
-
-        window.openCustEdit = function(idx) {
-            const cust = idx === -1 ? {} : globalCustomers[idx];
-            const container = document.getElementById('custFormFields');
-            const routeList = document.getElementById('currentRouteList');
-            const statusDiv = document.getElementById('saveStatus');
-            
-            statusDiv.innerText = '';
-            document.getElementById('custModalTitle').textContent = idx === -1 ? "New Customer" : "Edit: " + (cust.company || "New");
-            container.innerHTML = '';
-
-            csvHeaders.forEach(h => {
-                container.innerHTML += `
-                    <div class="form-group">
-                        <label>${h.toUpperCase()}</label>
-                        <input type="text" value="${cust[h] || ''}" id="edit_field_${h}">
-                    </div>`;
-            });
-
-            routeList.innerHTML = '';
-            if (cust._routes) {
-                cust._routes.forEach(rName => {
-                    const rDiv = document.createElement('div');
-                    rDiv.style = "display:flex; justify-content:space-between; align-items:center; background:white; padding:5px; border:1px solid #eee; margin-bottom:5px; border-radius:3px; font-size:0.85rem;";
-                    rDiv.innerHTML = `<span>${rName.replace('.csv', '')}</span> <button class="btn-top" style="padding:2px 5px; background:#dc3545; font-size:0.7rem;">Remove</button>`;
-                    routeList.appendChild(rDiv);
-                });
-            }
-
-            document.getElementById('custEditModal').style.display = 'flex';
-            
-            /* RESTORED: Safe Save Logic to prevent over-writing full lists */
-            document.getElementById('btnSaveCustData').onclick = async () => {
-                if (idx === -1) return;
-                
-                statusDiv.innerText = "Applying changes to GitHub routes...";
-                statusDiv.style.color = "orange";
-
-                let updatedData = {};
-                csvHeaders.forEach(h => {
-                    updatedData[h] = document.getElementById(`edit_field_${h}`).value;
-                });
-
-                try {
-                    for (let routeFile of cust._routes) {
-                        let routeInfo = routeDataMap[routeFile];
-                        let lines = routeInfo.text.split('\n').filter(l => l.trim());
-                        let newLines = [lines[0]]; 
-
-                        lines.slice(1).forEach(line => {
-                            let vals = line.split(',');
-                            if (vals[csvHeaders.indexOf('company')] === cust['company'] && 
-                                vals[csvHeaders.indexOf('address')] === cust['address']) {
-                                let newLine = csvHeaders.map(h => updatedData[h]).join(',');
-                                newLines.push(newLine);
-                            } else {
-                                newLines.push(line); 
-                            }
-                        });
-
-                        // PROTECTION: Never overwrite if data seems lost
-                        if (newLines.length < lines.length && lines.length > 5) {
-                            throw new Error("File integrity check failed. Save aborted.");
-                        }
-
-                        const finalCSV = newLines.join('\n');
-                        await ghPut(`routes/${routeFile}`, finalCSV, routeInfo.sha);
-                    }
-
-                    statusDiv.innerText = "Success: All route files updated.";
-                    statusDiv.style.color = "green";
-                    setTimeout(() => {
-                        document.getElementById('custEditModal').style.display = 'none';
-                        loadAllCustomers(); 
-                    }, 1000);
-
-                } catch (err) {
-                    statusDiv.innerText = "Error: " + err.message;
-                    statusDiv.style.color = "red";
+                    await ghPut(`routes/${rFile}`, newLines.join('\n'), info.sha);
                 }
+                document.getElementById('custEditModal').style.display = 'none';
+                loadAllCustomers();
             };
         };
 
         async function init() {
-            initMap();
-            try {
-                const routeFiles = await ghGet('routes');
-                const dropdown = document.getElementById('routeDropdown');
-                routeFiles.forEach(f => {
-                    if (f.name.endsWith('.csv')) {
-                        const opt = document.createElement('option');
-                        opt.value = f.download_url;
-                        opt.textContent = f.name.replace('.csv', '');
-                        dropdown.appendChild(opt);
-                    }
-                });
+            const map = L.map('map').setView([55.17, -118.79], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-                dropdown.onchange = async (e) => {
-                    if (!e.target.value) return;
-                    try {
-                        const r = await fetch(e.target.value + "?t=" + Date.now());
-                        const txt = await r.text();
-                        renderStops(txt);
-                    } catch (err) {}
-                };
-
-                document.getElementById('btnForceRefresh').onclick = async () => {
-                    const btn = document.getElementById('btnForceRefresh');
-                    btn.disabled = true;
-                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> REFRESHING...';
-                    await loadAllCustomers();
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-sync-alt"></i> FORCE REFRESH';
-                };
-
-                document.getElementById('btnManager').onclick = () => {
-                    document.getElementById('mgrModal').style.display = 'flex';
-                    loadAllCustomers();
-                };
-                
-                document.getElementById('btnShowCust').onclick = () => {
-                    document.getElementById('custView').style.display = 'block';
-                    document.getElementById('prodView').style.display = 'none';
-                    document.getElementById('btnShowCust').classList.add('active');
-                    document.getElementById('btnShowProd').classList.remove('active');
-                    loadAllCustomers();
-                };
-
-                document.getElementById('btnShowProd').onclick = () => {
-                    document.getElementById('custView').style.display = 'none';
-                    document.getElementById('prodView').style.display = 'block';
-                    document.getElementById('btnShowProd').classList.add('active');
-                    document.getElementById('btnShowCust').classList.remove('active');
-                };
-
-            } catch (e) {}
-        }
-
-        function renderStops(csv) {
-            const list = document.getElementById('stopList');
-            list.innerHTML = '';
-            const lines = csv.split('\n').filter(l => l.trim());
-            if (lines.length < 1) return;
-            
-            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-
-            lines.slice(1).forEach(line => {
-                const v = line.split(',');
-                let d = {}; 
-                headers.forEach((h, i) => d[h] = v[i] || "");
-                
-                const card = document.createElement('div');
-                card.className = "stop-card";
-                card.style = "background:white; padding:10px; margin-bottom:10px; border-radius:5px; border-left:5px solid #007bff; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.1); text-align: left; color: #333;";
-                card.innerHTML = `<strong>${d.company || 'N/A'}</strong><br><small>${d.address || 'No Address'}</small>`;
-                
-                card.onclick = () => {
-                    document.getElementById('currentAddress').innerText = d.address || "Unknown Address";
-                    document.getElementById('currentPhone').innerText = d.phone || "N/A";
-                };
-                
-                list.appendChild(card);
+            const files = await ghGet('routes');
+            const drop = document.getElementById('routeDropdown');
+            files.forEach(f => {
+                if(f.name.endsWith('.csv')) {
+                    const opt = document.createElement('option');
+                    opt.value = f.download_url; opt.textContent = f.name.replace('.csv','');
+                    drop.appendChild(opt);
+                }
             });
-        }
 
+            document.getElementById('btnManager').onclick = () => {
+                document.getElementById('mgrModal').style.display = 'flex';
+                loadAllCustomers();
+            };
+            document.getElementById('btnForceRefresh').onclick = loadAllCustomers;
+        }
         init();
     })();
     </script>
