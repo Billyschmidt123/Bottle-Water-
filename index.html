@@ -93,6 +93,13 @@
             background: #007bff;
             color: white;
         }
+
+        /* ADDED: Modal Styling for Customer Edit */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-size: 0.8rem; font-weight: bold; margin-bottom: 5px; color: #555; }
+        .form-group input, .form-group select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        .section-header { background: #f0f0f0; padding: 8px; font-weight: bold; margin-top: 20px; border-radius: 4px; border-left: 4px solid #007bff; }
     </style>
 </head>
 <body>
@@ -143,12 +150,12 @@
                 <!-- Customer Maintenance View -->
                 <div id="custView" style="display: block; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
                     <div style="display:flex; justify-content:space-between; align-items:center">
-                        <h3>Customer List</h3>
-                        <button class="btn-top" style="background:#28a745">+ Add New Customer</button>
+                        <h3>Customer Master List</h3>
+                        <button id="btnAddNewCust" class="btn-top" style="background:#28a745">+ Add New Customer</button>
                     </div>
                     <div style="max-height: 550px; overflow-y: auto; margin-top:10px;">
                         <table class="mgmt-table">
-                            <thead><tr><th>Company</th><th>Address</th><th>City</th><th>Phone</th><th>Actions</th></tr></thead>
+                            <thead id="custTableHead"></thead>
                             <tbody id="custTableBody"></tbody>
                         </table>
                     </div>
@@ -171,6 +178,40 @@
         </div>
     </div>
 
+    <!-- ADDED: Customer Edit/Add Modal -->
+    <div id="custEditModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 800px;">
+            <h2 id="custModalTitle">Edit Customer</h2>
+            <hr>
+            <div id="custFormFields" class="form-grid"></div>
+            
+            <div class="section-header">Route Scheduling</div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <select id="scheduleRouteSelect" style="flex-grow:1; padding:8px;"></select>
+                <button class="btn-top" onclick="addRouteToCustomer()">Schedule to Route</button>
+            </div>
+            <div style="margin-top:10px;">
+                <table class="mgmt-table">
+                    <thead><tr><th>Route Name</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody id="custRouteListBody"></tbody>
+                </table>
+            </div>
+
+            <div class="section-header">Pre-Order Product <i class="fas fa-shopping-cart"></i></div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <select id="preOrderWater" style="flex-grow:1; padding:8px;"></select>
+                <select id="preOrderCoffee" style="flex-grow:1; padding:8px;"></select>
+                <input type="number" id="preOrderQty" value="1" style="width:60px; padding:8px;">
+                <button class="btn-top" style="background:#28a745">Add to Order</button>
+            </div>
+
+            <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
+                <button onclick="document.getElementById('custEditModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
+                <button class="btn-top" style="background:#007bff;">Save All Changes</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
     (function() {
@@ -179,6 +220,8 @@
         const repo = 'Billyschmidt123/Bottle-Water-';
         
         let waterItems = [], coffeeItems = [];
+        let globalCustomers = [];
+        let csvHeaders = [];
         let map;
 
         function initMap() {
@@ -198,10 +241,88 @@
             } catch (e) { return []; }
         }
 
+        // ADDED: Logic to aggregate customers from all route CSVs
+        async function loadAllCustomers() {
+            const files = await ghGet('routes');
+            const tbody = document.getElementById('custTableBody');
+            const thead = document.getElementById('custTableHead');
+            const routeSel = document.getElementById('scheduleRouteSelect');
+            
+            tbody.innerHTML = '<tr><td colspan="5">Loading customers...</td></tr>';
+            globalCustomers = [];
+            routeSel.innerHTML = '';
+
+            for (let f of files) {
+                if (!f.name.endsWith('.csv')) continue;
+                
+                // Populate Route Dropdowns
+                const opt = document.createElement('option');
+                opt.value = f.name; opt.textContent = f.name.replace('.csv', '');
+                routeSel.appendChild(opt);
+
+                try {
+                    const resp = await fetch(f.download_url);
+                    const text = await resp.text();
+                    const lines = text.split('\n').filter(l => l.trim());
+                    if (lines.length < 1) continue;
+
+                    if (csvHeaders.length === 0) {
+                        csvHeaders = lines[0].split(',').map(h => h.trim());
+                        thead.innerHTML = `<tr>${csvHeaders.map(h => `<th>${h}</th>`).join('')}<th>Actions</th></tr>`;
+                    }
+
+                    lines.slice(1).forEach(line => {
+                        const vals = line.split(',');
+                        let cust = { _routeName: f.name };
+                        csvHeaders.forEach((h, i) => cust[h] = vals[i] || "");
+                        globalCustomers.push(cust);
+                    });
+                } catch (e) {}
+            }
+            renderCustomerTable();
+        }
+
+        function renderCustomerTable() {
+            const tbody = document.getElementById('custTableBody');
+            tbody.innerHTML = '';
+            
+            globalCustomers.forEach((c, idx) => {
+                let row = '<tr>';
+                csvHeaders.forEach(h => row += `<td>${c[h]}</td>`);
+                row += `<td><button class="btn-top" style="padding:2px 8px; background:#ffc107; color:black;" onclick="openCustEdit(${idx})">EDIT</button></td></tr>`;
+                tbody.innerHTML += row;
+            });
+        }
+
+        window.openCustEdit = function(idx) {
+            const cust = idx === -1 ? {} : globalCustomers[idx];
+            const container = document.getElementById('custFormFields');
+            document.getElementById('custModalTitle').textContent = idx === -1 ? "Add New Customer" : "Edit Customer";
+            container.innerHTML = '';
+
+            csvHeaders.forEach(h => {
+                container.innerHTML += `<div class="form-group">
+                    <label>${h}</label>
+                    <input type="text" value="${cust[h] || ''}" id="edit_${h}">
+                </div>`;
+            });
+
+            // Route list for customer
+            const routeBody = document.getElementById('custRouteListBody');
+            routeBody.innerHTML = idx === -1 ? '' : `<tr><td>${cust._routeName}</td><td>Active</td><td><button class="btn-top" style="background:#dc3545; padding:2px 5px;">Deactivate</button></td></tr>`;
+
+            document.getElementById('custEditModal').style.display = 'flex';
+        };
+
         async function loadData() {
             const files = await ghGet('Products');
             const prodTable = document.getElementById('prodTableBody');
+            const waterSel = document.getElementById('preOrderWater');
+            const coffeeSel = document.getElementById('preOrderCoffee');
+            
             prodTable.innerHTML = '';
+            waterSel.innerHTML = '<option>Select Water...</option>';
+            coffeeSel.innerHTML = '<option>Select Coffee...</option>';
 
             for (let f of files) {
                 if (!f.name.endsWith('.csv')) continue;
@@ -214,18 +335,12 @@
                     lines.forEach(l => {
                         const p = l.split(',');
                         const name = p[1] || p[0];
-                        if (type === 'Water') waterItems.push({name}); else coffeeItems.push({name});
                         
-                        prodTable.innerHTML += `<tr>
-                            <td>${name}</td>
-                            <td>${type}</td>
-                            <td>$0.00</td>
-                            <td>--</td>
-                            <td>
-                                <button class="btn-top" style="padding:2px 5px; background:#ffc107; color:black;"><i class="fas fa-edit"></i></button>
-                                <button class="btn-top" style="padding:2px 5px; background:#dc3545;"><i class="fas fa-trash"></i></button>
-                            </td>
-                        </tr>`;
+                        const opt = document.createElement('option');
+                        opt.textContent = name;
+                        if (type === 'Water') waterSel.appendChild(opt); else coffeeSel.appendChild(opt);
+
+                        prodTable.innerHTML += `<tr><td>${name}</td><td>${type}</td><td>$0.00</td><td>--</td><td><button class="btn-top" style="padding:2px 5px; background:#ffc107; color:black;"><i class="fas fa-edit"></i></button></td></tr>`;
                     });
                 } catch (e) {}
             }
@@ -233,11 +348,9 @@
 
         async function init() {
             initMap();
-            
             try {
                 const routeFiles = await ghGet('routes');
                 const dropdown = document.getElementById('routeDropdown');
-                
                 routeFiles.forEach(f => {
                     if (f.name.endsWith('.csv')) {
                         const opt = document.createElement('option');
@@ -257,16 +370,15 @@
 
                 document.getElementById('btnManager').onclick = () => {
                     document.getElementById('mgrModal').style.display = 'flex';
+                    loadAllCustomers();
                 };
                 
-                // START ADDED CUSTOMER MAINTENANCE CLICK HANDLER
                 document.getElementById('btnShowCust').onclick = () => {
                     document.getElementById('custView').style.display = 'block';
                     document.getElementById('prodView').style.display = 'none';
                     document.getElementById('btnShowCust').classList.add('active');
                     document.getElementById('btnShowProd').classList.remove('active');
                 };
-                // END ADDED CUSTOMER MAINTENANCE CLICK HANDLER
 
                 document.getElementById('btnShowProd').onclick = () => {
                     document.getElementById('custView').style.display = 'none';
@@ -274,6 +386,8 @@
                     document.getElementById('btnShowProd').classList.add('active');
                     document.getElementById('btnShowCust').classList.remove('active');
                 };
+
+                document.getElementById('btnAddNewCust').onclick = () => openCustEdit(-1);
 
                 await loadData();
             } catch (e) {
@@ -283,29 +397,14 @@
 
         function renderStops(csv) {
             const list = document.getElementById('stopList');
-            const custTable = document.getElementById('custTableBody');
-            list.innerHTML = ''; custTable.innerHTML = '';
-            
+            list.innerHTML = '';
             const lines = csv.split('\n').filter(l => l.trim());
             if (lines.length < 2) return;
-            
             const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
 
             lines.slice(1).forEach(line => {
                 const v = line.split(',');
                 let d = {}; headers.forEach((h, i) => d[h] = v[i] || "");
-
-                custTable.innerHTML += `<tr>
-                    <td>${d.company || 'Unknown'}</td>
-                    <td>${d.address || '--'}</td>
-                    <td>${d.city || '--'}</td>
-                    <td>${d.phone || '--'}</td>
-                    <td>
-                        <button class="btn-top" style="padding:2px 5px; background:#ffc107; color:black;"><i class="fas fa-edit"></i></button>
-                        <button class="btn-top" style="padding:2px 5px; background:#dc3545;"><i class="fas fa-trash"></i></button>
-                    </td>
-                </tr>`;
-
                 const card = document.createElement('div');
                 card.style = "background:white; padding:10px; margin-bottom:10px; border-radius:5px; border-left:5px solid #007bff; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.1);";
                 card.innerHTML = `<strong>${d.company || 'N/A'}</strong><br><small>${d.address || 'No Address'}</small>`;
