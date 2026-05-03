@@ -68,12 +68,13 @@
                 <button onclick="document.getElementById('mgrModal').style.display='none'" class="btn-top" style="background:#dc3545;">Exit</button>
             </div>
             <hr>
+            <!-- Navigation for Sub-Menus -->
             <div style="margin-bottom: 20px;">
                 <button id="btnShowCust" class="mgmt-nav-btn active">Customer Maintenance</button>
                 <button id="btnShowProd" class="mgmt-nav-btn">Product Maintenance</button>
             </div>
 
-            <!-- Customer View -->
+            <!-- Customer View (Original logic) -->
             <div id="custView" style="display: block;">
                 <table class="mgmt-table">
                     <thead id="custTableHead"></thead>
@@ -81,7 +82,7 @@
                 </table>
             </div>
 
-            <!-- Product View -->
+            <!-- FIX ADDED: Product View (Requested Enhancement) -->
             <div id="prodView" style="display: none;">
                 <div style="margin-bottom:15px;">
                     <button class="btn-top" onclick="loadProductFile('Coffee.csv')" style="background:#6f4e37;">Coffee Products</button>
@@ -126,6 +127,7 @@
             return r.ok ? await r.json() : [];
         }
 
+        // ORIGINAL FUNCTION PRESERVED
         async function loadAllCustomers() {
             const files = await ghGet('routes');
             const tbody = document.getElementById('custTableBody');
@@ -134,6 +136,7 @@
             
             globalCustomers = [];
             routeDataMap = {};
+            csvHeaders = [];
 
             for (let f of files) {
                 if (!f.name.endsWith('.csv')) continue;
@@ -174,6 +177,7 @@
             renderCustTable();
         }
 
+        // ORIGINAL FUNCTION PRESERVED
         function renderCustTable() {
             const tbody = document.getElementById('custTableBody');
             tbody.innerHTML = '';
@@ -184,10 +188,11 @@
             });
         }
 
+        // FIX ADDED: Product Loading Functionality
         window.loadProductFile = async function(fileName) {
             const tbody = document.getElementById('prodTableBody');
             const thead = document.getElementById('prodTableHead');
-            tbody.innerHTML = '<tr><td>Loading products...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="10">Loading products...</td></tr>';
             
             const resp = await fetch(`https://raw.githubusercontent.com/${repo}/main/Products/${fileName}?t=${Date.now()}`);
             const text = await resp.text();
@@ -198,7 +203,7 @@
                 thead.innerHTML = `<tr><th>Action</th>${pHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
                 tbody.innerHTML = '';
                 
-                lines.slice(1).forEach((line, idx) => {
+                lines.slice(1).forEach((line) => {
                     const vals = line.split(',');
                     let row = `<tr><td><button class="btn-top" style="padding:4px;">Edit</button></td>`;
                     vals.forEach(v => row += `<td>${v}</td>`);
@@ -207,6 +212,7 @@
             }
         };
 
+        // ORIGINAL FUNCTION PRESERVED
         window.openEdit = function(idx, type) {
             const data = type === 'cust' ? globalCustomers[idx] : null;
             const fields = type === 'cust' ? csvHeaders : [];
@@ -218,6 +224,7 @@
             document.getElementById('editModal').style.display = 'flex';
         };
 
+        // ORIGINAL INIT LOGIC PRESERVED WITH ADDED BUTTON LISTENERS
         async function init() {
             const map = L.map('map').setView([55.17, -118.79], 12);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -239,6 +246,7 @@
                 document.getElementById('prodView').style.display = 'block';
                 document.getElementById('btnShowProd').classList.add('active');
                 document.getElementById('btnShowCust').classList.remove('active');
+                loadProductFile('Coffee.csv');
             };
 
             document.getElementById('btnForceRefresh').onclick = loadAllCustomers;
