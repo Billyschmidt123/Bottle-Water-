@@ -1,6 +1,6 @@
 <!-- 
   PROJECT: LogiFlow Delivery System
-  VERSION: Stop Detail Modal - Stacked Layout & Mandatory Validation
+  VERSION: Tablet-Optimized Signature & Mandatory Validation
   STATUS: Stable - Non-Destructive Addition
 -->
 <!DOCTYPE html>
@@ -38,12 +38,12 @@
         .edit-input { width: 95%; padding: 6px; border: 2px solid #007bff; border-radius: 3px; font-size: 0.85rem; background: #ffffff; color: #000000; display: block; }
         .deactivated-row { background-color: #fceaea; color: #a94442; }
 
-        #sig-canvas { border: 2px dotted #CCCCCC; border-radius: 5px; cursor: crosshair; background: #fff; width: 100%; height: 150px; }
+        /* ADDITION: touch-action none prevents tablet scrolling while signing */
+        #sig-canvas { border: 2px dotted #CCCCCC; border-radius: 5px; cursor: crosshair; background: #fff; width: 100%; height: 150px; touch-action: none; }
         .cart-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.8rem; }
         .cart-table th { background: #eee; text-align: left; padding: 5px; }
         .cart-table td { border-bottom: 1px solid #eee; padding: 5px; }
 
-        /* Metadata Styling */
         .meta-edit-input { border: 1px solid #ccc; padding: 4px; border-radius: 3px; font-size: 0.8rem; width: 80%; }
         .meta-edit-textarea { border: 1px solid #ccc; padding: 4px; border-radius: 3px; font-size: 0.8rem; width: 95%; height: 40px; font-family: inherit; }
 
@@ -51,7 +51,6 @@
         .qty-input { width: 50px; padding: 7px; border: 1px solid #ddd; border-radius: 4px; text-align: center; }
         .unit-input { width: 80px; padding: 7px; border: 1px solid #ddd; border-radius: 4px; }
 
-        /* FIX: Adjusted width and forced single column layout for stacked items */
         #stopModal .modal-content { max-width: 1100px; width: 98%; }
         #stopModal .form-grid { grid-template-columns: 1fr; }
     </style>
@@ -112,7 +111,6 @@
             </div>
 
             <div class="form-grid">
-                <!-- Dropdowns are stacked via CSS grid row changes -->
                 <div class="form-group">
                     <label>Water Product</label>
                     <div class="cart-add-row">
@@ -159,7 +157,6 @@
 
             <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
                 <button onclick="document.getElementById('stopModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
-                <!-- ADDITION: validateAndFinishStop function replaces direct button action -->
                 <button class="btn-top" onclick="validateAndFinishStop()" style="background:#28a745;">FINISH STOP</button>
             </div>
         </div>
@@ -230,7 +227,6 @@
         let currentProductSHA = '';
 
         let deliveryCart = [];
-        /* ADDITION: Signature State Tracking */
         let isSigBlank = true;
 
         async function ghGet(path) {
@@ -491,10 +487,28 @@
             const canvas = document.getElementById('sig-canvas');
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            isSigBlank = true; /* Reset signature tracker */
+            isSigBlank = true; 
+
+            /* ADDITION: Draw "Sign Here" watermark on reset */
+            ctx.font = "24px 'Segoe UI'";
+            ctx.fillStyle = "#CCCCCC";
+            ctx.textAlign = "center";
+            ctx.fillText("SIGN HERE", canvas.width / 2, canvas.height / 2 + 10);
             
             let drawing = false;
-            canvas.onmousedown = () => { drawing = true; ctx.beginPath(); isSigBlank = false; };
+
+            /* ADDITION: Helper to clear watermark on first interaction */
+            function clearWatermark() {
+                if (isSigBlank) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    isSigBlank = false;
+                }
+            }
+
+            canvas.onmousedown = (e) => { 
+                clearWatermark();
+                drawing = true; ctx.beginPath(); 
+            };
             canvas.onmouseup = () => { drawing = false; };
             canvas.onmousemove = (e) => {
                 if (!drawing) return;
@@ -502,9 +516,35 @@
                 ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
                 ctx.stroke();
             };
+
+            /* ADDITION: Tablet-specific listeners to stop modal movement while signing */
+            canvas.addEventListener("touchstart", function (e) {
+                if (e.target == canvas) {
+                    e.preventDefault();
+                    clearWatermark();
+                    drawing = true; ctx.beginPath();
+                }
+            }, { passive: false });
+
+            canvas.addEventListener("touchend", function (e) {
+                if (e.target == canvas) {
+                    e.preventDefault();
+                    drawing = false;
+                }
+            }, { passive: false });
+
+            canvas.addEventListener("touchmove", function (e) {
+                if (e.target == canvas) {
+                    e.preventDefault();
+                    if (!drawing) return;
+                    const rect = canvas.getBoundingClientRect();
+                    const touch = e.touches[0];
+                    ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+                    ctx.stroke();
+                }
+            }, { passive: false });
         };
 
-        /* ADDITION: Validation Logic */
         window.validateAndFinishStop = function() {
             const name = document.getElementById('receivedBy').value.trim();
             if (!name) {
@@ -515,7 +555,6 @@
                 alert("A signature is required to complete the delivery.");
                 return;
             }
-            // Proceed with existing finish logic (mocked for now as requested fix only covers UI/Mandatory)
             alert("Stop finished successfully!");
             document.getElementById('stopModal').style.display='none';
         };
