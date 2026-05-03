@@ -177,52 +177,24 @@
         </div>
     </div>
 
-    <!-- Customer Edit/Add Modal (Added Fix) -->
+    <!-- START OF FIX: Customer Edit Modal -->
     <div id="custEditModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 900px;">
+        <div class="modal-content" style="max-width: 800px;">
             <div style="display:flex; justify-content: space-between; align-items:center;">
-                <h2 id="custModalTitle">Customer Details</h2>
+                <h2 id="custModalTitle">Edit Customer Information</h2>
                 <button onclick="document.getElementById('custEditModal').style.display='none'" class="btn-top" style="background:#dc3545;">Close</button>
             </div>
             <hr>
-            
-            <!-- Dynamic Form Fields -->
-            <div id="custFormFields" class="form-grid"></div>
-            
-            <!-- Route Scheduling Section -->
-            <div class="section-header">Route Schedule Management</div>
-            <div style="display:grid; grid-template-columns: 1fr 200px; gap:10px; margin-top:10px;">
-                <select id="scheduleRouteSelect" style="padding:8px; border-radius:4px; border:1px solid #ddd;"></select>
-                <button class="btn-top" id="btnAddRoute" style="background:#28a745">Schedule to Route</button>
+            <div id="custFormFields" class="form-grid">
+                <!-- Fields are generated dynamically by script -->
             </div>
-            <div style="margin-top:15px;">
-                <table class="mgmt-table">
-                    <thead><tr><th>Route Name</th><th>Status</th><th>Actions</th></tr></thead>
-                    <tbody id="custRouteListBody"></tbody>
-                </table>
-            </div>
-
-            <!-- Pre-Ordering Section -->
-            <div class="section-header">Pre-Order Product <i class="fas fa-shopping-cart"></i></div>
-            <div style="display:grid; grid-template-columns: 1fr 120px 120px 100px; gap:10px; margin-top:10px;">
-                <select id="preOrderProduct" style="padding:8px;"></select>
-                <input type="number" id="preOrderQty" value="1" min="1" style="padding:8px;">
-                <select id="preOrderUnit" style="padding:8px;">
-                    <option value="Cases">Cases</option>
-                    <option value="Bottles">Bottles</option>
-                    <option value="Units">Units</option>
-                </select>
-                <button class="btn-top" id="btnAddPreOrder" style="background:#007bff">Add</button>
-            </div>
-            <div style="margin-top:10px; background:#f9f9f9; padding:10px; border-radius:4px; border:1px solid #eee;">
-                <div id="cartItems">No pre-orders pending.</div>
-            </div>
-
             <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-                <button class="btn-top" id="btnSaveCustomer" style="background:#007bff; padding: 12px 25px;">SAVE CUSTOMER DATA</button>
+                <button onclick="document.getElementById('custEditModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
+                <button id="btnSaveCustData" class="btn-top" style="background:#28a745;">Save Changes</button>
             </div>
         </div>
     </div>
+    <!-- END OF FIX -->
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -257,19 +229,13 @@
             const files = await ghGet('routes');
             const tbody = document.getElementById('custTableBody');
             const thead = document.getElementById('custTableHead');
-            const routeSel = document.getElementById('scheduleRouteSelect');
             
-            tbody.innerHTML = '<tr><td colspan="5">Syncing route data...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5">Loading customers...</td></tr>';
             globalCustomers = [];
-            routeSel.innerHTML = '<option value="">Choose Route...</option>';
 
             for (let f of files) {
                 if (!f.name.endsWith('.csv')) continue;
                 
-                const opt = document.createElement('option');
-                opt.value = f.name; opt.textContent = f.name.replace('.csv', '');
-                routeSel.appendChild(opt);
-
                 try {
                     const resp = await fetch(f.download_url);
                     const text = await resp.text();
@@ -278,24 +244,16 @@
 
                     if (csvHeaders.length === 0) {
                         csvHeaders = lines[0].split(',').map(h => h.trim());
-                        thead.innerHTML = `<tr>${csvHeaders.map(h => `<th>${h}</th>`).join('')}<th>Actions</th></tr>`;
+                        // START OF FIX: Add Edit column to header
+                        thead.innerHTML = `<tr><th>Edit</th>${csvHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                        // END OF FIX
                     }
 
                     lines.slice(1).forEach(line => {
                         const vals = line.split(',');
-                        let cust = { _routes: [f.name], _raw: {} };
-                        csvHeaders.forEach((h, i) => {
-                            cust[h] = vals[i] || "";
-                            cust._raw[h] = vals[i] || "";
-                        });
-                        
-                        // Deduplicate by company name/address
-                        let existing = globalCustomers.find(ex => ex.company === cust.company && ex.address === cust.address);
-                        if (existing) {
-                            if(!existing._routes.includes(f.name)) existing._routes.push(f.name);
-                        } else {
-                            globalCustomers.push(cust);
-                        }
+                        let cust = { _routeName: f.name };
+                        csvHeaders.forEach((h, i) => cust[h] = vals[i] || "");
+                        globalCustomers.push(cust);
                     });
                 } catch (e) {}
             }
@@ -305,53 +263,53 @@
         function renderCustomerTable() {
             const tbody = document.getElementById('custTableBody');
             tbody.innerHTML = '';
+            
             globalCustomers.forEach((c, idx) => {
+                // START OF FIX: Add edit button on left side
                 let row = '<tr>';
+                row += `<td><button class="btn-top" style="padding:2px 8px; background:#ffc107; color:black;" onclick="openCustEdit(${idx})"><i class="fas fa-edit"></i></button></td>`;
                 csvHeaders.forEach(h => row += `<td>${c[h]}</td>`);
-                row += `<td><button class="btn-top" style="padding:2px 8px; background:#ffc107; color:black;" onclick="openCustEdit(${idx})"><i class="fas fa-edit"></i></button></td></tr>`;
+                row += '</tr>';
                 tbody.innerHTML += row;
+                // END OF FIX
             });
         }
 
+        // START OF FIX: Open Modal and Populate Fields
         window.openCustEdit = function(idx) {
             const cust = idx === -1 ? {} : globalCustomers[idx];
             const container = document.getElementById('custFormFields');
-            document.getElementById('custModalTitle').textContent = idx === -1 ? "Add New Customer Record" : "Modify Customer: " + cust.company;
+            document.getElementById('custModalTitle').textContent = idx === -1 ? "Add New Customer" : "Edit Customer: " + (cust.company || "New Record");
             container.innerHTML = '';
 
             csvHeaders.forEach(h => {
-                container.innerHTML += `<div class="form-group">
-                    <label>${h.toUpperCase()}</label>
-                    <input type="text" value="${cust[h] || ''}" id="field_${h}" placeholder="Enter ${h}...">
-                </div>`;
+                container.innerHTML += `
+                    <div class="form-group">
+                        <label>${h.toUpperCase()}</label>
+                        <input type="text" value="${cust[h] || ''}" id="edit_field_${h}" data-header="${h}">
+                    </div>`;
             });
 
-            // Populate Routes List
-            const routeBody = document.getElementById('custRouteListBody');
-            routeBody.innerHTML = '';
-            if(cust._routes) {
-                cust._routes.forEach(r => {
-                    routeBody.innerHTML += `<tr>
-                        <td>${r.replace('.csv','')}</td>
-                        <td><span style="color:green; font-weight:bold;">Active</span></td>
-                        <td>
-                            <button class="btn-top" style="background:#dc3545; padding:2px 5px;"><i class="fas fa-trash"></i></button>
-                            <button class="btn-top" style="background:#ffc107; color:black; padding:2px 5px;">Deactivate</button>
-                        </td>
-                    </tr>`;
-                });
-            }
-
             document.getElementById('custEditModal').style.display = 'flex';
+            
+            // Handle saving (placeholder logic to update global state)
+            document.getElementById('btnSaveCustData').onclick = () => {
+                if (idx !== -1) {
+                    csvHeaders.forEach(h => {
+                        globalCustomers[idx][h] = document.getElementById(`edit_field_${h}`).value;
+                    });
+                    renderCustomerTable();
+                }
+                document.getElementById('custEditModal').style.display = 'none';
+            };
         };
+        // END OF FIX
 
         async function loadData() {
             const files = await ghGet('Products');
             const prodTable = document.getElementById('prodTableBody');
-            const preOrderProd = document.getElementById('preOrderProduct');
             
             prodTable.innerHTML = '';
-            preOrderProd.innerHTML = '<option value="">Select Item...</option>';
 
             for (let f of files) {
                 if (!f.name.endsWith('.csv')) continue;
@@ -364,11 +322,6 @@
                     lines.forEach(l => {
                         const p = l.split(',');
                         const name = p[1] || p[0];
-                        
-                        const opt = document.createElement('option');
-                        opt.textContent = `[${type}] ${name}`;
-                        preOrderProd.appendChild(opt);
-
                         prodTable.innerHTML += `<tr><td>${name}</td><td>${type}</td><td>$0.00</td><td>--</td><td><button class="btn-top" style="padding:2px 5px; background:#ffc107; color:black;"><i class="fas fa-edit"></i></button></td></tr>`;
                     });
                 } catch (e) {}
