@@ -242,7 +242,6 @@
             const saveBtn = document.getElementById('btnSaveProdRecord');
             container.innerHTML = '';
             
-            // FIX: Explicitly setting the value attribute during creation to ensure data mirroring
             currentProdHeaders.forEach(h => {
                 const val = data[h] || '';
                 if (h === 'Status') {
@@ -252,15 +251,13 @@
                 }
             });
 
-            // FIX: Secondary population check to ensure data from table is mirrored
-            setTimeout(() => {
-                currentProdHeaders.forEach(h => {
-                    const field = document.getElementById(`pf_${h}`);
-                    if (field) {
-                        field.value = data[h] || '';
-                    }
-                });
-            }, 50);
+            // FIX: Explicitly populate the newly created input fields with the table row's data
+            currentProdHeaders.forEach(h => {
+                const inputEl = document.getElementById(`pf_${h}`);
+                if (inputEl) {
+                    inputEl.value = data[h] || '';
+                }
+            });
 
             deactivateBtn.innerText = data.Status === "Active" ? "DEACTIVATE" : "RE-ACTIVATE";
             deactivateBtn.style.background = data.Status === "Active" ? "#dc3545" : "#28a745";
