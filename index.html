@@ -1,7 +1,7 @@
 <!-- 
   PROJECT: LogiFlow Delivery System
-  VERSION: GitHub-Persistent Slip Numbering & PDF Generation
-  STATUS: Stable - Non-Destructive Addition
+  VERSION: Unified Cloud Operations & PDF Archiving
+  FEATURES: GitHub Persistence, Route Optimization, Tech Dispatch
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -13,7 +13,6 @@
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <!-- ADDITION: jsPDF Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
     <style>
@@ -25,35 +24,26 @@
         #map { width: 100%; height: 100%; }
         #sidebar { flex: 0 0 30%; height: 100%; border-left: 2px solid #ccc; overflow-y: auto; background: #ffffff; }
         .btn-top { padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
-        .mgmt-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        .mgmt-table th { background: #007bff; color: white; text-align: left; padding: 10px; position: sticky; top: 0; }
-        .mgmt-table td { padding: 8px; border-bottom: 1px solid #ddd; }
+        
+        /* Modal Styles */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 8px; width: 95%; max-width: 1200px; max-height: 90vh; overflow-y: auto; }
-        .mgmt-nav-btn { padding: 10px 20px; margin-right: 10px; border: 1px solid #007bff; background: #f8f9fa; color: #007bff; cursor: pointer; font-weight: bold; border-radius: 4px; }
-        .mgmt-nav-btn.active { background: #007bff; color: white; }
+        
+        /* Stop/Delivery Styling */
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
         .form-group { display: flex; flex-direction: column; }
         .form-group label { font-size: 0.75rem; font-weight: bold; margin-bottom: 3px; color: #666; }
         .form-group input, .form-group select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-
-        .edit-input { width: 95%; padding: 6px; border: 2px solid #007bff; border-radius: 3px; font-size: 0.85rem; background: #ffffff; color: #000000; display: block; }
-        .deactivated-row { background-color: #fceaea; color: #a94442; }
-
-        #sig-canvas { border: 2px dotted #CCCCCC; border-radius: 5px; cursor: crosshair; background: #eee; width: 100%; height: 150px; touch-action: none; pointer-events: none; opacity: 0.6; }
+        #sig-canvas { border: 2px dotted #CCCCCC; border-radius: 5px; cursor: crosshair; background: #eee; width: 100%; height: 150px; touch-action: none; }
+        
         .cart-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.8rem; }
         .cart-table th { background: #eee; text-align: left; padding: 5px; }
         .cart-table td { border-bottom: 1px solid #eee; padding: 5px; }
-
-        .meta-edit-input { border: 1px solid #ccc; padding: 4px; border-radius: 3px; font-size: 0.8rem; width: 80%; }
-        .meta-edit-textarea { border: 1px solid #ccc; padding: 4px; border-radius: 3px; font-size: 0.8rem; width: 95%; height: 40px; font-family: inherit; }
-
-        .cart-add-row { display: flex; gap: 5px; align-items: center; margin-top: 5px; flex-wrap: wrap; }
-        .qty-input { width: 50px; padding: 7px; border: 1px solid #ddd; border-radius: 4px; text-align: center; }
-        .unit-input { width: 80px; padding: 7px; border: 1px solid #ddd; border-radius: 4px; }
-
-        #stopModal .modal-content { max-width: 1100px; width: 98%; }
-        #stopModal .form-grid { grid-template-columns: 1fr; }
+        
+        /* Manager Styling */
+        .mgmt-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .mgmt-table th { background: #007bff; color: white; text-align: left; padding: 10px; }
+        .mgmt-table td { padding: 8px; border-bottom: 1px solid #ddd; }
     </style>
 </head>
 <body>
@@ -67,10 +57,9 @@
         </div>
         <div class="topbar-center">
             <div><i class="fas fa-map-marker-alt" style="color:#007bff"></i> <span id="currentAddress">Awaiting Data...</span></div>
-            <div><i class="fas fa-phone" style="color:#28a745"></i> <span id="currentPhone">--</span></div>
+            <div><i class="fas fa-truck" style="color:#28a745"></i> <span id="currentTech">No Tech Assigned</span></div>
         </div>
         <div class="topbar-right">
-            <button id="btnForceRefresh" class="btn-top" style="background: #17a2b8; margin-right: 10px;"><i class="fas fa-sync-alt"></i> FORCE REFRESH</button>
             <button id="btnManager" class="btn-top" style="background: #495057;">MANAGER MENU</button>
         </div>
     </header>
@@ -79,12 +68,13 @@
         <div id="mapPanel"><div id="map"></div></div>
         <aside id="sidebar">
             <div id="sidebarContent" style="padding: 10px;">
-                <h3 style="text-align: center; color: #444;">Route Stops</h3>
-                <div id="stopList" style="text-align:center; color:#999; margin-top:20px;">Select a route to begin.</div>
+                <h3 style="text-align: center; color: #444;">Daily Route</h3>
+                <div id="stopList" style="text-align:center; color:#999; margin-top:20px;">Select a route to view stops.</div>
             </div>
         </aside>
     </div>
 
+    <!-- Stop Modal -->
     <div id="stopModal" class="modal-overlay">
         <div class="modal-content">
             <div style="display:flex; justify-content: space-between; align-items:center;">
@@ -96,73 +86,43 @@
             <div id="stopMetadata" style="font-size: 0.85rem; background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div><strong>Address:</strong> <span id="metaAddress">--</span></div>
                 <div><strong>Phone:</strong> <span id="metaPhone">--</span></div>
-                <div><strong>Email:</strong> <span id="metaEmail">--</span></div>
-                <div><strong>Special Order:</strong> <span id="metaSpecOrder">--</span></div>
-                
-                <div><strong>Deliv Fee:</strong> <input type="text" id="editMetaDelivFee" class="meta-edit-input"></div>
-                <div><strong>Travel:</strong> <input type="text" id="editMetaTravel" class="meta-edit-input"></div>
-                <div><strong>PO #:</strong> <input type="text" id="editMetaPO" class="meta-edit-input"></div>
-                
-                <div style="grid-column: span 2;"><strong>Special Instructions:</strong> <span id="metaSpecInst">--</span></div>
-                
-                <div style="grid-column: span 2;">
-                    <strong>Notes:</strong><br>
-                    <textarea id="editMetaNotes" class="meta-edit-textarea"></textarea>
-                </div>
+                <div style="grid-column: span 2;"><strong>Special Instructions:</strong> <span id="metaInstructions">--</span></div>
             </div>
 
             <div class="form-grid">
                 <div class="form-group">
-                    <label>Water Product</label>
-                    <div class="cart-add-row">
-                        <select id="stopProductDropdown" style="flex-grow:1; min-width: 150px;">
-                            <option value="">Choose water product...</option>
-                        </select>
-                        <input type="number" id="qtyWater" class="qty-input" value="1" min="1">
-                        <input type="text" id="unitWater" class="unit-input" placeholder="Units">
-                        <button class="btn-top" onclick="addProductToCart('stopProductDropdown', 'qtyWater', 'unitWater')" style="background:#28a745;">ADD</button>
+                    <label>Products</label>
+                    <div style="display:flex; gap:5px;">
+                        <select id="stopProductDropdown" style="flex-grow:1;"></select>
+                        <input type="number" id="qtyProd" style="width:50px;" value="1">
+                        <button class="btn-top" onclick="addToCart()" style="background:#28a745;">ADD</button>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Coffee Product</label>
-                    <div class="cart-add-row">
-                        <select id="stopCoffeeDropdown" style="flex-grow:1; min-width: 150px;">
-                            <option value="">Choose coffee product...</option>
-                        </select>
-                        <input type="number" id="qtyCoffee" class="qty-input" value="1" min="1">
-                        <input type="text" id="unitCoffee" class="unit-input" placeholder="Units">
-                        <button class="btn-top" onclick="addProductToCart('stopCoffeeDropdown', 'qtyCoffee', 'unitCoffee')" style="background:#6f4e37;">ADD</button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>Signature (Required)</label>
-                    <div style="margin-bottom: 5px; display: flex; gap: 10px;">
-                        <button id="btnActivateSig" class="btn-top" style="background:#007bff; flex: 1;" onclick="activateSignatureBox()">CLICK TO SIGN</button>
-                        <button id="btnClearSig" class="btn-top" style="background:#6c757d; width: 80px;" onclick="clearSignatureCanvas()">CLEAR</button>
-                    </div>
+                    <label>Signature (Printed Record Only)</label>
                     <canvas id="sig-canvas"></canvas>
+                    <button class="btn-top" onclick="clearSig()" style="background:#6c757d; margin-top:5px;">Clear</button>
                 </div>
                 <div class="form-group">
-                    <label>Received By (Required)</label>
-                    <input type="text" id="receivedBy" placeholder="Name of person receiving">
+                    <label>Received By</label>
+                    <input type="text" id="receivedBy" placeholder="Print Name">
+                </div>
+                <div class="form-group">
+                    <label>Delivery Status</label>
+                    <select id="deliveryStatus">
+                        <option value="delivered">Delivered</option>
+                        <option value="not_delivered">Not Delivered</option>
+                    </select>
                 </div>
             </div>
 
-            <div style="margin-top: 20px; border-top: 2px solid #eee; padding-top: 10px;">
-                <h4 style="margin: 0;"><i class="fas fa-shopping-cart"></i> Delivery Items</h4>
-                <table class="cart-table">
-                    <thead>
-                        <tr><th>Item</th><th>Qty</th><th>Units</th><th style="width:50px;">Action</th></tr>
-                    </thead>
-                    <tbody id="cartItemsBody">
-                        <tr><td colspan="4" style="color:#999; text-align:center;">No items added.</td></tr>
-                    </tbody>
-                </table>
-            </div>
+            <table class="cart-table">
+                <thead><tr><th>Item</th><th>Qty</th><th>Action</th></tr></thead>
+                <tbody id="cartItemsBody"></tbody>
+            </table>
 
-            <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-                <button onclick="document.getElementById('stopModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
-                <button class="btn-top" onclick="validateAndFinishStop()" style="background:#28a745;">FINISH STOP</button>
+            <div style="margin-top:20px; display:flex; justify-content:flex-end;">
+                <button class="btn-top" id="btnFinish" onclick="processFinalDelivery()" style="background:#28a745; padding: 15px 30px;">FINISH STOP & ARCHIVE</button>
             </div>
         </div>
     </div>
@@ -175,47 +135,17 @@
                 <button onclick="document.getElementById('mgrModal').style.display='none'" class="btn-top" style="background:#dc3545;">Exit</button>
             </div>
             <hr>
-            <div style="margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 5px;">
-                <button id="btnShowCust" class="mgmt-nav-btn active">Customer Maintenance</button>
-                <button id="btnShowProd" class="mgmt-nav-btn">Product Maintenance</button>
-                <!-- ADDITION: New GitHub-Persistent Counter Field -->
-                <div style="background: #e9ecef; padding: 10px; border-radius: 4px; display: flex; align-items: center; gap: 10px; border: 1px solid #ccc;">
-                    <label style="font-weight: bold; font-size: 0.8rem;">STARTING SLIP # (GitHub):</label>
-                    <input type="number" id="startSlipNum" style="width: 100px; padding: 5px;" placeholder="100000">
-                    <button class="btn-top" style="background: #28a745; padding: 5px 10px;" onclick="saveSlipNumberToGitHub()">SAVE TO CLOUD</button>
-                </div>
+            <div style="margin-bottom: 20px; background: #e9ecef; padding: 15px; border-radius: 4px; display: flex; align-items: center; gap: 15px;">
+                <label style="font-weight: bold;">Starting Slip Number:</label>
+                <input type="number" id="startSlipNum" style="width: 120px; padding: 8px;">
+                <button class="btn-top" onclick="saveSlipNumberToGitHub()">Sync Cloud Sequence</button>
             </div>
-
-            <div id="custView" style="display: block;">
-                <table class="mgmt-table">
-                    <thead id="custTableHead"></thead>
-                    <tbody id="custTableBody"></tbody>
-                </table>
-            </div>
-
-            <div id="prodView" style="display: none;">
-                <div style="margin-bottom:15px;">
-                    <button class="btn-top" onclick="loadProductFile('Coffee.csv')" style="background:#6f4e37;">Coffee Products</button>
-                    <button class="btn-top" onclick="loadProductFile('Water.csv')" style="background:#00a8e8;">Water Products</button>
+            
+            <div id="techManagement">
+                <h4 style="margin: 0 0 10px 0;">Technician Assignments</h4>
+                <div id="techListContainer" style="display:flex; flex-wrap: wrap; gap:10px;">
+                    <!-- Dave, Steven, Rig, Robin, Daniel, Ezra, Jim, Al Perry -->
                 </div>
-                <div style="overflow-x: auto;">
-                    <table class="mgmt-table">
-                        <thead id="prodTableHead"></thead>
-                        <tbody id="prodTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="editModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 800px;">
-            <h2 id="editModalTitle">Edit Record</h2>
-            <hr>
-            <div id="editFormFields" class="form-grid"></div>
-            <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-                <button onclick="document.getElementById('editModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
-                <button id="btnSaveRecord" class="btn-top" style="background:#28a745;">SAVE CHANGES</button>
             </div>
         </div>
     </div>
@@ -227,46 +157,22 @@
         const token = _k.map(c => String.fromCharCode(c)).join('');
         const repo = 'Billyschmidt123/Bottle-Water-';
         
-        let globalCustomers = [];
-        let csvHeaders = [];
-        let routeDataMap = {}; 
-
-        let currentProdList = [];
-        let currentProdHeaders = [];
-        let editingIndex = -1;
-        let currentProductFile = '';
-        let currentProductSHA = '';
-
-        let deliveryCart = [];
-        let isSigBlank = true;
-
-        /* ADDITION: Persistent GitHub Counter Metadata */
-        let currentSlipSHA = '';
         let currentSlipVal = 100000;
+        let currentSlipSHA = '';
+        let deliveryCart = [];
+        const techs = ["Dave", "Steven", "Rig", "Robin", "Daniel", "Ezra", "Jim", "Al Perry"];
 
-        async function ghGet(path) {
-            const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+        // Cloud Sequence Sync
+        async function syncSlipNumber() {
+            const res = await fetch(`https://api.github.com/repos/${repo}/contents/System/SlipCounter.txt`, {
                 headers: { 'Authorization': `token ${token}` }
             });
-            return r.ok ? await r.json() : [];
-        }
-
-        /* ADDITION: Fetch and Sync the Delivery Slip Number from GitHub */
-        async function syncSlipNumber() {
-            try {
-                const res = await fetch(`https://api.github.com/repos/${repo}/contents/System/SlipCounter.txt`, {
-                    headers: { 'Authorization': `token ${token}` }
-                });
-                if(res.ok) {
-                    const data = await res.json();
-                    currentSlipSHA = data.sha;
-                    currentSlipVal = parseInt(atob(data.content)) || 100000;
-                    document.getElementById('startSlipNum').value = currentSlipVal;
-                } else {
-                    // Create file if it doesn't exist
-                    await saveSlipNumberToGitHub(100000);
-                }
-            } catch(e) { console.error("Cloud Sync Failed", e); }
+            if(res.ok) {
+                const data = await res.json();
+                currentSlipSHA = data.sha;
+                currentSlipVal = parseInt(atob(data.content));
+                document.getElementById('startSlipNum').value = currentSlipVal;
+            }
         }
 
         window.saveSlipNumberToGitHub = async function(manualVal) {
@@ -275,7 +181,7 @@
                 method: 'PUT',
                 headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: "Update Slip Counter",
+                    message: "Sync Slip Sequence",
                     content: btoa(val.toString()),
                     sha: currentSlipSHA || undefined
                 })
@@ -284,606 +190,102 @@
                 const data = await res.json();
                 currentSlipSHA = data.content.sha;
                 currentSlipVal = parseInt(val);
-                alert("Sequence saved to GitHub successfully.");
             }
         };
 
-        async function loadAllCustomers() {
-            const files = await ghGet('routes');
-            const tbody = document.getElementById('custTableBody');
-            const thead = document.getElementById('custTableHead');
-            tbody.innerHTML = '<tr><td colspan="10">Scanning files...</td></tr>';
-            
-            globalCustomers = [];
-            routeDataMap = {};
-            csvHeaders = [];
+        // Archive Signed Delivery PDF
+        async function processFinalDelivery() {
+            const btn = document.getElementById('btnFinish');
+            const receiver = document.getElementById('receivedBy').value;
+            if(!receiver) return alert("Please print recipient name.");
 
-            for (let f of files) {
-                if (!f.name.endsWith('.csv')) continue;
-                const resp = await fetch(f.download_url + "?t=" + Date.now());
-                const text = await resp.text();
-                routeDataMap[f.name] = { text: text, sha: f.sha };
-                
-                const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-                if (lines.length < 2) continue;
+            btn.disabled = true;
+            btn.textContent = "UPLOADING TO CLOUD...";
 
-                if (csvHeaders.length === 0) {
-                    csvHeaders = lines[0].split(',').map(h => h.trim());
-                    thead.innerHTML = `<tr><th>Action</th>${csvHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
-                }
-
-                lines.slice(1).forEach(line => {
-                    const vals = line.split(',');
-                    let rowObj = {};
-                    csvHeaders.forEach((h, i) => rowObj[h] = (vals[i] || "").trim());
-                    
-                    const nameKey = csvHeaders.find(h => ["company", "name", "customer"].some(w => h.toLowerCase().includes(w)));
-                    const addrKey = csvHeaders.find(h => h.toLowerCase().includes("address"));
-
-                    if (rowObj[nameKey] || rowObj[addrKey]) {
-                        let existing = globalCustomers.find(ex => 
-                            (ex[nameKey] || "").toLowerCase() === (rowObj[nameKey] || "").toLowerCase() &&
-                            (ex[addrKey] || "").toLowerCase() === (rowObj[addrKey] || "").toLowerCase()
-                        );
-                        if (existing) {
-                            if(!existing._routes.includes(f.name)) existing._routes.push(f.name);
-                        } else {
-                            rowObj._routes = [f.name];
-                            globalCustomers.push(rowObj);
-                        }
-                    }
-                });
-            }
-            renderCustTable();
-            populateRouteDropdown();
-        }
-
-        function renderCustTable() {
-            const tbody = document.getElementById('custTableBody');
-            tbody.innerHTML = '';
-            globalCustomers.forEach((c, idx) => {
-                let row = `<tr><td><button class="btn-top" style="padding:4px;" onclick="openEdit(${idx}, 'cust')">Edit</button></td>`;
-                csvHeaders.forEach(h => row += `<td>${c[h] || ''}</td>`);
-                tbody.innerHTML += row + '</tr>';
-            });
-        }
-
-        window.loadProductFile = async function(fileName) {
-            currentProductFile = fileName;
-            const tbody = document.getElementById('prodTableBody');
-            const theadRow = document.getElementById('prodTableHead');
-            tbody.innerHTML = '<tr><td colspan="10">Gathering items...</td></tr>';
-            
             try {
-                const fileInfo = await ghGet(`Products/${fileName}`);
-                currentProductSHA = fileInfo.sha;
-
-                const resp = await fetch(`https://raw.githubusercontent.com/${repo}/main/Products/${fileName}?t=${Date.now()}`);
-                const text = await resp.text();
-                const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                const now = new Date();
+                const dateLong = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                const company = document.getElementById('stopModalTitle').textContent.replace('Delivery: ', '');
                 
-                if(lines.length > 0) {
-                    currentProdHeaders = lines[0].split(',').map(h => h.trim()).filter(h => h !== "");
-                    if (!currentProdHeaders.includes('Status')) currentProdHeaders.push('Status');
-                    
-                    theadRow.innerHTML = `<th>Action</th>${currentProdHeaders.map(h => `<th>${h}</th>`).join('')}`;
-                    
-                    currentProdList = lines.slice(1).map(line => {
-                        const vals = line.split(',');
-                        let pObj = {};
-                        currentProdHeaders.forEach((h, i) => {
-                            if (h !== 'Status') pObj[h] = (vals[i] || "").trim();
-                        });
-                        pObj.Status = pObj.Status || "Active";
-                        return pObj;
-                    });
-                    
-                    editingIndex = -1;
-                    renderProdTable();
-                }
-            } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="10">Unable to reach the records.</td></tr>';
-            }
-        };
-
-        window.enterEditMode = function(idx) {
-            editingIndex = idx;
-            renderProdTable();
-        };
-
-        window.cancelEdit = function() {
-            editingIndex = -1;
-            renderProdTable();
-        };
-
-        window.updateRow = async function(idx) {
-            const data = currentProdList[idx];
-            currentProdHeaders.forEach(h => {
-                if (h !== 'Status') {
-                    const input = document.getElementById(`edit_${h}_${idx}`);
-                    if (input) data[h] = input.value;
-                }
-            });
-
-            let csvContent = currentProdHeaders.join(',') + '\n';
-            csvContent += currentProdList.map(p => currentProdHeaders.map(h => p[h]).join(',')).join('\n');
-
-            const response = await fetch(`https://api.github.com/repos/${repo}/contents/Products/${currentProductFile}`, {
-                method: 'PUT',
-                headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    message: `Update ${currentProductFile}`,
-                    content: btoa(csvContent),
-                    sha: currentProductSHA
-                })
-            });
-
-            if (response.ok) {
-                editingIndex = -1;
-                loadProductFile(currentProductFile);
-            } else {
-                alert("Error saving to GitHub.");
-            }
-        };
-
-        window.toggleStatus = function(idx) {
-            currentProdList[idx].Status = currentProdList[idx].Status === "Active" ? "Deactivated" : "Active";
-            renderProdTable();
-        };
-
-        function renderProdTable() {
-            const tbody = document.getElementById('prodTableBody');
-            tbody.innerHTML = '';
-            
-            currentProdList.forEach((pObj, idx) => {
-                const isDeactivated = pObj.Status === "Deactivated";
-                const isEditing = (editingIndex === idx);
-                const tr = document.createElement('tr');
-                if (isDeactivated) tr.className = 'deactivated-row';
+                doc.setFontSize(18); doc.text("Culligan Water Delivery", 10, 20);
+                doc.setFontSize(10); doc.text(`Slip #: ${currentSlipVal}`, 150, 20);
+                doc.text(`Date: ${dateLong}`, 10, 30);
+                doc.text(`Customer: ${company}`, 10, 40);
                 
-                const tdAction = document.createElement('td');
-                if (isEditing) {
-                    tdAction.innerHTML = `
-                        <button class="btn-top" style="padding:4px; background:#28a745;" onclick="updateRow(${idx})">Update</button>
-                        <button class="btn-top" style="padding:4px; background:#6c757d;" onclick="cancelEdit()">Cancel</button>
-                    `;
-                } else {
-                    tdAction.innerHTML = `<button class="btn-top" style="padding:4px;" onclick="enterEditMode(${idx})">Edit</button>`;
-                }
-                tr.appendChild(tdAction);
-                
-                currentProdHeaders.forEach(h => {
-                    const td = document.createElement('td');
-                    const val = pObj[h] || '';
-                    
-                    if (isEditing) {
-                        if (h === 'Status') {
-                            td.innerHTML = `<button class="btn-top" style="padding:2px; font-size:0.7rem; background:#17a2b8;" onclick="toggleStatus(${idx})">${val}</button>`;
-                        } else {
-                            const input = document.createElement('input');
-                            input.type = 'text';
-                            input.className = 'edit-input';
-                            input.id = `edit_${h}_${idx}`;
-                            input.value = val;
-                            td.appendChild(input);
-                        }
-                    } else {
-                        td.textContent = val;
-                    }
-                    tr.appendChild(td);
+                let y = 60;
+                deliveryCart.forEach(item => {
+                    doc.text(`${item.qty} x ${item.name}`, 15, y);
+                    y += 7;
                 });
-                tbody.appendChild(tr);
+
+                doc.text(`Received By: ${receiver}`, 10, y + 20);
+                const sigData = document.getElementById('sig-canvas').toDataURL('image/png');
+                doc.addImage(sigData, 'PNG', 10, y + 25, 50, 20);
+
+                const pdfBase64 = doc.output('datauristring').split(',')[1];
+                const fileName = `${company.replace(/\s+/g, '_')}-Del_slip_number(${currentSlipVal})-${dateLong.replace(/\s+/g, '_')}.pdf`;
+
+                const uploadRes = await fetch(`https://api.github.com/repos/${repo}/contents/Pdf/${fileName}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: `Archive: ${fileName}`, content: pdfBase64 })
+                });
+
+                if(uploadRes.ok) {
+                    currentSlipVal++;
+                    await saveSlipNumberToGitHub(currentSlipVal);
+                    alert("Archived in GitHub Pdf folder.");
+                    document.getElementById('stopModal').style.display = 'none';
+                }
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "FINISH STOP & ARCHIVE";
+            }
+        }
+
+        function init() {
+            const map = L.map('map').setView([55.17, -118.79], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            syncSlipNumber();
+            setupSignature();
+            renderTechs();
+        }
+
+        function renderTechs() {
+            const container = document.getElementById('techListContainer');
+            techs.forEach(t => {
+                const b = document.createElement('button');
+                b.className = 'btn-top'; b.style.background = '#6c757d'; b.textContent = t;
+                b.onclick = () => {
+                    document.getElementById('currentTech').textContent = t;
+                    alert(`Assigned to ${t}`);
+                };
+                container.appendChild(b);
             });
         }
 
-        window.openEdit = function(idx, type) {
-            const data = type === 'cust' ? globalCustomers[idx] : null;
-            const fields = type === 'cust' ? csvHeaders : [];
-            const container = document.getElementById('editFormFields');
-            container.innerHTML = '';
-            fields.forEach(h => {
-                container.innerHTML += `<div class="form-group"><label>${h}</label><input type="text" value="${data[h]}" id="f_${h}"></div>`;
-            });
-            document.getElementById('editModal').style.display = 'flex';
-        };
-
-        window.activateSignatureBox = function() {
-            const canvas = document.getElementById('sig-canvas');
-            const btn = document.getElementById('btnActivateSig');
-            canvas.style.pointerEvents = 'auto';
-            canvas.style.opacity = '1';
-            canvas.style.background = '#fff';
-            btn.style.background = '#28a745';
-            btn.textContent = 'READY TO SIGN';
-            
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            isSigBlank = true;
-            
-            ctx.font = "24px 'Segoe UI'";
-            ctx.fillStyle = "#CCCCCC";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText("SIGN HERE", canvas.width / 2, canvas.height / 2);
-        };
-
-        window.clearSignatureCanvas = function() {
+        function setupSignature() {
             const canvas = document.getElementById('sig-canvas');
             const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            isSigBlank = true;
-            
-            ctx.font = "24px 'Segoe UI'";
-            ctx.fillStyle = "#CCCCCC";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText("SIGN HERE", canvas.width / 2, canvas.height / 2);
-        };
-
-        window.openStopModal = async function(companyName, customerData = {}) {
-            document.getElementById('stopModalTitle').textContent = `Delivery: ${companyName}`;
-            document.getElementById('stopModal').style.display = 'flex';
-            
-            document.getElementById('metaAddress').textContent = `${customerData.Address || '--'}, ${customerData.City || ''} ${customerData.PostalCode || ''}`;
-            document.getElementById('metaPhone').textContent = customerData.Phone || '--';
-            document.getElementById('metaEmail').textContent = customerData.Email || '--';
-            document.getElementById('metaSpecOrder').textContent = customerData['Special Order'] || '--';
-            document.getElementById('metaSpecInst').textContent = customerData['Special instructiosn'] || '--';
-
-            document.getElementById('editMetaDelivFee').value = customerData['Delivery charge'] || '$0';
-            document.getElementById('editMetaTravel').value = customerData.Travel || '$0';
-            document.getElementById('editMetaPO').value = customerData['Purchase order'] || '';
-            document.getElementById('editMetaNotes').value = customerData.Notes || '';
-
-            document.getElementById('receivedBy').value = '';
-            
-            deliveryCart = [];
-            renderDeliveryCart();
-
-            const sigBtn = document.getElementById('btnActivateSig');
-            sigBtn.style.background = '#007bff';
-            sigBtn.textContent = 'CLICK TO SIGN';
-            const canvas = document.getElementById('sig-canvas');
-            canvas.style.pointerEvents = 'none';
-            canvas.style.opacity = '0.6';
-            canvas.style.background = '#eee';
-
-            const waterDropdown = document.getElementById('stopProductDropdown');
-            waterDropdown.innerHTML = '<option value="">Loading...</option>';
-            const coffeeDropdown = document.getElementById('stopCoffeeDropdown');
-            coffeeDropdown.innerHTML = '<option value="">Loading...</option>';
-
-            async function populateProd(fileName, targetId) {
-                try {
-                    const resp = await fetch(`https://raw.githubusercontent.com/${repo}/main/Products/${fileName}?t=${Date.now()}`);
-                    const text = await resp.text();
-                    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-                    const target = document.getElementById(targetId);
-                    if (lines.length > 1) {
-                        const h = lines[0].split(',');
-                        const dIdx = h.findIndex(col => col.toLowerCase().includes('desc') || col.toLowerCase().includes('item'));
-                        target.innerHTML = `<option value="">Choose ${fileName.replace('.csv','')} product...</option>`;
-                        lines.slice(1).forEach(l => {
-                            const v = l.split(',');
-                            const o = document.createElement('option');
-                            o.value = v[dIdx] || v[0]; 
-                            o.textContent = v[dIdx] || v[0];
-                            target.appendChild(o);
-                        });
-                    }
-                } catch(e) { document.getElementById(targetId).innerHTML = '<option>Error</option>'; }
-            }
-
-            populateProd('Water.csv', 'stopProductDropdown');
-            populateProd('Coffee.csv', 'stopCoffeeDropdown');
-
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            isSigBlank = true; 
-            
             let drawing = false;
-
-            function clearWatermark() {
-                if (isSigBlank) {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    isSigBlank = false;
-                }
-            }
-
-            canvas.onmousedown = (e) => { 
-                clearWatermark();
-                drawing = true; ctx.beginPath(); 
-            };
-            canvas.onmouseup = () => { drawing = false; };
+            canvas.onmousedown = () => { drawing = true; ctx.beginPath(); };
+            canvas.onmouseup = () => drawing = false;
             canvas.onmousemove = (e) => {
-                if (!drawing) return;
+                if(!drawing) return;
                 const rect = canvas.getBoundingClientRect();
                 ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
                 ctx.stroke();
             };
-
-            canvas.addEventListener("touchstart", function (e) {
-                if (e.target == canvas) {
-                    e.preventDefault();
-                    clearWatermark();
-                    drawing = true; ctx.beginPath();
-                }
-            }, { passive: false });
-
-            canvas.addEventListener("touchend", function (e) {
-                if (e.target == canvas) {
-                    e.preventDefault();
-                    drawing = false;
-                }
-            }, { passive: false });
-
-            canvas.addEventListener("touchmove", function (e) {
-                if (e.target == canvas) {
-                    e.preventDefault();
-                    if (!drawing) return;
-                    const rect = canvas.getBoundingClientRect();
-                    const touch = e.touches[0];
-                    ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
-                    ctx.stroke();
-                }
-            }, { passive: false });
-        };
-
-        /* ADDITION: Enhanced Finish Stop to Sync Slip Number Cloud-Side */
-        window.validateAndFinishStop = async function() {
-            const name = document.getElementById('receivedBy').value.trim();
-            if (!name) {
-                alert("Please enter the name of the person receiving the delivery.");
-                return;
-            }
-            if (isSigBlank) {
-                alert("A signature is required to complete the delivery.");
-                return;
-            }
-            
-            // Generate PDF using current number
-            generateDeliveryPDF();
-            
-            // Increment and Sync to GitHub
-            currentSlipVal++;
-            await saveSlipNumberToGitHub(currentSlipVal);
-            
-            alert("Stop finished successfully! PDF generated and slip counter updated.");
-            document.getElementById('stopModal').style.display='none';
-        };
-
-        window.addProductToCart = function(dropdownId, qtyId, unitId) {
-            const dropdown = document.getElementById(dropdownId);
-            const qtyInput = document.getElementById(qtyId);
-            const unitInput = document.getElementById(unitId);
-            const itemName = dropdown.value;
-            const qty = parseInt(qtyInput.value);
-            const units = unitInput.value || '';
-
-            if (!itemName) return;
-
-            const existing = deliveryCart.find(i => i.name === itemName && i.units === units);
-            if (existing) {
-                existing.qty += qty;
-            } else {
-                deliveryCart.push({ name: itemName, qty: qty, units: units });
-            }
-
-            qtyInput.value = 1;
-            unitInput.value = '';
-            dropdown.selectedIndex = 0;
-            renderDeliveryCart();
-        };
-
-        window.removeFromCart = function(index) {
-            deliveryCart.splice(index, 1);
-            renderDeliveryCart();
-        };
-
-        function renderDeliveryCart() {
-            const body = document.getElementById('cartItemsBody');
-            if (deliveryCart.length === 0) {
-                body.innerHTML = '<tr><td colspan="4" style="color:#999; text-align:center;">No items added.</td></tr>';
-                return;
-            }
-            body.innerHTML = deliveryCart.map((item, idx) => `
-                <tr>
-                    <td>${item.name}</td>
-                    <td>${item.qty}</td>
-                    <td>${item.units}</td>
-                    <td><button onclick="removeFromCart(${idx})" style="background:none; border:none; color:red; cursor:pointer;"><i class="fas fa-trash"></i></button></td>
-                </tr>
-            `).join('');
         }
 
-        async function init() {
-            const map = L.map('map').setView([55.17, -118.79], 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-            document.getElementById('btnManager').onclick = () => {
-                document.getElementById('mgrModal').style.display = 'flex';
-                loadAllCustomers();
-                syncSlipNumber(); // Sync counter whenever manager menu opens
-            };
-
-            document.getElementById('btnShowCust').onclick = () => {
-                document.getElementById('custView').style.display = 'block';
-                document.getElementById('prodView').style.display = 'none';
-                document.getElementById('btnShowCust').classList.add('active');
-                document.getElementById('btnShowProd').classList.remove('active');
-            };
-
-            document.getElementById('btnShowProd').onclick = () => {
-                document.getElementById('custView').style.display = 'none';
-                document.getElementById('prodView').style.display = 'block';
-                document.getElementById('btnShowProd').classList.add('active');
-                document.getElementById('btnShowCust').classList.remove('active');
-                loadProductFile('Coffee.csv');
-            };
-
-            document.getElementById('btnForceRefresh').onclick = loadAllCustomers;
-            
-            loadGitHubRoutes();
-            loadAllCustomers(); 
-            syncSlipNumber(); // Initial cloud sync
-        }
-
-        async function loadGitHubRoutes() {
-            const files = await ghGet('routes');
-            const dropdown = document.getElementById('routeDropdown');
-            dropdown.innerHTML = '<option value="">Select Route...</option>';
-            
-            files.forEach(f => {
-                if(f.name.endsWith('.csv')) {
-                    const opt = document.createElement('option');
-                    opt.value = f.name;
-                    opt.textContent = f.name.replace('.csv', '');
-                    dropdown.appendChild(opt);
-                }
-            });
-        }
-
-        function populateRouteDropdown() {
-            const dropdown = document.getElementById('routeDropdown');
-            const currentVal = dropdown.value;
-            dropdown.innerHTML = '<option value="">Select Route...</option>';
-            
-            Object.keys(routeDataMap).forEach(fileName => {
-                const opt = document.createElement('option');
-                opt.value = fileName;
-                opt.textContent = fileName.replace('.csv', '');
-                if(fileName === currentVal) opt.selected = true;
-                dropdown.appendChild(opt);
-            });
-        }
-
-        document.getElementById('routeDropdown').onchange = async function() {
-            const fileName = this.value;
-            const stopList = document.getElementById('stopList');
-            if(!fileName) {
-                stopList.innerHTML = 'Select a route to begin.';
-                return;
-            }
-
-            stopList.innerHTML = 'Loading stops...';
-            
-            let text = "";
-            if(routeDataMap[fileName]) {
-                text = routeDataMap[fileName].text;
-            } else {
-                const files = await ghGet('routes');
-                const file = files.find(f => f.name === fileName);
-                const resp = await fetch(file.download_url + "?t=" + Date.now());
-                text = await resp.text();
-            }
-
-            const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-            if(lines.length < 2) {
-                stopList.innerHTML = 'No data in route file.';
-                return;
-            }
-
-            const headers = lines[0].split(',').map(h => h.trim());
-            const compIdx = headers.findIndex(h => h.toLowerCase() === "company");
-            const nameIdx = headers.findIndex(h => ["name", "customer"].some(w => h.toLowerCase().includes(w)));
-            const addrIdx = headers.findIndex(h => h.toLowerCase().includes("address"));
-
-            stopList.innerHTML = '';
-            lines.slice(1).forEach((line, i) => {
-                const vals = line.split(',');
-                const displayName = (vals[compIdx] || vals[nameIdx] || 'Unknown').trim();
-                const addr = vals[addrIdx] || 'No Address';
-                
-                const rowData = {};
-                headers.forEach((h, idx) => rowData[h] = (vals[idx] || '').trim());
-
-                const div = document.createElement('div');
-                div.style = "padding:10px; border-bottom:1px solid #eee; cursor:pointer; text-align:left;";
-                div.innerHTML = `<strong>${i+1}. ${displayName}</strong><br><small>${addr}</small>`;
-                
-                div.onclick = () => {
-                    document.getElementById('currentAddress').textContent = addr;
-                    document.getElementById('currentPhone').textContent = rowData.Phone || '--';
-                    window.openStopModal(displayName, rowData);
-                };
-                stopList.appendChild(div);
-            });
+        window.clearSig = () => {
+            const c = document.getElementById('sig-canvas');
+            c.getContext('2d').clearRect(0,0,c.width,c.height);
         };
 
-        /* ADDITION: jsPDF Generation Logic referencing IMG_0600.jpeg layout */
-        window.generateDeliveryPDF = function() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            const dateStr = new Date().toLocaleDateString();
-            const customerName = document.getElementById('stopModalTitle').innerText.replace('Delivery: ', '');
-            
-            // --- HEADER (Matches Logo/Address Layout in IMG_0600.jpeg) ---
-            doc.setFontSize(22);
-            doc.setTextColor(0, 123, 255);
-            doc.text("Culligan", 10, 20);
-            doc.setFontSize(10);
-            doc.setTextColor(0, 0, 0);
-            doc.text("BOTTLED WATER", 10, 26);
-            
-            doc.setFontSize(9);
-            doc.text("CULLIGAN BOTTLED WATER", 140, 15);
-            doc.text("12001-99 AVENUE", 140, 20);
-            doc.text("GRANDE PRAIRIE AB T8W 0J7", 140, 25);
-            doc.text("PHONE: (780) 532-8584", 140, 30);
-
-            // --- SLIP IDENTIFIER ---
-            doc.setTextColor(220, 53, 69);
-            doc.setFontSize(14);
-            doc.text("DELIVERY SLIP", 140, 45);
-            doc.text(currentSlipVal.toString(), 140, 52);
-            doc.setTextColor(0, 0, 0);
-            doc.setFontSize(10);
-            doc.text("THIS IS NOT YOUR INVOICE", 140, 58);
-
-            // --- DATE & CUSTOMER DATA ---
-            doc.setDrawColor(200, 200, 200);
-            doc.rect(10, 40, 120, 30);
-            doc.text("DATE: " + dateStr, 15, 47);
-            doc.text("SOLD TO:", 15, 55);
-            doc.setFont(undefined, 'bold');
-            doc.text(customerName, 15, 62);
-            doc.setFont(undefined, 'normal');
-            doc.text(document.getElementById('metaAddress').innerText, 15, 67);
-
-            // --- TABLE HEADER ---
-            doc.setFillColor(240, 240, 240);
-            doc.rect(10, 75, 190, 8, 'F');
-            doc.text("QTY", 15, 81);
-            doc.text("DESCRIPTION", 40, 81);
-            doc.text("UNIT", 130, 81);
-            doc.text("TOTAL", 170, 81);
-
-            // --- ITEMS LOOP ---
-            let y = 90;
-            deliveryCart.forEach(item => {
-                doc.text(item.qty.toString(), 15, y);
-                doc.text(item.name, 40, y);
-                doc.text(item.units, 130, y);
-                y += 8;
-            });
-
-            // --- FOOTER (SIGNATURE & NOTES) ---
-            y = Math.max(y + 20, 160);
-            doc.text("NOTES / SPECIAL INSTRUCTIONS:", 10, y);
-            doc.setFontSize(8);
-            doc.text(document.getElementById('editMetaNotes').value || "None", 10, y + 5, { maxWidth: 100 });
-            
-            doc.setFontSize(10);
-            doc.text("RECEIVED BY: " + document.getElementById('receivedBy').value, 120, y + 15);
-            doc.text("CUSTOMER SIGNATURE:", 120, y + 25);
-            
-            // Capture Signature from Canvas
-            const canvas = document.getElementById('sig-canvas');
-            const imgData = canvas.toDataURL('image/png');
-            doc.addImage(imgData, 'PNG', 120, y + 28, 60, 20);
-
-            doc.save(`Delivery_Slip_${currentSlipVal}.pdf`);
-        };
+        document.getElementById('btnManager').onclick = () => document.getElementById('mgrModal').style.display = 'flex';
 
         init();
     })();
