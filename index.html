@@ -1,7 +1,7 @@
 <!-- 
   PROJECT: LogiFlow Delivery System
-  VERSION: Unified Cloud Operations & PDF Archiving
-  FEATURES: GitHub Persistence, Route Optimization, Tech Dispatch
+  VERSION: Unified Cloud Operations & PDF Archiving + Preview Approval
+  FEATURES: GitHub Persistence, Route Optimization, Tech Dispatch, Document Verification
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -44,6 +44,11 @@
         .mgmt-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         .mgmt-table th { background: #007bff; color: white; text-align: left; padding: 10px; }
         .mgmt-table td { padding: 8px; border-bottom: 1px solid #ddd; }
+
+        /* --- ADDITION: PREVIEW UI --- */
+        #pdfPreviewOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; flex-direction: column; align-items: center; justify-content: center; }
+        #pdfPreviewFrame { width: 80%; height: 80%; border: none; background: white; border-radius: 8px; }
+        .preview-controls { margin-top: 15px; display: flex; gap: 20px; }
     </style>
 </head>
 <body>
@@ -122,7 +127,7 @@
             </table>
 
             <div style="margin-top:20px; display:flex; justify-content:flex-end;">
-                <button class="btn-top" id="btnFinish" onclick="processFinalDelivery()" style="background:#28a745; padding: 15px 30px;">FINISH STOP & ARCHIVE</button>
+                <button class="btn-top" id="btnFinish" onclick="processFinalDelivery()" style="background:#28a745; padding: 15px 30px;">GENERATE PREVIEW</button>
             </div>
         </div>
     </div>
@@ -150,6 +155,15 @@
         </div>
     </div>
 
+    <!-- --- ADDITION: PREVIEW OVERLAY HTML --- -->
+    <div id="pdfPreviewOverlay">
+        <iframe id="pdfPreviewFrame"></iframe>
+        <div class="preview-controls">
+            <button class="btn-top" id="btnCancelPreview" style="background:#6c757d; padding: 12px 24px;">Return to Edit</button>
+            <button class="btn-top" id="btnConfirmArchive" style="background:#28a745; padding: 12px 24px;">Confirm & Archive to GitHub</button>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
     (function() {
@@ -161,6 +175,10 @@
         let currentSlipSHA = '';
         let deliveryCart = [];
         const techs = ["Dave", "Steven", "Rig", "Robin", "Daniel", "Ezra", "Jim", "Al Perry"];
+
+        // --- ADDITION: PERSISTENCE FOR PREVIEW ---
+        let pendingPdfData = null;
+        let pendingFileName = "";
 
         // Cloud Sequence Sync
         async function syncSlipNumber() {
@@ -193,14 +211,10 @@
             }
         };
 
-        // Archive Signed Delivery PDF
+        // --- ADDITION: SEPARATED PREVIEW FROM ARCHIVE ---
         async function processFinalDelivery() {
-            const btn = document.getElementById('btnFinish');
             const receiver = document.getElementById('receivedBy').value;
             if(!receiver) return alert("Please print recipient name.");
-
-            btn.disabled = true;
-            btn.textContent = "UPLOADING TO CLOUD...";
 
             try {
                 const { jsPDF } = window.jspdf;
@@ -224,26 +238,47 @@
                 const sigData = document.getElementById('sig-canvas').toDataURL('image/png');
                 doc.addImage(sigData, 'PNG', 10, y + 25, 50, 20);
 
-                const pdfBase64 = doc.output('datauristring').split(',')[1];
-                const fileName = `${company.replace(/\s+/g, '_')}-Del_slip_number(${currentSlipVal})-${dateLong.replace(/\s+/g, '_')}.pdf`;
+                // Store for later upload
+                pendingPdfData = doc.output('datauristring').split(',')[1];
+                pendingFileName = `${company.replace(/\s+/g, '_')}-Del_slip_number(${currentSlipVal})-${dateLong.replace(/\s+/g, '_')}.pdf`;
 
-                const uploadRes = await fetch(`https://api.github.com/repos/${repo}/contents/Pdf/${fileName}`, {
+                // Show Preview Overlay
+                document.getElementById('pdfPreviewFrame').src = doc.output('datauristring');
+                document.getElementById('pdfPreviewOverlay').style.display = 'flex';
+
+            } catch (e) {
+                console.error(e);
+                alert("Preview Generation Error.");
+            }
+        }
+
+        // --- ADDITION: ARCHIVE EXECUTION ---
+        window.executeCloudArchive = async function() {
+            const btn = document.getElementById('btnConfirmArchive');
+            btn.disabled = true;
+            btn.textContent = "UPLOADING...";
+
+            try {
+                const uploadRes = await fetch(`https://api.github.com/repos/${repo}/contents/Pdf/${pendingFileName}`, {
                     method: 'PUT',
                     headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: `Archive: ${fileName}`, content: pdfBase64 })
+                    body: JSON.stringify({ message: `Archive: ${pendingFileName}`, content: pendingPdfData })
                 });
 
                 if(uploadRes.ok) {
                     currentSlipVal++;
                     await saveSlipNumberToGitHub(currentSlipVal);
                     alert("Archived in GitHub Pdf folder.");
+                    document.getElementById('pdfPreviewOverlay').style.display = 'none';
                     document.getElementById('stopModal').style.display = 'none';
+                } else {
+                    alert("Upload Failed. Check GitHub connection.");
                 }
             } finally {
                 btn.disabled = false;
-                btn.textContent = "FINISH STOP & ARCHIVE";
+                btn.textContent = "Confirm & Archive to GitHub";
             }
-        }
+        };
 
         function init() {
             const map = L.map('map').setView([55.17, -118.79], 12);
@@ -251,6 +286,14 @@
             syncSlipNumber();
             setupSignature();
             renderTechs();
+
+            // --- ADDITION: BUTTON BINDINGS ---
+            document.getElementById('btnCancelPreview').onclick = () => {
+                document.getElementById('pdfPreviewOverlay').style.display = 'none';
+            };
+            document.getElementById('btnConfirmArchive').onclick = () => {
+                executeCloudArchive();
+            };
         }
 
         function renderTechs() {
