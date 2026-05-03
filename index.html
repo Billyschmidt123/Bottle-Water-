@@ -1,6 +1,6 @@
 <!-- 
   PROJECT: LogiFlow Delivery System
-  VERSION: Stop Detail Modal - Editable Metadata + Product Selection Cart
+  VERSION: Stop Detail Modal - Editable Metadata + Advanced Product Cart (Qty/Units)
   STATUS: Stable - Non-Destructive Addition
 -->
 <!DOCTYPE html>
@@ -47,9 +47,10 @@
         .meta-edit-input { border: 1px solid #ccc; padding: 4px; border-radius: 3px; font-size: 0.8rem; width: 80%; }
         .meta-edit-textarea { border: 1px solid #ccc; padding: 4px; border-radius: 3px; font-size: 0.8rem; width: 95%; height: 40px; font-family: inherit; }
 
-        /* ADDITION: Add-to-Cart Controls Styling */
+        /* ADDITION: Enhanced Cart Add Controls */
         .cart-add-row { display: flex; gap: 5px; align-items: center; margin-top: 5px; }
         .qty-input { width: 50px; padding: 7px; border: 1px solid #ddd; border-radius: 4px; text-align: center; }
+        .unit-input { width: 80px; padding: 7px; border: 1px solid #ddd; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -110,22 +111,26 @@
             <div class="form-grid">
                 <div class="form-group">
                     <label>Water Product</label>
+                    <!-- ADDITION: Water controls with Qty and Units -->
                     <div class="cart-add-row">
                         <select id="stopProductDropdown" style="flex-grow:1;">
                             <option value="">Choose water product...</option>
                         </select>
                         <input type="number" id="qtyWater" class="qty-input" value="1" min="1">
-                        <button class="btn-top" onclick="addProductToCart('stopProductDropdown', 'qtyWater')" style="background:#28a745;">ADD</button>
+                        <input type="text" id="unitWater" class="unit-input" placeholder="Units">
+                        <button class="btn-top" onclick="addProductToCart('stopProductDropdown', 'qtyWater', 'unitWater')" style="background:#28a745;">ADD</button>
                     </div>
                 </div>
                 <div class="form-group">
                     <label>Coffee Product</label>
+                    <!-- ADDITION: Coffee controls with Qty and Units -->
                     <div class="cart-add-row">
                         <select id="stopCoffeeDropdown" style="flex-grow:1;">
                             <option value="">Choose coffee product...</option>
                         </select>
                         <input type="number" id="qtyCoffee" class="qty-input" value="1" min="1">
-                        <button class="btn-top" onclick="addProductToCart('stopCoffeeDropdown', 'qtyCoffee')" style="background:#6f4e37;">ADD</button>
+                        <input type="text" id="unitCoffee" class="unit-input" placeholder="Units">
+                        <button class="btn-top" onclick="addProductToCart('stopCoffeeDropdown', 'qtyCoffee', 'unitCoffee')" style="background:#6f4e37;">ADD</button>
                     </div>
                 </div>
                 <div class="form-group">
@@ -142,10 +147,10 @@
                 <h4 style="margin: 0;"><i class="fas fa-shopping-cart"></i> Delivery Items</h4>
                 <table class="cart-table">
                     <thead>
-                        <tr><th>Item</th><th>Qty</th><th style="width:50px;">Action</th></tr>
+                        <tr><th>Item</th><th>Qty</th><th>Units</th><th style="width:50px;">Action</th></tr>
                     </thead>
                     <tbody id="cartItemsBody">
-                        <tr><td colspan="3" style="color:#999; text-align:center;">No items added.</td></tr>
+                        <tr><td colspan="4" style="color:#999; text-align:center;">No items added.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -495,23 +500,28 @@
             };
         };
 
-        /* ADDITION: Helper functions for the Delivery Cart */
-        window.addProductToCart = function(dropdownId, qtyId) {
+        /* ADDITION: Helper functions for the Delivery Cart with Units */
+        window.addProductToCart = function(dropdownId, qtyId, unitId) {
             const dropdown = document.getElementById(dropdownId);
             const qtyInput = document.getElementById(qtyId);
+            const unitInput = document.getElementById(unitId);
             const itemName = dropdown.value;
             const qty = parseInt(qtyInput.value);
+            const units = unitInput.value || '';
 
             if (!itemName) return;
 
-            const existing = deliveryCart.find(i => i.name === itemName);
+            // Group by item name AND unit type
+            const existing = deliveryCart.find(i => i.name === itemName && i.units === units);
             if (existing) {
                 existing.qty += qty;
             } else {
-                deliveryCart.push({ name: itemName, qty: qty });
+                deliveryCart.push({ name: itemName, qty: qty, units: units });
             }
 
+            // Reset inputs
             qtyInput.value = 1;
+            unitInput.value = '';
             dropdown.selectedIndex = 0;
             renderDeliveryCart();
         };
@@ -524,13 +534,14 @@
         function renderDeliveryCart() {
             const body = document.getElementById('cartItemsBody');
             if (deliveryCart.length === 0) {
-                body.innerHTML = '<tr><td colspan="3" style="color:#999; text-align:center;">No items added.</td></tr>';
+                body.innerHTML = '<tr><td colspan="4" style="color:#999; text-align:center;">No items added.</td></tr>';
                 return;
             }
             body.innerHTML = deliveryCart.map((item, idx) => `
                 <tr>
                     <td>${item.name}</td>
                     <td>${item.qty}</td>
+                    <td>${item.units}</td>
                     <td><button onclick="removeFromCart(${idx})" style="background:none; border:none; color:red; cursor:pointer;"><i class="fas fa-trash"></i></button></td>
                 </tr>
             `).join('');
