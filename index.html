@@ -1,6 +1,6 @@
 <!-- 
   PROJECT: LogiFlow Delivery System
-  VERSION: Merged Orig 1 + Rev 2
+  VERSION: Restored Route/Customer Logic + Rev 2 Product Maintenance
   STATUS: Stable - Non-Destructive Addition
 -->
 <!DOCTYPE html>
@@ -35,7 +35,6 @@
         .form-group label { font-size: 0.75rem; font-weight: bold; margin-bottom: 3px; color: #666; }
         .form-group input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
 
-        /* ADDITIONS FROM REV 2 */
         .edit-input { width: 95%; padding: 6px; border: 2px solid #007bff; border-radius: 3px; font-size: 0.85rem; background: #ffffff; color: #000000; display: block; }
         .deactivated-row { background-color: #fceaea; color: #a94442; }
     </style>
@@ -82,7 +81,6 @@
                 <button id="btnShowProd" class="mgmt-nav-btn">Product Maintenance</button>
             </div>
 
-            <!-- Customer View (Original logic) -->
             <div id="custView" style="display: block;">
                 <table class="mgmt-table">
                     <thead id="custTableHead"></thead>
@@ -90,7 +88,6 @@
                 </table>
             </div>
 
-            <!-- Product View (Rev 2 Inline Logic Merged) -->
             <div id="prodView" style="display: none;">
                 <div style="margin-bottom:15px;">
                     <button class="btn-top" onclick="loadProductFile('Coffee.csv')" style="background:#6f4e37;">Coffee Products</button>
@@ -106,7 +103,6 @@
         </div>
     </div>
 
-    <!-- Edit Modal (Original preserved for Customers) -->
     <div id="editModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 800px;">
             <h2 id="editModalTitle">Edit Record</h2>
@@ -130,7 +126,6 @@
         let csvHeaders = [];
         let routeDataMap = {}; 
 
-        /* ADDED FROM REV 2 VARIABLES */
         let currentProdList = [];
         let currentProdHeaders = [];
         let editingIndex = -1;
@@ -191,6 +186,8 @@
                 });
             }
             renderCustTable();
+            /* RESTORATION ADDITION: Re-trigger the dropdown update when manager loads */
+            populateRouteDropdown();
         }
 
         function renderCustTable() {
@@ -203,7 +200,6 @@
             });
         }
 
-        /* MERGED PRODUCT MAINTENANCE LOGIC FROM REV 2 */
         window.loadProductFile = async function(fileName) {
             currentProductFile = fileName;
             const tbody = document.getElementById('prodTableBody');
@@ -211,7 +207,6 @@
             tbody.innerHTML = '<tr><td colspan="10">Gathering items...</td></tr>';
             
             try {
-                // Fetch SHA first for later updates
                 const fileInfo = await ghGet(`Products/${fileName}`);
                 currentProductSHA = fileInfo.sha;
 
@@ -262,7 +257,6 @@
                 }
             });
 
-            // Rebuild CSV content for saving
             let csvContent = currentProdHeaders.join(',') + '\n';
             csvContent += currentProdList.map(p => currentProdHeaders.map(h => p[h]).join(',')).join('\n');
 
@@ -334,7 +328,6 @@
             });
         }
 
-        /* ORIGINAL MODAL FUNCTION (PRESERVED) */
         window.openEdit = function(idx, type) {
             const data = type === 'cust' ? globalCustomers[idx] : null;
             const fields = type === 'cust' ? csvHeaders : [];
@@ -371,7 +364,91 @@
             };
 
             document.getElementById('btnForceRefresh').onclick = loadAllCustomers;
+            
+            /* RESTORATION ADDITION: Initialize the routes from GitHub on startup */
+            loadGitHubRoutes();
         }
+
+        /* ---------------------------------------------------------
+           RESTORATION BLOCKS (RESTORING ORIGINAL GITHUB LOGIC)
+           --------------------------------------------------------- */
+        
+        async function loadGitHubRoutes() {
+            const files = await ghGet('routes');
+            const dropdown = document.getElementById('routeDropdown');
+            dropdown.innerHTML = '<option value="">Select Route...</option>';
+            
+            files.forEach(f => {
+                if(f.name.endsWith('.csv')) {
+                    const opt = document.createElement('option');
+                    opt.value = f.name;
+                    opt.textContent = f.name.replace('.csv', '');
+                    dropdown.appendChild(opt);
+                }
+            });
+        }
+
+        function populateRouteDropdown() {
+            const dropdown = document.getElementById('routeDropdown');
+            const currentVal = dropdown.value;
+            dropdown.innerHTML = '<option value="">Select Route...</option>';
+            
+            Object.keys(routeDataMap).forEach(fileName => {
+                const opt = document.createElement('option');
+                opt.value = fileName;
+                opt.textContent = fileName.replace('.csv', '');
+                if(fileName === currentVal) opt.selected = true;
+                dropdown.appendChild(opt);
+            });
+        }
+
+        document.getElementById('routeDropdown').onchange = async function() {
+            const fileName = this.value;
+            const stopList = document.getElementById('stopList');
+            if(!fileName) {
+                stopList.innerHTML = 'Select a route to begin.';
+                return;
+            }
+
+            stopList.innerHTML = 'Loading stops...';
+            
+            let text = "";
+            if(routeDataMap[fileName]) {
+                text = routeDataMap[fileName].text;
+            } else {
+                const files = await ghGet('routes');
+                const file = files.find(f => f.name === fileName);
+                const resp = await fetch(file.download_url + "?t=" + Date.now());
+                text = await resp.text();
+            }
+
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+            if(lines.length < 2) {
+                stopList.innerHTML = 'No data in route file.';
+                return;
+            }
+
+            const headers = lines[0].split(',').map(h => h.trim());
+            const nameIdx = headers.findIndex(h => ["company", "name", "customer"].some(w => h.toLowerCase().includes(w)));
+            const addrIdx = headers.findIndex(h => h.toLowerCase().includes("address"));
+
+            stopList.innerHTML = '';
+            lines.slice(1).forEach((line, i) => {
+                const vals = line.split(',');
+                const name = vals[nameIdx] || 'Unknown';
+                const addr = vals[addrIdx] || 'No Address';
+                
+                const div = document.createElement('div');
+                div.style = "padding:10px; border-bottom:1px solid #eee; cursor:pointer; text-align:left;";
+                div.innerHTML = `<strong>${i+1}. ${name}</strong><br><small>${addr}</small>`;
+                div.onclick = () => {
+                    document.getElementById('currentAddress').textContent = addr;
+                    document.getElementById('currentPhone').textContent = vals[headers.findIndex(h => h.toLowerCase().includes("phone"))] || '--';
+                };
+                stopList.appendChild(div);
+            });
+        };
+
         init();
     })();
     </script>
