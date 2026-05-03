@@ -29,6 +29,8 @@
         .form-group { display: flex; flex-direction: column; }
         .form-group label { font-size: 0.75rem; font-weight: bold; margin-bottom: 3px; color: #666; }
         .form-group input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        /* ADDED: Deactivated row styling */
+        .deactivated-row { background-color: #fceaea; color: #a94442; }
     </style>
 </head>
 <body>
@@ -68,13 +70,12 @@
                 <button onclick="document.getElementById('mgrModal').style.display='none'" class="btn-top" style="background:#dc3545;">Exit</button>
             </div>
             <hr>
-            <!-- Navigation for Sub-Menus -->
             <div style="margin-bottom: 20px;">
                 <button id="btnShowCust" class="mgmt-nav-btn active">Customer Maintenance</button>
                 <button id="btnShowProd" class="mgmt-nav-btn">Product Maintenance</button>
             </div>
 
-            <!-- Customer View (Original logic) -->
+            <!-- Customer View -->
             <div id="custView" style="display: block;">
                 <table class="mgmt-table">
                     <thead id="custTableHead"></thead>
@@ -82,7 +83,7 @@
                 </table>
             </div>
 
-            <!-- FIX ADDED: Product View (Requested Enhancement) -->
+            <!-- Product View -->
             <div id="prodView" style="display: none;">
                 <div style="margin-bottom:15px;">
                     <button class="btn-top" onclick="loadProductFile('Coffee.csv')" style="background:#6f4e37;">Coffee Products</button>
@@ -96,7 +97,7 @@
         </div>
     </div>
 
-    <!-- Edit Modal -->
+    <!-- Customer Edit Modal -->
     <div id="editModal" class="modal-overlay">
         <div class="modal-content" style="max-width: 800px;">
             <h2 id="editModalTitle">Edit Record</h2>
@@ -105,6 +106,22 @@
             <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
                 <button onclick="document.getElementById('editModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
                 <button id="btnSaveRecord" class="btn-top" style="background:#28a745;">SAVE CHANGES</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADDED: Product Edit Modal (CRUD Features) -->
+    <div id="prodEditModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px;">
+            <h2 id="prodEditTitle">Manage Product</h2>
+            <hr>
+            <div id="prodFormFields" class="form-grid" style="grid-template-columns: 1fr;"></div>
+            <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
+                <button id="btnDeactivateProd" class="btn-top" style="background:#dc3545;">DEACTIVATE</button>
+                <div style="display:flex; gap:10px;">
+                    <button onclick="document.getElementById('prodEditModal').style.display='none'" class="btn-top" style="background:#6c757d;">Cancel</button>
+                    <button id="btnSaveProdRecord" class="btn-top" style="background:#28a745;">SAVE PRODUCT</button>
+                </div>
             </div>
         </div>
     </div>
@@ -119,6 +136,10 @@
         let globalCustomers = [];
         let csvHeaders = [];
         let routeDataMap = {}; 
+        
+        // ADDED: Product State Tracking
+        let currentProdList = [];
+        let currentProdHeaders = [];
 
         async function ghGet(path) {
             const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
@@ -127,7 +148,6 @@
             return r.ok ? await r.json() : [];
         }
 
-        // ORIGINAL FUNCTION PRESERVED
         async function loadAllCustomers() {
             const files = await ghGet('routes');
             const tbody = document.getElementById('custTableBody');
@@ -177,7 +197,6 @@
             renderCustTable();
         }
 
-        // ORIGINAL FUNCTION PRESERVED
         function renderCustTable() {
             const tbody = document.getElementById('custTableBody');
             tbody.innerHTML = '';
@@ -188,7 +207,6 @@
             });
         }
 
-        // FIX ADDED: Product Loading Functionality
         window.loadProductFile = async function(fileName) {
             const tbody = document.getElementById('prodTableBody');
             const thead = document.getElementById('prodTableHead');
@@ -199,20 +217,70 @@
             const lines = text.split('\n').map(l => l.trim()).filter(l => l);
             
             if(lines.length > 0) {
-                const pHeaders = lines[0].split(',').map(h => h.trim());
-                thead.innerHTML = `<tr><th>Action</th>${pHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
-                tbody.innerHTML = '';
+                currentProdHeaders = lines[0].split(',').map(h => h.trim());
+                if (!currentProdHeaders.includes('Status')) currentProdHeaders.push('Status');
                 
-                lines.slice(1).forEach((line) => {
+                thead.innerHTML = `<tr><th>Action</th>${currentProdHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+                tbody.innerHTML = '';
+                currentProdList = [];
+                
+                lines.slice(1).forEach((line, idx) => {
                     const vals = line.split(',');
-                    let row = `<tr><td><button class="btn-top" style="padding:4px;">Edit</button></td>`;
-                    vals.forEach(v => row += `<td>${v}</td>`);
+                    let pObj = {};
+                    currentProdHeaders.forEach((h, i) => pObj[h] = (vals[i] || "").trim());
+                    if (!pObj.Status) pObj.Status = "Active";
+                    
+                    currentProdList.push(pObj);
+                    
+                    const isDeactivated = pObj.Status === "Deactivated";
+                    let row = `<tr class="${isDeactivated ? 'deactivated-row' : ''}">
+                        <td><button class="btn-top" style="padding:4px;" onclick="openProdEdit(${idx})">Manage</button></td>`;
+                    currentProdHeaders.forEach(h => row += `<td>${pObj[h] || ''}</td>`);
                     tbody.innerHTML += row + '</tr>';
                 });
             }
         };
 
-        // ORIGINAL FUNCTION PRESERVED
+        // ADDED: Product CRUD Modal Logic
+        window.openProdEdit = function(idx) {
+            const data = currentProdList[idx];
+            const container = document.getElementById('prodFormFields');
+            const deactivateBtn = document.getElementById('btnDeactivateProd');
+            container.innerHTML = '';
+            
+            currentProdHeaders.forEach(h => {
+                if (h === 'Status') {
+                    container.innerHTML += `<div class="form-group"><label>${h}</label><input type="text" value="${data[h]}" id="pf_${h}" readonly style="background:#eee;"></div>`;
+                } else {
+                    container.innerHTML += `<div class="form-group"><label>${h}</label><input type="text" value="${data[h] || ''}" id="pf_${h}"></div>`;
+                }
+            });
+
+            deactivateBtn.innerText = data.Status === "Active" ? "DEACTIVATE" : "RE-ACTIVATE";
+            deactivateBtn.style.background = data.Status === "Active" ? "#dc3545" : "#28a745";
+            
+            deactivateBtn.onclick = () => {
+                data.Status = data.Status === "Active" ? "Deactivated" : "Active";
+                document.getElementById('prodEditModal').style.display = 'none';
+                renderProdTable();
+            };
+
+            document.getElementById('prodEditModal').style.display = 'flex';
+        };
+
+        // ADDED: Re-render product table after state change
+        function renderProdTable() {
+            const tbody = document.getElementById('prodTableBody');
+            tbody.innerHTML = '';
+            currentProdList.forEach((pObj, idx) => {
+                const isDeactivated = pObj.Status === "Deactivated";
+                let row = `<tr class="${isDeactivated ? 'deactivated-row' : ''}">
+                    <td><button class="btn-top" style="padding:4px;" onclick="openProdEdit(${idx})">Manage</button></td>`;
+                currentProdHeaders.forEach(h => row += `<td>${pObj[h] || ''}</td>`);
+                tbody.innerHTML += row + '</tr>';
+            });
+        }
+
         window.openEdit = function(idx, type) {
             const data = type === 'cust' ? globalCustomers[idx] : null;
             const fields = type === 'cust' ? csvHeaders : [];
@@ -224,7 +292,6 @@
             document.getElementById('editModal').style.display = 'flex';
         };
 
-        // ORIGINAL INIT LOGIC PRESERVED WITH ADDED BUTTON LISTENERS
         async function init() {
             const map = L.map('map').setView([55.17, -118.79], 12);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
