@@ -18,18 +18,19 @@
         #map { width: 100%; height: 100%; }
         #sidebar { flex: 0 0 30%; height: 100%; border-left: 2px solid #ccc; overflow-y: auto; background: #ffffff; }
         .btn-top { padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
-        .mgmt-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        /* FIX: Increased table width for better single-screen visibility */
+        .mgmt-table { width: 100%; min-width: 1000px; border-collapse: collapse; font-size: 0.85rem; }
         .mgmt-table th { background: #007bff; color: white; text-align: left; padding: 10px; position: sticky; top: 0; }
         .mgmt-table td { padding: 8px; border-bottom: 1px solid #ddd; }
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 95%; max-width: 1200px; max-height: 90vh; overflow-y: auto; }
+        /* FIX: Wider modal content */
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 98%; max-width: 1600px; max-height: 90vh; overflow-y: auto; overflow-x: auto; }
         .mgmt-nav-btn { padding: 10px 20px; margin-right: 10px; border: 1px solid #007bff; background: #f8f9fa; color: #007bff; cursor: pointer; font-weight: bold; border-radius: 4px; }
         .mgmt-nav-btn.active { background: #007bff; color: white; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
         .form-group { display: flex; flex-direction: column; }
         .form-group label { font-size: 0.75rem; font-weight: bold; margin-bottom: 3px; color: #666; }
         .form-group input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-        /* ADDED: Deactivated row styling */
         .deactivated-row { background-color: #fceaea; color: #a94442; }
     </style>
 </head>
@@ -89,10 +90,12 @@
                     <button class="btn-top" onclick="loadProductFile('Coffee.csv')" style="background:#6f4e37;">Coffee Products</button>
                     <button class="btn-top" onclick="loadProductFile('Water.csv')" style="background:#00a8e8;">Water Products</button>
                 </div>
-                <table class="mgmt-table">
-                    <thead id="prodTableHead"></thead>
-                    <tbody id="prodTableBody"></tbody>
-                </table>
+                <div style="overflow-x: auto;">
+                    <table class="mgmt-table">
+                        <thead id="prodTableHead"></thead>
+                        <tbody id="prodTableBody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -110,12 +113,12 @@
         </div>
     </div>
 
-    <!-- ADDED: Product Edit Modal (CRUD Features) -->
+    <!-- Product Edit Modal -->
     <div id="prodEditModal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content" style="max-width: 800px;">
             <h2 id="prodEditTitle">Manage Product</h2>
             <hr>
-            <div id="prodFormFields" class="form-grid" style="grid-template-columns: 1fr;"></div>
+            <div id="prodFormFields" class="form-grid"></div>
             <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
                 <button id="btnDeactivateProd" class="btn-top" style="background:#dc3545;">DEACTIVATE</button>
                 <div style="display:flex; gap:10px;">
@@ -137,7 +140,6 @@
         let csvHeaders = [];
         let routeDataMap = {}; 
         
-        // ADDED: Product State Tracking
         let currentProdList = [];
         let currentProdHeaders = [];
 
@@ -224,36 +226,37 @@
                 tbody.innerHTML = '';
                 currentProdList = [];
                 
-                lines.slice(1).forEach((line, idx) => {
+                lines.slice(1).forEach((line) => {
                     const vals = line.split(',');
                     let pObj = {};
                     currentProdHeaders.forEach((h, i) => pObj[h] = (vals[i] || "").trim());
                     if (!pObj.Status) pObj.Status = "Active";
-                    
                     currentProdList.push(pObj);
-                    
-                    const isDeactivated = pObj.Status === "Deactivated";
-                    let row = `<tr class="${isDeactivated ? 'deactivated-row' : ''}">
-                        <td><button class="btn-top" style="padding:4px;" onclick="openProdEdit(${idx})">Manage</button></td>`;
-                    currentProdHeaders.forEach(h => row += `<td>${pObj[h] || ''}</td>`);
-                    tbody.innerHTML += row + '</tr>';
                 });
+                renderProdTable();
             }
         };
 
-        // ADDED: Product CRUD Modal Logic
         window.openProdEdit = function(idx) {
             const data = currentProdList[idx];
             const container = document.getElementById('prodFormFields');
             const deactivateBtn = document.getElementById('btnDeactivateProd');
+            const saveBtn = document.getElementById('btnSaveProdRecord');
             container.innerHTML = '';
             
             currentProdHeaders.forEach(h => {
+                const val = data[h] || '';
                 if (h === 'Status') {
-                    container.innerHTML += `<div class="form-group"><label>${h}</label><input type="text" value="${data[h]}" id="pf_${h}" readonly style="background:#eee;"></div>`;
+                    container.innerHTML += `<div class="form-group"><label>${h}</label><input type="text" value="${val}" id="pf_${h}" readonly style="background:#eee;"></div>`;
                 } else {
-                    container.innerHTML += `<div class="form-group"><label>${h}</label><input type="text" value="${data[h] || ''}" id="pf_${h}"></div>`;
+                    container.innerHTML += `<div class="form-group"><label>${h}</label><input type="text" value="${val}" id="pf_${h}"></div>`;
                 }
+            });
+
+            // FIX: Explicitly set values after adding to DOM to ensure population
+            currentProdHeaders.forEach(h => {
+                const el = document.getElementById(`pf_${h}`);
+                if(el) el.value = data[h] || '';
             });
 
             deactivateBtn.innerText = data.Status === "Active" ? "DEACTIVATE" : "RE-ACTIVATE";
@@ -265,10 +268,19 @@
                 renderProdTable();
             };
 
+            saveBtn.onclick = () => {
+                currentProdHeaders.forEach(h => {
+                    if (h !== 'Status') {
+                        data[h] = document.getElementById(`pf_${h}`).value;
+                    }
+                });
+                document.getElementById('prodEditModal').style.display = 'none';
+                renderProdTable();
+            };
+
             document.getElementById('prodEditModal').style.display = 'flex';
         };
 
-        // ADDED: Re-render product table after state change
         function renderProdTable() {
             const tbody = document.getElementById('prodTableBody');
             tbody.innerHTML = '';
