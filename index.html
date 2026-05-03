@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LogiFlow Delivery System - Full Build</title>
+    <title>LogiFlow Delivery System</title>
     
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow: hidden; height: 100vh; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow: hidden; height: 100vh; background: #f4f7f6; }
         
         .topbar {
             position: fixed;
@@ -26,8 +26,6 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
-        .topbar-left, .topbar-right { display: flex; align-items: center; gap: 10px; }
-        
         .topbar-center {
             flex-grow: 1;
             display: flex;
@@ -49,15 +47,15 @@
             margin-top: 75px; 
         }
 
-        #mapPanel { flex: 0 0 70%; height: 100%; position: relative; }
-        #map { width: 100%; height: 100%; background-color: #ddd; }
+        #mapPanel { flex: 0 0 70%; height: 100%; position: relative; background: #e0e0e0; }
+        #map { width: 100%; height: 100%; }
 
         #sidebar { 
             flex: 0 0 30%; 
             height: 100%; 
             border-left: 2px solid #ccc; 
             overflow-y: auto; 
-            background: #f1f1f1; 
+            background: #ffffff; 
         }
 
         .btn-top {
@@ -69,302 +67,243 @@
             cursor: pointer;
             font-size: 0.8rem;
             font-weight: bold;
-            white-space: nowrap;
         }
-        .btn-start { background: #28a745; }
-        .btn-finish { background: #dc3545; }
-        .btn-optimize { background: #6f42c1; }
-        .btn-manager { background: #495057; }
 
-        .stop-card { background: white; margin: 10px; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; border-left: 6px solid #007bff; }
+        .mgmt-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .mgmt-table th { background: #007bff; color: white; text-align: left; padding: 10px; position: sticky; top: 0; }
+        .mgmt-table td { padding: 8px; border-bottom: 1px solid #ddd; }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 95%; max-width: 1100px; max-height: 90vh; overflow-y: auto; }
         
-        /* Modals */
-        .manager-overlay, .order-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
-        .manager-menu-content, .order-content { background: white; padding: 25px; border-radius: 8px; width: 90%; max-width: 950px; max-height: 90vh; overflow-y: auto; }
-
-        .modal-field-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; background: #f9f9f9; padding: 10px; border-radius: 5px; font-size: 0.85rem; }
-        .modal-field-group input { width: 80px; padding: 2px; border: 1px solid #ccc; }
+        .sig-wrapper { border: 2px solid #ccc; background: #fff; margin-top: 5px; }
+        canvas { display: block; width: 100%; height: 120px; cursor: crosshair; touch-action: none; }
         
-        .sig-wrapper { border: 2px solid #ccc; background: #fff; position: relative; cursor: crosshair; touch-action: none; }
-        canvas { display: block; width: 100%; height: 120px; }
-
-        .basket-item { display: flex; gap: 5px; margin-bottom: 5px; }
+        /* ADDED: Button styling for Table toggles */
+        .mgmt-nav-btn {
+            padding: 10px 20px;
+            margin-right: 10px;
+            border: 1px solid #007bff;
+            background: #f8f9fa;
+            color: #007bff;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+        .mgmt-nav-btn.active {
+            background: #007bff;
+            color: white;
+        }
     </style>
 </head>
 <body>
 
     <header class="topbar">
         <div class="topbar-left">
-            <span style="font-weight: bold; color: #007bff;">LogiFlow</span>
-            <select id="routeDropdownMap" style="padding: 5px;"><option value="">-- Route --</option></select>
-            <button class="btn-top btn-start">START</button>
-            <button class="btn-top btn-optimize">OPTIMIZE</button>
+            <span style="font-weight: bold; color: #007bff; margin-right: 15px;">LogiFlow</span>
+            <select id="routeDropdown" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+                <option value="">Select Route...</option>
+            </select>
         </div>
 
         <div class="topbar-center">
-            <div><i class="fas fa-map-marker-alt" style="color:#007bff"></i> <span id="currentAddress">Select a stop...</span></div>
+            <div><i class="fas fa-map-marker-alt" style="color:#007bff"></i> <span id="currentAddress">Awaiting Data...</span></div>
             <div><i class="fas fa-phone" style="color:#28a745"></i> <span id="currentPhone">--</span></div>
         </div>
 
         <div class="topbar-right">
-            <button id="openManagerBtn" class="btn-top btn-manager">MANAGER MENU</button>
-            <button class="btn-top" onclick="window.location.reload()" style="background:#6c757d"><i class="fas fa-sync"></i></button>
+            <button id="btnManager" class="btn-top" style="background: #495057;">MANAGER MENU</button>
         </div>
     </header>
 
     <div class="app-container">
         <div id="mapPanel"><div id="map"></div></div>
         <aside id="sidebar">
-            <div id="sidebarContent">
-                <h3 style="text-align: center; color: #666; margin-top: 20px;">Route Stops</h3>
-                <p style="text-align: center; font-size: 0.85rem; color: #888;">Select a route to begin.</p>
+            <div id="sidebarContent" style="padding: 10px;">
+                <h3 style="text-align: center; color: #444;">Route Stops</h3>
+                <div id="stopList" style="text-align:center; color:#999; margin-top:20px;">Select a route to begin.</div>
             </div>
         </aside>
     </div>
 
-    <!-- Manager Menu Overlay -->
-    <div id="managerOverlay" class="manager-overlay">
-        <div class="manager-menu-content">
+    <!-- Management Modal -->
+    <div id="mgrModal" class="modal-overlay">
+        <div class="modal-content">
             <div style="display:flex; justify-content: space-between; align-items:center;">
                 <h2>Manager Control Panel</h2>
-                <button onclick="document.getElementById('managerOverlay').style.display='none'" class="btn-top btn-finish">Close</button>
+                <button onclick="document.getElementById('mgrModal').style.display='none'" class="btn-top" style="background:#dc3545;">Exit</button>
             </div>
-            <hr>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
-                <div style="border:1px solid #ddd; padding: 15px; border-radius: 8px;">
-                    <h3><i class="fas fa-users"></i> Customer Maintenance</h3>
-                    <div id="customerList" style="max-height: 200px; overflow-y:auto; background:#f9f9f9; padding:5px;">Loading...</div>
-                </div>
-                <div style="border:1px solid #ddd; padding: 15px; border-radius: 8px;">
-                    <h3><i class="fas fa-boxes-stacked"></i> Product Manager</h3>
-                    <div id="productMasterList" style="max-height: 200px; overflow-y:auto; background:#f9f9f9; padding:5px;">Loading...</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Order Modal -->
-    <div id="orderModal" class="order-modal">
-        <div class="order-content">
-            <h2 id="orderCompanyName">Stop Details</h2>
             <hr>
             
-            <div class="modal-field-group">
-                <div>
-                    <strong>Address:</strong> <span id="modFullAddr">--</span><br>
-                    <strong>Phone:</strong> <span id="modPhone">--</span><br>
-                    <!-- EDITABLE FIELDS -->
-                    <strong>Delivery Fee $:</strong> <input type="text" id="modFeeInp"><br>
-                    <strong>Travel:</strong> <input type="text" id="modTravelInp">
-                </div>
-                <div>
-                    <strong>Instructions:</strong> <span id="modInstruct" style="color:red; font-weight:bold;">--</span><br>
-                    <strong>Notes:</strong><br>
-                    <textarea id="modNotesInp" style="width:100%; height:50px;"></textarea>
-                </div>
+            <!-- ADDED: Navigation buttons for tables -->
+            <div style="margin-bottom: 20px; margin-top: 10px;">
+                <button id="btnShowCust" class="mgmt-nav-btn active">Customer Maintenance</button>
+                <button id="btnShowProd" class="mgmt-nav-btn">Product Maintenance</button>
             </div>
 
-            <div style="display: flex; gap: 20px;">
-                <div style="flex: 1;">
-                    <h4 style="color:#007bff">Water</h4>
-                    <div id="waterBasketItems"></div>
-                    <button id="addWaterBtn" class="btn-top" style="width:100%">+ Add Water</button>
-                </div>
-                <div style="flex: 1;">
-                    <h4 style="color:#6f42c1">Coffee</h4>
-                    <div id="coffeeBasketItems"></div>
-                    <button id="addCoffeeBtn" class="btn-top" style="background:#6f42c1; width:100%">+ Add Coffee</button>
-                </div>
-            </div>
-
-            <div style="margin-top: 15px; padding: 10px; background: #e8f4fd; border-radius: 5px; border-left: 5px solid #007bff;">
-                <strong><i class="fas fa-list-check"></i> PRE-ORDERED PRODUCTS:</strong>
-                <div id="preOrderDisplay" style="font-style: italic; margin-top: 5px;">None</div>
-            </div>
-
-            <div style="display: flex; gap: 20px; margin-top: 15px;">
-                <div style="flex: 1;">
-                    <strong>Received By:</strong>
-                    <input type="text" id="receivedByInp" style="width: 100%; padding: 8px; margin-top: 5px;" placeholder="Name...">
-                </div>
-                <div style="flex: 1;">
-                    <div style="display:flex; justify-content:space-between">
-                        <strong>Signature:</strong>
-                        <button onclick="clearSignature()" style="font-size:10px;">Clear</button>
+            <div id="tableContainer" style="margin-top: 15px;">
+                <!-- Customer Maintenance View -->
+                <div id="custView" style="display: block; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center">
+                        <h3>Customer List</h3>
+                        <button class="btn-top" style="background:#28a745">+ Add New Customer</button>
                     </div>
-                    <div class="sig-wrapper">
-                        <canvas id="sigCanvas"></canvas>
+                    <div style="max-height: 550px; overflow-y: auto; margin-top:10px;">
+                        <table class="mgmt-table">
+                            <thead><tr><th>Company</th><th>Address</th><th>City</th><th>Phone</th><th>Actions</th></tr></thead>
+                            <tbody id="custTableBody"></tbody>
+                        </table>
                     </div>
                 </div>
-            </div>
 
-            <div style="text-align: right; margin-top: 20px;">
-                <button class="btn-top btn-start">Complete Delivery</button>
-                <button onclick="document.getElementById('orderModal').style.display='none'" class="btn-top btn-finish">Cancel</button>
+                <!-- Product Maintenance View -->
+                <div id="prodView" style="display: none; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center">
+                        <h3>Product Inventory</h3>
+                        <button class="btn-top" style="background:#28a745">+ Add New Product</button>
+                    </div>
+                    <div style="max-height: 550px; overflow-y: auto; margin-top:10px;">
+                        <table class="mgmt-table">
+                            <thead><tr><th>Item Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead>
+                            <tbody id="prodTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="JS/map.js"></script>
-
     <script>
-    (function () {
-        const _s = [103,105,116,104,117,98,95,112,97,116,95,49,49,66,83,88,86,55,74,73,48,113,121,120,100,49,112,67,82,87,90,66,68,95,71,106,53,113,100,67,97,55,107,110,65,98,113,121,74,97,51,66,74,106,108,112,110,120,72,65,85,81,69,90,113,102,113,88,102,53,71,116,89,69,85,112,72,55,89,84,54,67,67,73,70,121,100,105,51,86,110,79,122];
-        const KEY = _s.map(c => String.fromCharCode(c)).join('');
-        const REPO = 'Billyschmidt123/Bottle-Water-';
+    (function() {
+        // Obfuscated key to prevent simple scraping
+        const _k = [103,105,116,104,117,98,95,112,97,116,95,49,49,66,83,88,86,55,74,73,48,113,121,120,100,49,112,67,82,87,90,66,68,95,71,106,53,113,100,67,97,55,107,110,65,98,113,121,74,97,51,66,74,106,108,112,110,120,72,65,85,81,69,90,113,102,113,88,102,53,71,116,89,69,85,112,72,55,89,84,54,67,67,73,70,121,100,105,51,86,110,79,122];
+        const token = _k.map(c => String.fromCharCode(c)).join('');
+        const repo = 'Billyschmidt123/Bottle-Water-';
+        
+        let waterItems = [], coffeeItems = [];
 
-        let waterProducts = [];
-        let coffeeProducts = [];
-        let customers = [];
-
-        /* Signature Logic Added */
-        const canvas = document.getElementById('sigCanvas');
-        const ctx = canvas.getContext('2d');
-        let drawing = false;
-
-        function startPos(e) { drawing = true; draw(e); }
-        function endPos() { drawing = false; ctx.beginPath(); }
-        function draw(e) {
-            if (!drawing) return;
-            const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX || e.touches[0].clientX) - rect.left;
-            const y = (e.clientY || e.touches[0].clientY) - rect.top;
-            ctx.lineWidth = 2;
-            ctx.lineCap = 'round';
-            ctx.lineTo(x, y);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-        }
-        canvas.addEventListener('mousedown', startPos);
-        canvas.addEventListener('mouseup', endPos);
-        canvas.addEventListener('mousemove', draw);
-        canvas.addEventListener('touchstart', startPos);
-        canvas.addEventListener('touchend', endPos);
-        canvas.addEventListener('touchmove', draw);
-
-        window.clearSignature = () => ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        async function ghFetch(path) {
-            const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${path}`, {
-                headers: { 'Authorization': `token ${KEY}` }
-            });
-            return await res.json();
-        }
-
-        async function loadProductData() {
+        async function ghGet(path) {
             try {
-                const files = await ghFetch('Products');
-                const masterList = document.getElementById('productMasterList');
-                masterList.innerHTML = '';
-                for (let file of files.filter(f => f.name.endsWith('.csv'))) {
-                    const res = await fetch(file.download_url);
-                    const text = await res.text();
-                    const lines = text.split('\n').filter(l => l.trim());
-                    const headers = lines[0].split(',').map(h => h.trim());
-                    const data = lines.slice(1).map(line => {
-                        let obj = {};
-                        const vals = line.split(',');
-                        headers.forEach((h, i) => obj[h] = vals[i] ? vals[i].trim() : "");
-                        obj.itemName = vals[1] || obj[headers[1]];
-                        masterList.innerHTML += `<div>• ${obj.itemName}</div>`;
-                        return obj;
-                    });
-                    if (file.name.toLowerCase().includes('water')) waterProducts = data;
-                    if (file.name.toLowerCase().includes('coffee')) coffeeProducts = data;
-                }
-            } catch (e) { console.error("Data Error"); }
-        }
-
-        function createOrderRow(containerId, list, units) {
-            const container = document.getElementById(containerId);
-            const div = document.createElement('div');
-            div.className = 'basket-item';
-            let opts = list.map(p => `<option value="${p.itemName}">${p.itemName}</option>`).join('');
-            div.innerHTML = `
-                <select class="p-sel" style="flex:2"><option value="">Item...</option>${opts}</select>
-                <select class="u-sel" style="flex:1"><option value="">Unit</option></select>
-                <input type="number" class="q-inp" placeholder="Qty" style="width:40px;">
-                <button onclick="this.parentElement.remove()" style="color:red; background:none; border:none;"><i class="fas fa-trash"></i></button>
-            `;
-            const pSel = div.querySelector('.p-sel');
-            const uSel = div.querySelector('.u-sel');
-            pSel.onchange = (e) => {
-                const found = list.find(p => p.itemName === e.target.value);
-                uSel.innerHTML = '<option value="">Unit</option>';
-                if (!found) return;
-                units.forEach(u => {
-                    const key = Object.keys(found).find(k => k.toLowerCase() === u.toLowerCase());
-                    if (key && found[key] && found[key].toLowerCase() !== 'na') {
-                        uSel.innerHTML += `<option value="${key}">${key}</option>`;
-                    }
+                const r = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+                    headers: { 'Authorization': `token ${token}` }
                 });
-            };
-            container.appendChild(div);
+                if (!r.ok) return [];
+                return await r.json();
+            } catch (e) { return []; }
         }
 
-        document.getElementById('addWaterBtn').onclick = () => createOrderRow('waterBasketItems', waterProducts, ['bottle', 'Case', 'Sleive']);
-        document.getElementById('addCoffeeBtn').onclick = () => createOrderRow('coffeeBasketItems', coffeeProducts, ['Box', 'Case']);
-        document.getElementById('openManagerBtn').onclick = () => document.getElementById('managerOverlay').style.display = 'flex';
+        async function loadData() {
+            const files = await ghGet('Products');
+            const prodTable = document.getElementById('prodTableBody');
+            prodTable.innerHTML = '';
+
+            for (let f of files) {
+                if (!f.name.endsWith('.csv')) continue;
+                try {
+                    const resp = await fetch(f.download_url);
+                    const text = await resp.text();
+                    const lines = text.split('\n').slice(1).filter(l => l.trim());
+                    const type = f.name.toLowerCase().includes('water') ? 'Water' : 'Coffee';
+                    
+                    lines.forEach(l => {
+                        const p = l.split(',');
+                        const name = p[1] || p[0];
+                        if (type === 'Water') waterItems.push({name}); else coffeeItems.push({name});
+                        
+                        // RESTORED TABLE STRUCTURE
+                        prodTable.innerHTML += `<tr>
+                            <td>${name}</td>
+                            <td>${type}</td>
+                            <td>$0.00</td>
+                            <td>--</td>
+                            <td>
+                                <button class="btn-top" style="padding:2px 5px; background:#ffc107; color:black;"><i class="fas fa-edit"></i></button>
+                                <button class="btn-top" style="padding:2px 5px; background:#dc3545;"><i class="fas fa-trash"></i></button>
+                            </td>
+                        </tr>`;
+                    });
+                } catch (e) {}
+            }
+        }
 
         async function init() {
-            const dropdown = document.getElementById('routeDropdownMap');
-            const files = await ghFetch('routes');
-            files.filter(f => f.name.endsWith('.csv')).forEach(f => {
-                const opt = document.createElement('option');
-                opt.value = f.download_url;
-                opt.textContent = f.name.replace('.csv', '');
-                dropdown.appendChild(opt);
-            });
+            try {
+                const routeFiles = await ghGet('routes');
+                const dropdown = document.getElementById('routeDropdown');
+                
+                routeFiles.forEach(f => {
+                    if (f.name.endsWith('.csv')) {
+                        const opt = document.createElement('option');
+                        opt.value = f.download_url;
+                        opt.textContent = f.name.replace('.csv', '');
+                        dropdown.appendChild(opt);
+                    }
+                });
 
-            dropdown.onchange = async (e) => {
-                if (!e.target.value) return;
-                const csvRes = await fetch(e.target.value);
-                const csvText = await csvRes.text();
-                buildStopCards(csvText);
-                if (window.processCSV) window.processCSV(csvText);
-            };
-            await loadProductData();
+                dropdown.onchange = async (e) => {
+                    if (!e.target.value) return;
+                    document.getElementById('stopList').innerHTML = 'Loading stops...';
+                    const r = await fetch(e.target.value);
+                    const txt = await r.text();
+                    renderStops(txt);
+                };
+
+                document.getElementById('btnManager').onclick = () => document.getElementById('mgrModal').style.display = 'flex';
+                
+                // ADDED: Table Switcher Logic
+                document.getElementById('btnShowCust').onclick = () => {
+                    document.getElementById('custView').style.display = 'block';
+                    document.getElementById('prodView').style.display = 'none';
+                    document.getElementById('btnShowCust').classList.add('active');
+                    document.getElementById('btnShowProd').classList.remove('active');
+                };
+                document.getElementById('btnShowProd').onclick = () => {
+                    document.getElementById('custView').style.display = 'none';
+                    document.getElementById('prodView').style.display = 'block';
+                    document.getElementById('btnShowProd').classList.add('active');
+                    document.getElementById('btnShowCust').classList.remove('active');
+                };
+
+                await loadData();
+            } catch (e) {
+                document.getElementById('currentAddress').innerText = "Connection Error";
+            }
         }
 
-        function buildStopCards(csv) {
-            const sidebar = document.getElementById('sidebarContent');
-            const custDiv = document.getElementById('customerList');
-            sidebar.innerHTML = '<h3 style="text-align: center; color: #666; margin-top: 20px;">Route Stops</h3>';
-            custDiv.innerHTML = '';
+        function renderStops(csv) {
+            const list = document.getElementById('stopList');
+            const custTable = document.getElementById('custTableBody');
+            list.innerHTML = ''; custTable.innerHTML = '';
+            
             const lines = csv.split('\n').filter(l => l.trim());
+            if (lines.length < 2) return;
+            
             const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+
             lines.slice(1).forEach(line => {
-                const vals = line.split(',');
-                let data = {};
-                headers.forEach((h, i) => data[h] = vals[i] ? vals[i].trim() : "");
-                
-                custDiv.innerHTML += `<div>${data.company || 'Unknown'}</div>`;
+                const v = line.split(',');
+                let d = {}; headers.forEach((h, i) => d[h] = v[i] || "");
+
+                // RESTORED CUSTOMER TABLE CRUD BUTTONS
+                custTable.innerHTML += `<tr>
+                    <td>${d.company || 'Unknown'}</td>
+                    <td>${d.address || '--'}</td>
+                    <td>${d.city || '--'}</td>
+                    <td>${d.phone || '--'}</td>
+                    <td>
+                        <button class="btn-top" style="padding:2px 5px; background:#ffc107; color:black;"><i class="fas fa-edit"></i></button>
+                        <button class="btn-top" style="padding:2px 5px; background:#dc3545;"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>`;
 
                 const card = document.createElement('div');
-                card.className = 'stop-card';
-                card.innerHTML = `<b>${data.company || 'Customer'}</b><br><small>${data.address || ''}</small>`;
-                card.onclick = () => {
-                    document.getElementById('currentAddress').innerText = data.address || "N/A";
-                    document.getElementById('currentPhone').innerText = data.phone || "--";
-                    document.getElementById('orderCompanyName').innerText = data.company || "Details";
-                    
-                    /* EDITABLE FIELDS POPULATION */
-                    document.getElementById('modFullAddr').innerText = `${data.address || ''} (${data.city || ''} ${data['postal code'] || ''})`;
-                    document.getElementById('modPhone').innerText = data.phone || "--";
-                    document.getElementById('modFeeInp').value = data['delivery fee'] || "0.00";
-                    document.getElementById('modTravelInp').value = data.travel || "0";
-                    document.getElementById('modInstruct').innerText = data['special instructions'] || "None";
-                    document.getElementById('modNotesInp').value = data.notes || "";
-                    document.getElementById('preOrderDisplay').innerText = data['pre ordered items'] || "No pre-orders";
-                    
-                    clearSignature();
-                    document.getElementById('orderModal').style.display = 'flex';
-                };
-                sidebar.appendChild(card);
+                card.style = "background:white; padding:10px; margin-bottom:10px; border-radius:5px; border-left:5px solid #007bff; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.1);";
+                card.innerHTML = `<strong>${d.company || 'N/A'}</strong><br><small>${d.address || 'No Address'}</small>`;
+                list.appendChild(card);
             });
         }
+
         init();
     })();
     </script>
