@@ -22,9 +22,7 @@
         .mgmt-table td { padding: 8px; border-bottom: 1px solid #ddd; }
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 25px; border-radius: 8px; width: 98%; max-width: 1600px; max-height: 90vh; overflow-y: auto; overflow-x: auto; }
-        .mgmt-nav-btn { padding: 10px 20px; margin-right: 10px; border: 1px solid #007bff; background: #f8f9fa; color: #007bff; cursor: pointer; font-weight: bold; border-radius: 4px; }
-        .mgmt-nav-btn.active { background: #007bff; color: white; }
-        .edit-input { width: 90%; padding: 4px; border: 1px solid #007bff; border-radius: 3px; font-size: 0.85rem; }
+        .edit-input { width: 90%; padding: 4px; border: 1px solid #007bff; border-radius: 3px; font-size: 0.85rem; background: #fff; color: #000; }
         .deactivated-row { background-color: #fceaea; color: #a94442; }
     </style>
 </head>
@@ -53,7 +51,6 @@
             </div>
             <hr>
             <div style="margin-bottom: 20px;">
-                <button id="btnShowCust" class="mgmt-nav-btn">Customer Maintenance</button>
                 <button id="btnShowProd" class="mgmt-nav-btn active">Product Maintenance</button>
             </div>
 
@@ -64,7 +61,7 @@
                 </div>
                 <div style="overflow-x: auto;">
                     <table class="mgmt-table">
-                        <thead id="prodTableHead"></thead>
+                        <thead><tr id="prodTableHead"></tr></thead>
                         <tbody id="prodTableBody"></tbody>
                     </table>
                 </div>
@@ -82,32 +79,35 @@
 
         window.loadProductFile = async function(fileName) {
             const tbody = document.getElementById('prodTableBody');
-            const thead = document.getElementById('prodTableHead');
-            tbody.innerHTML = '<tr><td colspan="10">Loading products...</td></tr>';
+            const theadRow = document.getElementById('prodTableHead');
+            tbody.innerHTML = '<tr><td colspan="10">Gathering items...</td></tr>';
             
-            const resp = await fetch(`https://raw.githubusercontent.com/${repo}/main/Products/${fileName}?t=${Date.now()}`);
-            const text = await resp.text();
-            const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-            
-            if(lines.length > 0) {
-                currentProdHeaders = lines[0].split(',').map(h => h.trim()).filter(h => h);
-                if (!currentProdHeaders.includes('Status')) currentProdHeaders.push('Status');
+            try {
+                const resp = await fetch(`https://raw.githubusercontent.com/${repo}/main/Products/${fileName}?t=${Date.now()}`);
+                const text = await resp.text();
+                const lines = text.split('\n').map(l => l.trim()).filter(l => l);
                 
-                thead.innerHTML = `<tr><th>Action</th>${currentProdHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
-                tbody.innerHTML = '';
-                currentProdList = [];
-                
-                lines.slice(1).forEach((line) => {
-                    const vals = line.split(',');
-                    let pObj = {};
-                    currentProdHeaders.forEach((h, i) => {
-                        if (h !== 'Status') pObj[h] = (vals[i] || "").trim();
+                if(lines.length > 0) {
+                    currentProdHeaders = lines[0].split(',').map(h => h.trim()).filter(h => h !== "");
+                    if (!currentProdHeaders.includes('Status')) currentProdHeaders.push('Status');
+                    
+                    theadRow.innerHTML = `<th>Action</th>${currentProdHeaders.map(h => `<th>${h}</th>`).join('')}`;
+                    
+                    currentProdList = lines.slice(1).map(line => {
+                        const vals = line.split(',');
+                        let pObj = {};
+                        currentProdHeaders.forEach((h, i) => {
+                            if (h !== 'Status') pObj[h] = (vals[i] || "").trim();
+                        });
+                        pObj.Status = pObj.Status || "Active";
+                        return pObj;
                     });
-                    pObj.Status = pObj.Status || "Active";
-                    currentProdList.push(pObj);
-                });
-                editingIndex = -1;
-                renderProdTable();
+                    
+                    editingIndex = -1;
+                    renderProdTable();
+                }
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="10">Could not reach the file.</td></tr>';
             }
         };
 
@@ -134,38 +134,47 @@
         };
 
         window.toggleStatus = function(idx) {
-            const data = currentProdList[idx];
-            data.Status = data.Status === "Active" ? "Deactivated" : "Active";
+            currentProdList[idx].Status = currentProdList[idx].Status === "Active" ? "Deactivated" : "Active";
             renderProdTable();
         };
 
         function renderProdTable() {
             const tbody = document.getElementById('prodTableBody');
             tbody.innerHTML = '';
+            
             currentProdList.forEach((pObj, idx) => {
                 const isDeactivated = pObj.Status === "Deactivated";
-                const isEditing = editingIndex === idx;
+                const isEditing = (editingIndex === idx);
+                const tr = document.createElement('tr');
+                if (isDeactivated) tr.className = 'deactivated-row';
                 
-                let row = `<tr class="${isDeactivated ? 'deactivated-row' : ''}">`;
-                
+                let actionHtml = '';
                 if (isEditing) {
-                    row += `<td>
+                    actionHtml = `
                         <button class="btn-top" style="padding:4px; background:#28a745;" onclick="updateRow(${idx})">Update</button>
                         <button class="btn-top" style="padding:4px; background:#6c757d;" onclick="cancelEdit()">Cancel</button>
-                    </td>`;
-                    currentProdHeaders.forEach(h => {
-                        if (h === 'Status') {
-                            row += `<td><button class="btn-top" style="padding:2px; font-size:0.7rem; background:#17a2b8;" onclick="toggleStatus(${idx})">${pObj[h]}</button></td>`;
-                        } else {
-                            row += `<td><input type="text" class="edit-input" id="edit_${h}_${idx}" value="${pObj[h]}"></td>`;
-                        }
-                    });
+                    `;
                 } else {
-                    row += `<td><button class="btn-top" style="padding:4px;" onclick="enterEditMode(${idx})">Edit</button></td>`;
-                    currentProdHeaders.forEach(h => row += `<td>${pObj[h] || ''}</td>`);
+                    actionHtml = `<button class="btn-top" style="padding:4px;" onclick="enterEditMode(${idx})">Edit</button>`;
                 }
                 
-                tbody.innerHTML += row + '</tr>';
+                let rowContent = `<td>${actionHtml}</td>`;
+                
+                currentProdHeaders.forEach(h => {
+                    const val = pObj[h] || '';
+                    if (isEditing) {
+                        if (h === 'Status') {
+                            rowContent += `<td><button class="btn-top" style="padding:2px; font-size:0.7rem; background:#17a2b8;" onclick="toggleStatus(${idx})">${val}</button></td>`;
+                        } else {
+                            rowContent += `<td><input type="text" class="edit-input" id="edit_${h}_${idx}" value="${val.replace(/"/g, '&quot;')}"></td>`;
+                        }
+                    } else {
+                        rowContent += `<td>${val}</td>`;
+                    }
+                });
+                
+                tr.innerHTML = rowContent;
+                tbody.appendChild(tr);
             });
         }
 
